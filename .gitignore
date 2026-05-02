@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+.expo/
+.expo-shared/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Builds
+*.apk
+*.ipa
+*.app/
+dist/
+build/
+
+# Logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+
+# Testing
+.nyc_output/
+coverage/
+
+# Misc
+.watchman-cookie
