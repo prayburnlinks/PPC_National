@@ -11,12 +11,13 @@ import {
   TouchableOpacity,
   Text,
   ActivityIndicator,
-  FlatList,
 } from 'react-native';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { getUpcomingEvents } from '../services/firestoreService';
+import { useUser } from '../context/UserContext';
 
-const HomeScreen = ({ user, navigation }) => {
+const HomeScreen = ({ navigation }) => {
+  const { user } = useUser();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
 

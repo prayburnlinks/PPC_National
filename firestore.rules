@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return u.role == 'admin' && u.status == 'approved';
+    }
+
+    function isChangingProtectedField() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(['role', 'status', 'approvedAt']);
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+
+      // Self-registration: enforce correct status for chosen role
+      allow create: if isAuthenticated() && isOwner(userId) && (
+        (request.resource.data.role == 'member'  && request.resource.data.status == 'approved') ||
+        (request.resource.data.role in ['leader', 'admin'] && request.resource.data.status == 'pending')
+      );
+
+      // Users can update their own profile but cannot touch protected fields
+      allow update: if isAuthenticated() && isOwner(userId) && !isChangingProtectedField();
+
+      // Admins can update anything (approval, role changes)
+      allow update: if isAdmin();
+
+      allow delete: if false;
+
+      match /registeredEvents/{eventId} {
+        allow read, write: if isAuthenticated() && isOwner(userId);
+      }
+
+      match /givingHistory/{transactionId} {
+        allow read:   if isAuthenticated() && isOwner(userId);
+        allow create: if isAuthenticated() && isOwner(userId);
+      }
+
+      match /notifications/{notificationId} {
+        allow read: if isAuthenticated() && isOwner(userId);
+        // Only allow marking as read — no other field changes
+        allow update: if isAuthenticated() && isOwner(userId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      }
+    }
+
+    match /events/{eventId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /districts/{districtId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Admin notification feed (created by app on registration)
+    match /notifications/{notificationId} {
+      allow read:   if isAdmin();
+      allow create: if isAuthenticated();
+    }
+
+    // Global giving analytics
+    match /givingTransactions/{transactionId} {
+      allow read:   if isAdmin();
+      allow create: if isAuthenticated();
+    }
+  }
+}

@@ -17,6 +17,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  increment,
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase-config';
@@ -167,13 +168,10 @@ export const registerForEvent = async (userId, eventId) => {
       feePaid: false,
     });
 
-    // Update event attendee count
+    // Atomically increment attendee count
     const eventRef = doc(db, 'events', eventId);
-    const eventDoc = await getDoc(eventRef);
-    const currentCount = eventDoc.data().attendeeCount || 0;
-
     await updateDoc(eventRef, {
-      attendeeCount: currentCount + 1,
+      attendeeCount: increment(1),
     });
 
     return { success: true, message: 'Registered for event' };
@@ -192,14 +190,8 @@ export const getUserRegisteredEvents = async (userId) => {
     const snapshot = await getDocs(registeredRef);
 
     const eventIds = snapshot.docs.map(doc => doc.id);
-    const events = [];
-
-    for (const eventId of eventIds) {
-      const event = await getEventById(eventId);
-      if (event) {
-        events.push(event);
-      }
-    }
+    const results = await Promise.all(eventIds.map(getEventById));
+    const events = results.filter(Boolean);
 
     return events.sort((a, b) => a.eventDate - b.eventDate);
   } catch (error) {

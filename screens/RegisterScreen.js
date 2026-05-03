@@ -18,10 +18,12 @@ import {
   FlatList,
 } from 'react-native';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
-import { registerUser } from '../services/authService';
+import { registerUser, logoutUser, getCurrentUser } from '../services/authService';
 import { ROLES, CONGREGATIONS } from '../constants/config';
+import { useUser } from '../context/UserContext';
 
-const RegisterScreen = ({ navigation, onRegisterSuccess }) => {
+const RegisterScreen = ({ navigation }) => {
+  const { onLogin } = useUser();
   const [step, setStep] = useState(1); // Step 1: Basic, Step 2: Role, Step 3: Congregation
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -76,18 +78,17 @@ const RegisterScreen = ({ navigation, onRegisterSuccess }) => {
 
       setLoading(false);
 
-      Alert.alert('Success', result.message, [
-        {
-          text: 'OK',
-          onPress: () => {
-            if (result.status === 'approved') {
-              navigation.navigate('Login');
-            } else {
-              navigation.navigate('Login');
-            }
-          },
-        },
-      ]);
+      if (result.status === 'approved') {
+        const userProfile = await getCurrentUser();
+        Alert.alert('Welcome!', result.message, [
+          { text: 'OK', onPress: () => onLogin(userProfile) }
+        ]);
+      } else {
+        await logoutUser();
+        Alert.alert('Registration Submitted', result.message, [
+          { text: 'OK', onPress: () => navigation.navigate('Login') }
+        ]);
+      }
     } catch (error) {
       setLoading(false);
       Alert.alert('Registration Failed', error.message || 'An error occurred');

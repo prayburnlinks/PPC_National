@@ -14,8 +14,10 @@ import {
 } from 'react-native';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { logoutUser } from '../services/authService';
+import { useUser } from '../context/UserContext';
 
-const ProfileScreen = ({ user, navigation, onLogout }) => {
+const ProfileScreen = ({ navigation }) => {
+  const { user, onLogout } = useUser();
   const handleLogout = async () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', onPress: () => {} },

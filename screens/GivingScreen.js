@@ -17,8 +17,10 @@ import {
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { logGivingTransaction } from '../services/firestoreService';
 import { GIVING_FUNDS, BANK_DETAILS } from '../constants/config';
+import { useUser } from '../context/UserContext';
 
-const GivingScreen = ({ user, navigation }) => {
+const GivingScreen = ({ navigation }) => {
+  const { user } = useUser();
   const [selectedFund, setSelectedFund] = useState(GIVING_FUNDS[0].id);
   const [selectedAmount, setSelectedAmount] = useState('250');
   const [customAmount, setCustomAmount] = useState('');

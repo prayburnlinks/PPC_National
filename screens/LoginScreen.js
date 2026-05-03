@@ -17,8 +17,10 @@ import {
 } from 'react-native';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { loginUser } from '../services/authService';
+import { useUser } from '../context/UserContext';
 
-const LoginScreen = ({ navigation, onLoginSuccess }) => {
+const LoginScreen = ({ navigation }) => {
+  const { onLogin } = useUser();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -36,7 +38,7 @@ const LoginScreen = ({ navigation, onLoginSuccess }) => {
       setLoading(false);
 
       if (result.success) {
-        onLoginSuccess?.(result.user);
+        onLogin(result.user);
       }
     } catch (error) {
       setLoading(false);

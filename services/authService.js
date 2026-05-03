@@ -9,12 +9,12 @@ import {
   signOut,
   sendPasswordResetEmail,
   updateProfile,
-  getAuth,
 } from 'firebase/auth';
 import {
   collection,
   doc,
   setDoc,
+  addDoc,
   getDoc,
   updateDoc,
   query,
@@ -245,7 +245,7 @@ const notifyAdminOfNewRegistration = async (uid, userData) => {
   try {
     // Create notification record
     const notificationRef = collection(db, 'notifications');
-    await setDoc(doc(notificationRef), {
+    await addDoc(notificationRef, {
       type: 'new_registration',
       userId: uid,
       userData,

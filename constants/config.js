@@ -3,19 +3,10 @@
  * Firebase and application constants
  */
 
-export const firebaseConfig = {
-  apiKey: process.env.FIREBASE_API_KEY || 'AIzaSyDemoKey123456789',
-  authDomain: process.env.FIREBASE_AUTH_DOMAIN || 'ppc-national.firebaseapp.com',
-  projectId: process.env.FIREBASE_PROJECT_ID || 'ppc-national-church',
-  storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'ppc-national-church.appspot.com',
-  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || '123456789',
-  appId: process.env.FIREBASE_APP_ID || '1:123456789:web:abcdef123456',
-};
-
 export const appConfig = {
-  name: process.env.APP_NAME || 'PPC National Church',
-  version: process.env.APP_VERSION || '1.0.0',
-  environment: process.env.APP_ENV || 'development',
+  name: 'PPC National Church',
+  version: '1.0.0',
+  environment: 'development',
 };
 
 // Role Constants
@@ -99,7 +90,6 @@ export const LIMITS = {
 };
 
 export default {
-  firebaseConfig,
   appConfig,
   ROLES,
   USER_STATUS,
