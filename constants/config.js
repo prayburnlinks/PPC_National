@@ -3,8 +3,6 @@
  * Firebase and application constants
  */
 
-import 'dotenv/config';
-
 export const firebaseConfig = {
   apiKey: process.env.FIREBASE_API_KEY || 'AIzaSyDemoKey123456789',
   authDomain: process.env.FIREBASE_AUTH_DOMAIN || 'ppc-national.firebaseapp.com',

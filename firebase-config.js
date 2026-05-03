@@ -6,19 +6,22 @@
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
-  setPersistence, 
-  browserLocalPersistence 
+  initializeAuth,
+  getReactNativePersistence
 } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getMessaging, isSupported } from 'firebase/messaging';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { firebaseConfig } from './constants/config';
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Auth
-const auth = getAuth(app);
+// Initialize Auth with React Native persistence
+const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(AsyncStorage)
+});
 
 // Initialize Firestore
 const db = getFirestore(app);
@@ -35,13 +38,6 @@ isSupported().then(supported => {
 }).catch(err => {
   console.log('Messaging not supported:', err);
 });
-
-// Set persistence for web
-try {
-  setPersistence(auth, browserLocalPersistence);
-} catch (err) {
-  console.log('Persistence setup error (expected on native):', err.code);
-}
 
 export { app, auth, db, storage, messaging };
 export default { app, auth, db, storage, messaging };
