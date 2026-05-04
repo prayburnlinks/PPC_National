@@ -18,9 +18,11 @@ import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { logGivingTransaction } from '../services/firestoreService';
 import { GIVING_FUNDS, BANK_DETAILS } from '../constants/config';
 import { useUser } from '../context/UserContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const GivingScreen = ({ navigation }) => {
   const { user } = useUser();
+  const insets = useSafeAreaInsets();
   const [selectedFund, setSelectedFund] = useState(GIVING_FUNDS[0].id);
   const [selectedAmount, setSelectedAmount] = useState('250');
   const [customAmount, setCustomAmount] = useState('');
@@ -60,7 +62,7 @@ const GivingScreen = ({ navigation }) => {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Hero Header */}
-      <View style={styles.heroHeader}>
+      <View style={[styles.heroHeader, { paddingTop: insets.top + spacing.md }]}>
         <Text style={styles.heroIcon}>🙏</Text>
         <Text style={styles.heroTitle}>Give to God's Work</Text>
         <Text style={styles.heroVerse}>

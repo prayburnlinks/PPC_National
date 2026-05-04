@@ -46,15 +46,13 @@ export const GIVING_FUNDS = [
 
 // Districts
 export const DISTRICTS = [
-  { id: 1, name: 'Gauteng North', location: 'Pretoria', congregations: 10 },
-  { id: 2, name: 'Gauteng South', location: 'Soweto', congregations: 10 },
-  { id: 3, name: 'Western Cape', location: 'Cape Town', congregations: 10 },
-  { id: 4, name: 'KwaZulu-Natal', location: 'Durban', congregations: 10 },
-  { id: 5, name: 'Eastern Cape', location: 'East London', congregations: 10 },
-  { id: 6, name: 'Limpopo', location: 'Polokwane', congregations: 10 },
-  { id: 7, name: 'Mpumalanga', location: 'Nelspruit', congregations: 10 },
-  { id: 8, name: 'Free State', location: 'Bloemfontein', congregations: 10 },
-  { id: 9, name: 'North West', location: 'Mahikeng', congregations: 10 },
+  { id: 1, name: 'Southern Cape', location: 'Cape Town', congregations: 10 },
+  { id: 2, name: 'Northern Cape', location: 'Northern Cape', congregations: 1 },
+  { id: 3, name: 'Free State', location: 'Free State', congregations: 1 },
+  { id: 4, name: 'Gauteng', location: 'Gauteng', congregations: 1 },
+  { id: 5, name: 'Central Cape', location: 'Cape Town', congregations: 3 },
+  { id: 6, name: 'Garden Route', location: 'George', congregations: 3 },
+  { id: 7, name: 'West Coast', location: 'West Coast', congregations: 1 },
 ];
 
 // Bank Details for EFT
@@ -67,18 +65,35 @@ export const BANK_DETAILS = {
   referenceFormat: 'Name + Congregation',
 };
 
-// Sample Congregations
+// Congregations mapped to their district
 export const CONGREGATIONS = [
-  'Cape Town Central',
-  'District 1 HQ',
-  'District 2 HQ',
-  'District 3 HQ',
-  'District 4 HQ',
-  'District 5 HQ',
-  'District 6 HQ',
-  'District 7 HQ',
-  'District 8 HQ',
-  'District 9 HQ',
+  // Southern Cape
+  { name: 'Ebenezer', district: 'Southern Cape' },
+  { name: 'Ravensmead', district: 'Southern Cape' },
+  { name: 'Kraaifontein', district: 'Southern Cape' },
+  { name: 'Factreton', district: 'Southern Cape' },
+  { name: 'Mount Carmel', district: 'Southern Cape' },
+  { name: 'Mount Horeb', district: 'Southern Cape' },
+  { name: 'Ocean View', district: 'Southern Cape' },
+  { name: 'Emmanuel', district: 'Southern Cape' },
+  { name: 'Belhar', district: 'Southern Cape' },
+  { name: 'Atlantis', district: 'Southern Cape' },
+  // Northern Cape
+  { name: 'Congregation 01', district: 'Northern Cape' },
+  // Free State
+  { name: 'Congregation 02', district: 'Free State' },
+  // Gauteng
+  { name: 'Congregation 03', district: 'Gauteng' },
+  // Central Cape
+  { name: 'Mount Olive', district: 'Central Cape' },
+  { name: 'Beacon Valley', district: 'Central Cape' },
+  { name: 'Eden', district: 'Central Cape' },
+  // Garden Route
+  { name: 'Parkdene', district: 'Garden Route' },
+  { name: 'Rosemoore', district: 'Garden Route' },
+  { name: 'Pacaltsdorp', district: 'Garden Route' },
+  // West Coast
+  { name: 'Laaiplek', district: 'West Coast' },
 ];
 
 // API/Firestore Limits

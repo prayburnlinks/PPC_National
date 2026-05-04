@@ -12,12 +12,14 @@ import {
   Text,
 } from 'react-native';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const MediaScreen = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
-      <View style={styles.hero}>
+      <View style={[styles.hero, { paddingTop: insets.top + spacing.md }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>

@@ -15,9 +15,11 @@ import {
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { logoutUser } from '../services/authService';
 import { useUser } from '../context/UserContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const ProfileScreen = ({ navigation }) => {
   const { user, onLogout } = useUser();
+  const insets = useSafeAreaInsets();
   const handleLogout = async () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', onPress: () => {} },
@@ -39,7 +41,7 @@ const ProfileScreen = ({ navigation }) => {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Hero Header */}
-      <View style={styles.heroHeader}>
+      <View style={[styles.heroHeader, { paddingTop: insets.top + spacing.md }]}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>🙏</Text>
         </View>

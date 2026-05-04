@@ -15,9 +15,11 @@ import {
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { getUpcomingEvents } from '../services/firestoreService';
 import { useUser } from '../context/UserContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const HomeScreen = ({ navigation }) => {
   const { user } = useUser();
+  const insets = useSafeAreaInsets();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -43,7 +45,7 @@ const HomeScreen = ({ navigation }) => {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Hero Header */}
-      <View style={styles.heroHeader}>
+      <View style={[styles.heroHeader, { paddingTop: insets.top + spacing.md }]}>
         <View style={styles.headerTop}>
           <View style={styles.logoRow}>
             <Text style={styles.logo}>🔥</Text>
@@ -119,7 +121,7 @@ const HomeScreen = ({ navigation }) => {
           >
             <Text style={styles.quickIcon}>🗺</Text>
             <Text style={styles.quickTitle}>Districts</Text>
-            <Text style={styles.quickSub}>9 districts · 90 congs</Text>
+            <Text style={styles.quickSub}>7 districts · 21 congs</Text>
           </TouchableOpacity>
 
           <TouchableOpacity

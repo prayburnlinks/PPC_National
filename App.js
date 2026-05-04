@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -23,20 +24,21 @@ const Tab = createBottomTabNavigator();
 const TAB_ICONS = { Home: '🏠', Media: '📺', Giving: '💝', Districts: '🗺', Profile: '👤' };
 
 function AppTabs() {
+  const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: colors.purple,
+        tabBarActiveTintColor: colors.blue,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarLabelStyle: { fontSize: 10, fontWeight: '700' },
         tabBarStyle: {
           borderTopWidth: 1,
           borderTopColor: colors.border,
           backgroundColor: colors.white,
-          paddingBottom: 8,
+          paddingBottom: insets.bottom || 8,
           paddingTop: 8,
-          height: 60,
+          height: 60 + (insets.bottom || 0),
         },
         tabBarIcon: () => (
           <Text style={{ fontSize: 18 }}>{TAB_ICONS[route.name] || '📱'}</Text>
@@ -86,6 +88,7 @@ export default function App() {
   }
 
   return (
+    <SafeAreaProvider>
     <UserContext.Provider value={{ user, onLogin: handleLogin, onLogout: handleLogout }}>
       <NavigationContainer>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -99,6 +102,7 @@ export default function App() {
         </Stack.Navigator>
       </NavigationContainer>
     </UserContext.Provider>
+    </SafeAreaProvider>
   );
 }
 

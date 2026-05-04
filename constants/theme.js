@@ -4,38 +4,44 @@
  */
 
 export const colors = {
-  // Primary Colors - Pentecostal Branding
-  darkPurple: '#1A0A2E',      // Deep navy/purple
-  purple: '#4B1D8E',          // Main purple
-  lightPurple: '#7C3FD4',     // Light purple
-  orangeRed: '#E8521A',       // Flame/vibrant orange-red
-  gold: '#D4A017',            // Accent gold
+  // Primary Colors - PPC Branding (Blue, White, Red)
+  darkBlue: '#0A1F44',        // Deep navy blue
+  blue: '#1A3A8F',            // Main blue
+  lightBlue: '#2D5BE3',       // Light blue
+  red: '#CC1E1E',             // Main red
+  darkRed: '#8B0000',         // Deep red
   white: '#FFFFFF',
-  
+
   // Secondary Colors
   darkGreen: '#1A7A4A',
   green: '#2EAD6F',
-  lightGold: '#E8B800',
-  
+  gold: '#D4A017',
+
   // Neutrals
-  background: '#F9F5FF',      // Light background
+  background: '#F4F6FB',      // Light blue-tinted background
   surface: '#FFFFFF',
-  surfaceLight: '#F0E8FF',
-  border: '#EDE6F6',
-  textPrimary: '#1A0A2E',
-  textSecondary: '#6B5F85',
-  textTertiary: '#9D91B3',
-  placeholder: '#C5BDD5',
-  
+  surfaceLight: '#E8EDF8',
+  border: '#D0D9EE',
+  textPrimary: '#0A1F44',
+  textSecondary: '#4A5878',
+  textTertiary: '#8A95B0',
+  placeholder: '#B0BAD0',
+
   // Status Colors
   success: '#2EAD6F',
-  error: '#E8521A',
+  error: '#CC1E1E',
   warning: '#D4A017',
-  info: '#4B1D8E',
-  
+  info: '#1A3A8F',
+
   // Opacity variants
-  overlayDark: 'rgba(26, 10, 46, 0.7)',
+  overlayDark: 'rgba(10, 31, 68, 0.7)',
   overlayLight: 'rgba(255, 255, 255, 0.1)',
+
+  // Aliases so existing code referencing purple/orangeRed still works
+  purple: '#1A3A8F',
+  lightPurple: '#2D5BE3',
+  darkPurple: '#0A1F44',
+  orangeRed: '#CC1E1E',
 };
 
 export const typography = {

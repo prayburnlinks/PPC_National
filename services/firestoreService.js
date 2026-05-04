@@ -34,20 +34,16 @@ import { db } from '../firebase-config';
 export const getUpcomingEvents = async (maxResults = 4) => {
   try {
     const now = new Date();
-    const eventsRef = collection(db, 'events');
-    const q = query(
-      eventsRef,
-      where('eventDate', '>=', Timestamp.fromDate(now)),
-      orderBy('eventDate', 'asc'),
-      limit(maxResults)
-    );
-
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-      ...doc.data(),
-      id: doc.id,
-      eventDate: doc.data().eventDate?.toDate?.() || new Date(doc.data().eventDate),
-    }));
+    const snapshot = await getDocs(collection(db, 'events'));
+    return snapshot.docs
+      .map(doc => ({
+        ...doc.data(),
+        id: doc.id,
+        eventDate: doc.data().eventDate?.toDate?.() || new Date(doc.data().eventDate),
+      }))
+      .filter(e => e.eventDate >= now)
+      .sort((a, b) => a.eventDate - b.eventDate)
+      .slice(0, maxResults);
   } catch (error) {
     console.error('Error fetching upcoming events:', error);
     return [];
@@ -57,42 +53,29 @@ export const getUpcomingEvents = async (maxResults = 4) => {
 /**
  * Get all events (paginated)
  */
-export const getAllEvents = async (pageSize = 20, startDoc = null) => {
+export const getAllEvents = async (pageSize = 20) => {
   try {
     const now = new Date();
-    const eventsRef = collection(db, 'events');
-    let q = query(
-      eventsRef,
-      where('eventDate', '>=', Timestamp.fromDate(now)),
-      orderBy('eventDate', 'asc'),
-      limit(pageSize + 1)
-    );
-
-    if (startDoc) {
-      q = query(
-        eventsRef,
-        where('eventDate', '>=', Timestamp.fromDate(now)),
-        orderBy('eventDate', 'asc'),
-        startAfter(startDoc),
-        limit(pageSize + 1)
-      );
-    }
-
-    const snapshot = await getDocs(q);
-    const docs = snapshot.docs.map(doc => ({
-      ...doc.data(),
-      id: doc.id,
-      eventDate: doc.data().eventDate?.toDate?.() || new Date(doc.data().eventDate),
-    }));
+    const snapshot = await getDocs(collection(db, 'events'));
+    console.log('Total events in Firestore:', snapshot.docs.length);
+    const all = snapshot.docs
+      .map(doc => {
+        const data = doc.data();
+        const rawDate = data.eventDate;
+        const eventDate = rawDate?.toDate?.() || (rawDate ? new Date(rawDate) : new Date());
+        console.log('Event:', data.name, '| Date:', eventDate, '| Valid:', !isNaN(eventDate));
+        return { ...data, id: doc.id, eventDate };
+      })
+      .filter(e => !isNaN(e.eventDate))
+      .sort((a, b) => a.eventDate - b.eventDate);
 
     return {
-      events: docs.slice(0, pageSize),
-      hasMore: docs.length > pageSize,
-      lastDoc: docs.length > pageSize ? snapshot.docs[pageSize] : null,
+      events: all.slice(0, pageSize),
+      hasMore: all.length > pageSize,
     };
   } catch (error) {
     console.error('Error fetching all events:', error);
-    return { events: [], hasMore: false, lastDoc: null };
+    return { events: [], hasMore: false };
   }
 };
 

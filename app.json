@@ -9,7 +9,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#1A0A2E"
+      "backgroundColor": "#0A1F44"
     },
     "updates": {
       "fallbackToCacheTimeout": 0
@@ -25,7 +25,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#1A0A2E"
+        "backgroundColor": "#0A1F44"
       },
       "package": "com.ppcnationalchurch.app",
       "versionCode": 1

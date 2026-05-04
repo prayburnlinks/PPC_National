@@ -13,26 +13,24 @@ import {
 } from 'react-native';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { DISTRICTS } from '../constants/config';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const DistrictsScreen = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
-      <View style={styles.hero}>
+      <View style={[styles.hero, { paddingTop: insets.top + spacing.md }]}>
         <Text style={styles.heroTitle}>PPC Districts</Text>
         <Text style={styles.heroSub}>National Church of South Africa</Text>
         <View style={styles.stats}>
           <View style={styles.stat}>
-            <Text style={styles.statNum}>9</Text>
+            <Text style={styles.statNum}>7</Text>
             <Text style={styles.statLabel}>Districts</Text>
           </View>
           <View style={styles.stat}>
-            <Text style={styles.statNum}>90</Text>
+            <Text style={styles.statNum}>21</Text>
             <Text style={styles.statLabel}>Congregations</Text>
-          </View>
-          <View style={styles.stat}>
-            <Text style={styles.statNum}>48k</Text>
-            <Text style={styles.statLabel}>Members</Text>
           </View>
         </View>
       </View>

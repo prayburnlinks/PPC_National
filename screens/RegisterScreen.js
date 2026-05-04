@@ -21,9 +21,11 @@ import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { registerUser, logoutUser, getCurrentUser } from '../services/authService';
 import { ROLES, CONGREGATIONS } from '../constants/config';
 import { useUser } from '../context/UserContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const RegisterScreen = ({ navigation }) => {
   const { onLogin } = useUser();
+  const insets = useSafeAreaInsets();
   const [step, setStep] = useState(1); // Step 1: Basic, Step 2: Role, Step 3: Congregation
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -104,22 +106,14 @@ const RegisterScreen = ({ navigation }) => {
   };
 
   const selectCongregation = (cong) => {
-    setCongregation(cong);
-    // Auto-set district based on congregation
-    if (cong.includes('Cape Town')) {
-      setDistrict('Western Cape (3)');
-    } else if (cong.includes('Pretoria')) {
-      setDistrict('Gauteng North (1)');
-    } else if (cong.includes('Soweto')) {
-      setDistrict('Gauteng South (2)');
-    } else if (cong.includes('Durban')) {
-      setDistrict('KwaZulu-Natal (4)');
-    }
+    setCongregation(cong.name);
+    setDistrict(cong.district);
     setShowCongregationModal(false);
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingTop: insets.top }}>
       <View style={styles.content}>
         {/* Header */}
         <View style={styles.header}>
@@ -355,13 +349,14 @@ const RegisterScreen = ({ navigation }) => {
               </View>
               <FlatList
                 data={CONGREGATIONS}
-                keyExtractor={(item, idx) => idx.toString()}
+                keyExtractor={(item) => item.name}
                 renderItem={({ item }) => (
                   <TouchableOpacity
                     style={styles.congregationItem}
                     onPress={() => selectCongregation(item)}
                   >
-                    <Text style={styles.congregationItemText}>{item}</Text>
+                    <Text style={styles.congregationItemText}>{item.name}</Text>
+                    <Text style={styles.congregationItemDistrict}>{item.district}</Text>
                   </TouchableOpacity>
                 )}
               />
@@ -655,6 +650,11 @@ const styles = StyleSheet.create({
   congregationItemText: {
     fontSize: typography.sizes.base,
     color: colors.textPrimary,
+  },
+  congregationItemDistrict: {
+    fontSize: typography.sizes.xs,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
 });
 

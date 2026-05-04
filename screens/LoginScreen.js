@@ -1,8 +1,3 @@
-/**
- * Login Screen
- * User email/password login interface
- */
-
 import React, { useState } from 'react';
 import {
   View,
@@ -14,13 +9,16 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  Image,
 } from 'react-native';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { loginUser } from '../services/authService';
 import { useUser } from '../context/UserContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const LoginScreen = ({ navigation }) => {
   const { onLogin } = useUser();
+  const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -31,12 +29,10 @@ const LoginScreen = ({ navigation }) => {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
-
     setLoading(true);
     try {
       const result = await loginUser(email, password);
       setLoading(false);
-
       if (result.success) {
         onLogin(result.user);
       }
@@ -47,21 +43,38 @@ const LoginScreen = ({ navigation }) => {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <View style={styles.content}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerIcon}>🔥</Text>
-          <Text style={styles.headerTitle}>PPC National Church</Text>
-          <Text style={styles.headerSub}>Pentecostal Protestant Church</Text>
+    <View style={styles.root}>
+      {/* Top blue hero section */}
+      <View style={[styles.hero, { paddingTop: insets.top + spacing.xxxl }]}>
+        <View style={styles.emblemWrapper}>
+          <Image
+            source={require('../assets/emblem.jpg')}
+            style={styles.emblem}
+            resizeMode="contain"
+          />
         </View>
+        <Text style={styles.heroTitle}>PPC National Church</Text>
+        <Text style={styles.heroSub}>Pentecostal Protestant Church</Text>
 
-        {/* Login Form */}
-        <View style={styles.formContainer}>
+        {/* Red accent bar */}
+        <View style={styles.accentBar}>
+          <View style={styles.accentSegment} />
+          <View style={[styles.accentSegment, styles.accentWhite]} />
+          <View style={styles.accentSegment} />
+        </View>
+      </View>
+
+      {/* White card sliding up over the blue */}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.card}>
           <Text style={styles.formTitle}>Welcome Back</Text>
           <Text style={styles.formSub}>Sign in to your account</Text>
 
-          {/* Email Input */}
           <View style={styles.inputWrapper}>
             <Text style={styles.label}>Email Address</Text>
             <TextInput
@@ -76,7 +89,6 @@ const LoginScreen = ({ navigation }) => {
             />
           </View>
 
-          {/* Password Input */}
           <View style={styles.inputWrapper}>
             <Text style={styles.label}>Password</Text>
             <View style={styles.passwordWrapper}>
@@ -100,12 +112,10 @@ const LoginScreen = ({ navigation }) => {
             </View>
           </View>
 
-          {/* Forgot Password Link */}
           <TouchableOpacity style={styles.forgotContainer}>
             <Text style={styles.forgotLink}>Forgot password?</Text>
           </TouchableOpacity>
 
-          {/* Login Button */}
           <TouchableOpacity
             style={[styles.loginButton, loading && styles.buttonDisabled]}
             onPress={handleLogin}
@@ -118,14 +128,12 @@ const LoginScreen = ({ navigation }) => {
             )}
           </TouchableOpacity>
 
-          {/* Divider */}
           <View style={styles.divider}>
             <View style={styles.dividerLine} />
             <Text style={styles.dividerText}>or</Text>
             <View style={styles.dividerLine} />
           </View>
 
-          {/* Sign Up Link */}
           <View style={styles.signupContainer}>
             <Text style={styles.signupText}>Don't have an account? </Text>
             <TouchableOpacity onPress={() => navigation.navigate('Register')}>
@@ -134,49 +142,85 @@ const LoginScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>🙏 "For God so loved the world..." — John 3:16</Text>
+          <Text style={styles.footerText}>
+            "The fire must be kept burning on the altar continuously; it must not go out."
+          </Text>
+          <Text style={styles.footerRef}>— Leviticus 6:13</Text>
         </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.darkBlue,
   },
-  content: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xxl,
-    paddingBottom: spacing.xxxl,
-  },
-  header: {
+  hero: {
+    backgroundColor: colors.darkBlue,
     alignItems: 'center',
-    marginBottom: spacing.xxxl,
+    paddingBottom: spacing.xxxl + 20,
+    paddingHorizontal: spacing.lg,
   },
-  headerIcon: {
-    fontSize: 48,
-    marginBottom: spacing.md,
+  emblemWrapper: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
+    borderWidth: 4,
+    borderColor: colors.red,
+    overflow: 'hidden',
   },
-  headerTitle: {
-    fontSize: typography.sizes.xl,
-    fontWeight: '700',
-    color: colors.purple,
+  emblem: {
+    width: 130,
+    height: 130,
+  },
+  heroTitle: {
+    color: colors.white,
+    fontSize: typography.sizes.xxl,
+    fontWeight: '800',
+    letterSpacing: 0.5,
     marginBottom: spacing.xs,
   },
-  headerSub: {
+  heroSub: {
+    color: 'rgba(255,255,255,0.6)',
     fontSize: typography.sizes.sm,
-    color: colors.textSecondary,
-    letterSpacing: 0.5,
+    letterSpacing: 1,
+    marginBottom: spacing.lg,
   },
-  formContainer: {
+  accentBar: {
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: spacing.sm,
+  },
+  accentSegment: {
+    width: 32,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.red,
+  },
+  accentWhite: {
     backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.xl,
+  },
+  scroll: {
+    flex: 1,
+    marginTop: -24,
+  },
+  scrollContent: {
+    paddingBottom: spacing.xxxl,
+  },
+  card: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xxl,
+    paddingBottom: spacing.lg,
   },
   formTitle: {
     fontSize: typography.sizes.xl,
@@ -235,11 +279,11 @@ const styles = StyleSheet.create({
   },
   forgotLink: {
     fontSize: typography.sizes.sm,
-    color: colors.purple,
+    color: colors.blue,
     fontWeight: '600',
   },
   loginButton: {
-    backgroundColor: colors.purple,
+    backgroundColor: colors.blue,
     borderRadius: borderRadius.md,
     paddingVertical: spacing.md,
     alignItems: 'center',
@@ -280,18 +324,28 @@ const styles = StyleSheet.create({
   },
   signupLink: {
     fontSize: typography.sizes.sm,
-    color: colors.purple,
+    color: colors.blue,
     fontWeight: '700',
   },
   footer: {
+    backgroundColor: colors.white,
     alignItems: 'center',
-    marginTop: spacing.xxxl,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xxxl,
+    paddingTop: spacing.lg,
   },
   footerText: {
     fontSize: typography.sizes.sm,
     color: colors.textSecondary,
     fontStyle: 'italic',
     textAlign: 'center',
+    lineHeight: 20,
+  },
+  footerRef: {
+    fontSize: typography.sizes.sm,
+    color: colors.red,
+    fontWeight: '700',
+    marginTop: spacing.xs,
   },
 });
 
