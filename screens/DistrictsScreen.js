@@ -3,7 +3,7 @@
  * Shows all PPC districts
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   ScrollView,
@@ -13,11 +13,14 @@ import {
   Image,
 } from 'react-native';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
-import { DISTRICTS } from '../constants/config';
+import { DISTRICTS, CONGREGATIONS } from '../constants/config';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const DistrictsScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const [expanded, setExpanded] = useState([]);
+  const toggleDistrict = (name) => setExpanded(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]);
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
@@ -38,22 +41,42 @@ const DistrictsScreen = ({ navigation }) => {
       </View>
 
       <View style={styles.content}>
-        {DISTRICTS.map((district, idx) => (
-          <TouchableOpacity key={district.id} style={styles.districtItem}>
-            <View style={styles.districtLeft}>
-              <View style={styles.districtNum}>
-                <Text style={styles.districtNumText}>{district.id}</Text>
-              </View>
-              <View>
-                <Text style={styles.districtName}>{district.name}</Text>
-                <Text style={styles.districtCong}>
-                  📍 {district.location} · {district.congregations} congregations
-                </Text>
-              </View>
+        {DISTRICTS.map((district, idx) => {
+          const isOpen = expanded.includes(district.name);
+          const congregations = CONGREGATIONS.filter(c => c.district === district.name);
+          return (
+            <View key={district.id}>
+              <TouchableOpacity
+                style={styles.districtItem}
+                onPress={() => toggleDistrict(district.name)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.districtLeft}>
+                  <View style={styles.districtNum}>
+                    <Text style={styles.districtNumText}>{district.id}</Text>
+                  </View>
+                  <View>
+                    <Text style={styles.districtName}>{district.name}</Text>
+                    <Text style={styles.districtCong}>
+                      📍 {district.location} · {district.congregations} congregations
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.districtArrow}>{isOpen ? '˅' : '›'}</Text>
+              </TouchableOpacity>
+
+              {isOpen && (
+                <View style={styles.congregationList}>
+                  {congregations.map((c) => (
+                    <View key={c.name} style={styles.congregationItem}>
+                      <Text style={styles.congregationText}>• {c.name}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
-            <Text style={styles.districtArrow}>›</Text>
-          </TouchableOpacity>
-        ))}
+          );
+        })}
         <View style={styles.spacer} />
       </View>
     </ScrollView>
@@ -157,6 +180,20 @@ const styles = StyleSheet.create({
   },
   spacer: {
     height: spacing.lg,
+  },
+  congregationList: {
+    paddingHorizontal: spacing.lg + 8,
+    paddingBottom: spacing.md,
+    backgroundColor: 'transparent',
+  },
+  congregationItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: spacing.sm,
+  },
+  congregationText: {
+    fontSize: typography.sizes.sm,
+    color: colors.textSecondary,
   },
 });
 

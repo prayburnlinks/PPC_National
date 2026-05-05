@@ -16,6 +16,7 @@ import GivingScreen from './screens/GivingScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import MediaScreen from './screens/MediaScreen';
 import DistrictsScreen from './screens/DistrictsScreen';
+
 import EventsScreen from './screens/EventsScreen';
 
 const Stack = createNativeStackNavigator();
@@ -99,6 +100,7 @@ export default function App() {
             )}
             {!user && <Stack.Screen name="Register" component={RegisterScreen} />}
             {user && <Stack.Screen name="Events" component={EventsScreen} />}
+
           </Stack.Navigator>
         </NavigationContainer>
       </UserContext.Provider>
