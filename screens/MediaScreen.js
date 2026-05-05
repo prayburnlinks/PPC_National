@@ -53,7 +53,7 @@ const MediaScreen = ({ navigation }) => {
             { emoji: '📖', title: 'The Word Is a Lamp', meta: 'Ps. Hannah Mokoena · 1 Apr · 52:30 · 4.1k' },
           ].map((sermon, idx) => (
             <TouchableOpacity key={idx} style={styles.sermonCard}>
-              <View style={[styles.sermonThumb, { backgroundColor: colors.purple }]}>
+              <View style={[styles.sermonThumb, { backgroundColor: colors.blue }]}>
                 <Text style={styles.sermonEmoji}>{sermon.emoji}</Text>
               </View>
               <View style={styles.sermonInfo}>
@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   hero: {
-    backgroundColor: colors.darkPurple,
+    backgroundColor: colors.darkBlue,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   liveCard: {
-    backgroundColor: colors.darkPurple,
+    backgroundColor: colors.darkBlue,
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
     position: 'relative',
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.orangeRed,
+    backgroundColor: colors.red,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.full,

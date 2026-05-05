@@ -103,7 +103,6 @@ export const loginUser = async (email, password) => {
 
     // Fetch user data to check status
     const userDoc = await getDoc(doc(db, 'users', user.uid));
-    const userData = userDoc.data();
 
     // Check if Firestore profile exists
     if (!userDoc.exists()) {
@@ -121,6 +120,8 @@ export const loginUser = async (email, password) => {
       const newDoc = await getDoc(doc(db, 'users', user.uid));
       return { success: true, uid: user.uid, user: { ...newDoc.data(), uid: user.uid } };
     }
+
+    const userData = userDoc.data();
 
     // Check if user is approved
     if (userData.status !== USER_STATUS.APPROVED) {
@@ -217,14 +218,6 @@ export const approveUser = async (uid) => {
       updatedAt: new Date(),
     });
 
-    // Fetch user data for notification
-    const userDoc = await getDoc(doc(db, 'users', uid));
-    const userData = userDoc.data();
-
-    // Trigger approval email via Cloud Function
-    // Cloud Function will send approval email to user
-    console.log('User approved, notification will be sent via Cloud Function');
-
     return { success: true, message: 'User approved' };
   } catch (error) {
     console.error('Approve user error:', error);
@@ -242,9 +235,6 @@ export const rejectUser = async (uid, reason = '') => {
       rejectionReason: reason,
       updatedAt: new Date(),
     });
-
-    // Trigger rejection email via Cloud Function
-    console.log('User rejected, notification will be sent via Cloud Function');
 
     return { success: true, message: 'User rejected' };
   } catch (error) {
@@ -268,7 +258,6 @@ const notifyAdminOfNewRegistration = async (uid, userData) => {
       read: false,
       createdAt: new Date(),
     });
-    console.log('Admin notification created for new registration');
   } catch (error) {
     console.error('Notification error:', error);
     // Don't throw - notification failure shouldn't break registration

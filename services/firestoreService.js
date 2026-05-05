@@ -10,18 +10,33 @@ import {
   getDoc,
   getDocs,
   getDocsFromServer,
-  query,
-  where,
-  orderBy,
-  limit,
-  startAfter,
   addDoc,
   updateDoc,
-  deleteDoc,
   increment,
-  Timestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase-config';
+
+const parseDate = (raw) => {
+  if (raw?.toDate) return raw.toDate();
+  if (raw?.seconds) return new Date(raw.seconds * 1000);
+  if (raw) return new Date(raw);
+  return new Date('2099-01-01');
+};
+
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+let eventsCache = null;
+let eventsCachedAt = 0;
+
+const fetchEvents = async () => {
+  const now = Date.now();
+  if (eventsCache && now - eventsCachedAt < CACHE_TTL) return eventsCache;
+  const snapshot = await getDocsFromServer(collection(db, 'events'));
+  eventsCache = snapshot.docs.map(doc => ({
+    ...doc.data(), id: doc.id, eventDate: parseDate(doc.data().eventDate),
+  }));
+  eventsCachedAt = now;
+  return eventsCache;
+};
 
 /**
  * ============================================
@@ -35,23 +50,8 @@ import { db } from '../firebase-config';
 export const getUpcomingEvents = async (maxResults = 4) => {
   try {
     const now = new Date();
-    const snapshot = await getDocsFromServer(collection(db, 'events'));
-    return snapshot.docs
-      .map(doc => {
-        const data = doc.data();
-        const rawDate = data.eventDate;
-        let eventDate;
-        if (rawDate?.toDate) {
-          eventDate = rawDate.toDate();
-        } else if (rawDate?.seconds) {
-          eventDate = new Date(rawDate.seconds * 1000);
-        } else if (rawDate) {
-          eventDate = new Date(rawDate);
-        } else {
-          eventDate = new Date('2099-01-01');
-        }
-        return { ...data, id: doc.id, eventDate };
-      })
+    const docs = await fetchEvents();
+    return docs
       .filter(e => e.eventDate >= now)
       .sort((a, b) => a.eventDate - b.eventDate)
       .slice(0, maxResults);
@@ -66,26 +66,8 @@ export const getUpcomingEvents = async (maxResults = 4) => {
  */
 export const getAllEvents = async (pageSize = 20) => {
   try {
-    const snapshot = await getDocsFromServer(collection(db, 'events'));
-    const all = snapshot.docs
-      .map(doc => {
-        const data = doc.data();
-        const rawDate = data.eventDate;
-        // Handle Firestore Timestamp, JS Date, numeric ms, or string
-        let eventDate;
-        if (rawDate?.toDate) {
-          eventDate = rawDate.toDate();
-        } else if (rawDate?.seconds) {
-          eventDate = new Date(rawDate.seconds * 1000);
-        } else if (rawDate) {
-          eventDate = new Date(rawDate);
-        } else {
-          eventDate = new Date('2099-01-01'); // no date = push to end
-        }
-        return { ...data, id: doc.id, eventDate };
-      })
-      .sort((a, b) => a.eventDate - b.eventDate);
-
+    const docs = await fetchEvents();
+    const all = [...docs].sort((a, b) => a.eventDate - b.eventDate);
     return {
       events: all.slice(0, pageSize),
       hasMore: all.length > pageSize,
@@ -105,11 +87,7 @@ export const getEventById = async (eventId) => {
     if (!eventDoc.exists()) return null;
 
     const data = eventDoc.data();
-    return {
-      ...data,
-      id: eventDoc.id,
-      eventDate: data.eventDate?.toDate?.() || new Date(data.eventDate),
-    };
+    return { ...data, id: eventDoc.id, eventDate: parseDate(data.eventDate) };
   } catch (error) {
     console.error('Error fetching event:', error);
     return null;
@@ -122,20 +100,8 @@ export const getEventById = async (eventId) => {
 export const getEventsByCategory = async (category) => {
   try {
     const now = new Date();
-    const eventsRef = collection(db, 'events');
-    const q = query(
-      eventsRef,
-      where('category', '==', category),
-      where('eventDate', '>=', Timestamp.fromDate(now)),
-      orderBy('eventDate', 'asc')
-    );
-
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-      ...doc.data(),
-      id: doc.id,
-      eventDate: doc.data().eventDate?.toDate?.() || new Date(doc.data().eventDate),
-    }));
+    const { events } = await getAllEvents(100);
+    return events.filter(e => e.category === category && e.eventDate >= now);
   } catch (error) {
     console.error('Error fetching events by category:', error);
     return [];
@@ -261,14 +227,14 @@ export const logGivingTransaction = async (userId, transactionData) => {
 export const getUserGivingHistory = async (userId) => {
   try {
     const givingRef = collection(db, 'users', userId, 'givingHistory');
-    const q = query(givingRef, orderBy('createdAt', 'desc'));
-
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-      ...doc.data(),
-      id: doc.id,
-      createdAt: doc.data().createdAt?.toDate?.() || new Date(doc.data().createdAt),
-    }));
+    const snapshot = await getDocs(givingRef);
+    return snapshot.docs
+      .map(doc => ({
+        ...doc.data(),
+        id: doc.id,
+        createdAt: parseDate(doc.data().createdAt),
+      }))
+      .sort((a, b) => b.createdAt - a.createdAt);
   } catch (error) {
     console.error('Error fetching giving history:', error);
     return [];
@@ -303,11 +269,7 @@ export const getUserProfile = async (userId) => {
     if (!userDoc.exists()) return null;
 
     const data = userDoc.data();
-    return {
-      ...data,
-      uid: userDoc.id,
-      createdAt: data.createdAt?.toDate?.() || new Date(data.createdAt),
-    };
+    return { ...data, uid: userDoc.id, createdAt: parseDate(data.createdAt) };
   } catch (error) {
     console.error('Error fetching user profile:', error);
     return null;
@@ -317,64 +279,19 @@ export const getUserProfile = async (userId) => {
 /**
  * Update user profile
  */
+const PROFILE_ALLOWED_FIELDS = ['name', 'phone', 'congregation', 'district'];
+
 export const updateUserProfile = async (userId, updates) => {
   try {
+    const safe = Object.fromEntries(
+      Object.entries(updates).filter(([k]) => PROFILE_ALLOWED_FIELDS.includes(k))
+    );
     const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, {
-      ...updates,
-      updatedAt: new Date(),
-    });
+    await updateDoc(userRef, { ...safe, updatedAt: new Date() });
     return { success: true };
   } catch (error) {
     console.error('Error updating user profile:', error);
     throw { message: 'Failed to update profile' };
-  }
-};
-
-/**
- * Get user's ministries
- */
-export const getUserMinistries = async (userId) => {
-  try {
-    const userDoc = await getDoc(doc(db, 'users', userId));
-    return userDoc.data()?.ministries || [];
-  } catch (error) {
-    console.error('Error fetching user ministries:', error);
-    return [];
-  }
-};
-
-/**
- * ============================================
- * DISTRICTS
- * ============================================
- */
-
-/**
- * Get all districts
- */
-export const getAllDistricts = async () => {
-  try {
-    const districtRef = collection(db, 'districts');
-    const snapshot = await getDocs(districtRef);
-    return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-  } catch (error) {
-    console.error('Error fetching districts:', error);
-    return [];
-  }
-};
-
-/**
- * Get district by ID
- */
-export const getDistrictById = async (districtId) => {
-  try {
-    const districtDoc = await getDoc(doc(db, 'districts', districtId));
-    if (!districtDoc.exists()) return null;
-    return { ...districtDoc.data(), id: districtDoc.id };
-  } catch (error) {
-    console.error('Error fetching district:', error);
-    return null;
   }
 };
 
@@ -390,18 +307,15 @@ export const getDistrictById = async (districtId) => {
 export const getUserNotifications = async (userId, maxResults = 10) => {
   try {
     const notificationsRef = collection(db, 'users', userId, 'notifications');
-    const q = query(
-      notificationsRef,
-      orderBy('createdAt', 'desc'),
-      limit(maxResults)
-    );
-
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-      ...doc.data(),
-      id: doc.id,
-      createdAt: doc.data().createdAt?.toDate?.() || new Date(doc.data().createdAt),
-    }));
+    const snapshot = await getDocs(notificationsRef);
+    return snapshot.docs
+      .map(doc => ({
+        ...doc.data(),
+        id: doc.id,
+        createdAt: parseDate(doc.data().createdAt),
+      }))
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, maxResults);
   } catch (error) {
     console.error('Error fetching notifications:', error);
     return [];
@@ -442,12 +356,7 @@ export default {
   // User
   getUserProfile,
   updateUserProfile,
-  getUserMinistries,
-  
-  // Districts
-  getAllDistricts,
-  getDistrictById,
-  
+
   // Notifications
   getUserNotifications,
   markNotificationAsRead,

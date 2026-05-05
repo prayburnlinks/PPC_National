@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   heroHeader: {
-    backgroundColor: colors.darkPurple,
+    backgroundColor: colors.darkBlue,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
     paddingBottom: spacing.xxxl,
@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: borderRadius.full,
-    backgroundColor: colors.gold,
+    backgroundColor: colors.blue,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
@@ -172,15 +172,15 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   roleBadge: {
-    backgroundColor: 'rgba(212, 160, 23, 0.18)',
+    backgroundColor: 'rgba(255,255,255,0.15)',
     borderWidth: 1,
-    borderColor: 'rgba(212, 160, 23, 0.35)',
+    borderColor: 'rgba(255,255,255,0.3)',
     borderRadius: borderRadius.full,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
   },
   roleBadgeText: {
-    color: colors.gold,
+    color: colors.white,
     fontSize: typography.sizes.xs,
     fontWeight: '600',
   },
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
   ministryChipText: {
     fontSize: typography.sizes.xs,
     fontWeight: '700',
-    color: colors.purple,
+    color: colors.blue,
   },
   logoutButton: {
     backgroundColor: '#FFF0EE',
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
   logoutButtonText: {
     fontSize: typography.sizes.sm,
     fontWeight: '600',
-    color: colors.orangeRed,
+    color: colors.red,
   },
   spacer: {
     height: spacing.lg,

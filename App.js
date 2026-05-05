@@ -82,26 +82,26 @@ export default function App() {
   if (loading) {
     return (
       <View style={styles.splash}>
-        <ActivityIndicator size="large" color={colors.purple} />
+        <ActivityIndicator size="large" color={colors.blue} />
       </View>
     );
   }
 
   return (
     <SafeAreaProvider>
-    <UserContext.Provider value={{ user, onLogin: handleLogin, onLogout: handleLogout }}>
-      <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-          {user ? (
-            <Stack.Screen name="Tabs" component={AppTabs} />
-          ) : (
-            <Stack.Screen name="Login" component={LoginScreen} />
-          )}
-          <Stack.Screen name="Register" component={RegisterScreen} />
-          <Stack.Screen name="Events" component={EventsScreen} />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </UserContext.Provider>
+      <UserContext.Provider value={{ user, onLogin: handleLogin, onLogout: handleLogout }}>
+        <NavigationContainer>
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            {user ? (
+              <Stack.Screen name="Tabs" component={AppTabs} />
+            ) : (
+              <Stack.Screen name="Login" component={LoginScreen} />
+            )}
+            {!user && <Stack.Screen name="Register" component={RegisterScreen} />}
+            {user && <Stack.Screen name="Events" component={EventsScreen} />}
+          </Stack.Navigator>
+        </NavigationContainer>
+      </UserContext.Provider>
     </SafeAreaProvider>
   );
 }

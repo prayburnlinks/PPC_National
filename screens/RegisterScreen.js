@@ -39,6 +39,7 @@ const RegisterScreen = ({ navigation }) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showCongregationModal, setShowCongregationModal] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const handleNext = () => {
     if (step === 1) {
@@ -63,6 +64,10 @@ const RegisterScreen = ({ navigation }) => {
   const handleRegister = async () => {
     if (!congregation || !district) {
       Alert.alert('Error', 'Please select your congregation and district');
+      return;
+    }
+    if (!termsAccepted) {
+      Alert.alert('Error', 'Please accept the Terms of Service to continue');
       return;
     }
 
@@ -298,12 +303,18 @@ const RegisterScreen = ({ navigation }) => {
               </View>
             </View>
 
-            <View style={styles.termsBox}>
-              <Text style={styles.termsCheckbox}>☑️</Text>
+            <TouchableOpacity
+              style={styles.termsBox}
+              onPress={() => setTermsAccepted(!termsAccepted)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.termsCheckbox, termsAccepted && styles.termsCheckboxChecked]}>
+                {termsAccepted && <Text style={styles.termsCheckboxTick}>✓</Text>}
+              </View>
               <Text style={styles.termsText}>
                 I agree to the Terms of Service and Privacy Policy
               </Text>
-            </View>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -394,7 +405,7 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: typography.sizes.xl,
-    color: colors.purple,
+    color: colors.blue,
   },
   headerTitle: {
     flex: 1,
@@ -571,9 +582,25 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
   },
   termsCheckbox: {
-    fontSize: typography.sizes.lg,
+    width: 22,
+    height: 22,
+    borderRadius: borderRadius.sm,
+    borderWidth: 2,
+    borderColor: colors.border,
     marginRight: spacing.md,
-    marginTop: spacing.xs,
+    marginTop: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
+  },
+  termsCheckboxChecked: {
+    borderColor: colors.blue,
+    backgroundColor: colors.blue,
+  },
+  termsCheckboxTick: {
+    color: colors.white,
+    fontSize: 13,
+    fontWeight: '700',
   },
   termsText: {
     flex: 1,

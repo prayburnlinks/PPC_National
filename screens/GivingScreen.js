@@ -35,18 +35,24 @@ const GivingScreen = ({ navigation }) => {
   };
 
   const handleProceedToGive = async () => {
-    if (!selectedFund || (!selectedAmount || selectedAmount === 'other' && !customAmount)) {
+    if (!selectedFund || !selectedAmount || (selectedAmount === 'other' && !customAmount)) {
       Alert.alert('Error', 'Please select an amount');
+      return;
+    }
+
+    const amount = selectedAmount === 'other' ? parseFloat(customAmount) : parseInt(selectedAmount);
+
+    if (isNaN(amount) || amount < 10) {
+      Alert.alert('Error', 'Please enter a valid amount of at least R10');
       return;
     }
 
     setLoading(true);
     try {
-      const amount = selectedAmount === 'other' ? parseInt(customAmount) : parseInt(selectedAmount);
       
       await logGivingTransaction(user.uid, {
         fund: selectedFund,
-        amount,
+        amount: Math.round(amount * 100) / 100,
         paymentMethod: 'eft',
         reference: `${user.name} · ${user.congregation}`,
       });
@@ -187,9 +193,9 @@ const GivingScreen = ({ navigation }) => {
             ))}
 
             <View style={styles.referenceInfo}>
-              <Text style={styles.referenceTitle}>📌 Example:</Text>
+              <Text style={styles.referenceTitle}>📌 Your Reference:</Text>
               <Text style={styles.referenceExample}>
-                <Text style={{ fontWeight: '700' }}>Nomsa Dlamini · CT Central</Text>
+                <Text style={{ fontWeight: '700' }}>{user?.name} · {user?.congregation}</Text>
               </Text>
             </View>
 
@@ -212,8 +218,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   heroHeader: {
-    backgroundColor: `linear-gradient(145deg, ${colors.orangeRed}, ${colors.gold})`,
-    backgroundColor: colors.orangeRed,
+    backgroundColor: colors.red,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
     paddingBottom: spacing.xl,
@@ -263,7 +268,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   fundCardSelected: {
-    borderColor: colors.lightPurple,
+    borderColor: colors.lightBlue,
     backgroundColor: colors.surfaceLight,
   },
   fundIcon: {
@@ -291,7 +296,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   amountButtonSelected: {
-    borderColor: colors.lightPurple,
+    borderColor: colors.lightBlue,
     backgroundColor: colors.surfaceLight,
   },
   amountButtonText: {
@@ -300,7 +305,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   amountButtonTextSelected: {
-    color: colors.purple,
+    color: colors.blue,
   },
   customAmountInput: {
     borderWidth: 1,
@@ -315,7 +320,7 @@ const styles = StyleSheet.create({
   methodCard: {
     backgroundColor: colors.white,
     borderWidth: 1.5,
-    borderColor: colors.lightPurple,
+    borderColor: colors.lightBlue,
     borderRadius: borderRadius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
@@ -350,7 +355,7 @@ const styles = StyleSheet.create({
     height: 18,
     borderRadius: borderRadius.full,
     borderWidth: 2,
-    borderColor: colors.lightPurple,
+    borderColor: colors.lightBlue,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -358,10 +363,10 @@ const styles = StyleSheet.create({
     width: 9,
     height: 9,
     borderRadius: borderRadius.full,
-    backgroundColor: colors.lightPurple,
+    backgroundColor: colors.lightBlue,
   },
   giveButton: {
-    backgroundColor: colors.purple,
+    backgroundColor: colors.blue,
     borderRadius: borderRadius.md,
     paddingVertical: spacing.md,
     alignItems: 'center',
@@ -387,7 +392,7 @@ const styles = StyleSheet.create({
   // Modal styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(26, 10, 46, 0.7)',
+    backgroundColor: colors.overlayDark,
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -441,7 +446,7 @@ const styles = StyleSheet.create({
   copyButtonText: {
     fontSize: typography.sizes.xs,
     fontWeight: '700',
-    color: colors.purple,
+    color: colors.blue,
   },
   referenceInfo: {
     backgroundColor: colors.surfaceLight,
@@ -461,7 +466,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   modalCloseButton: {
-    backgroundColor: colors.darkPurple,
+    backgroundColor: colors.darkBlue,
     borderRadius: borderRadius.md,
     paddingVertical: spacing.md,
     alignItems: 'center',
