@@ -13,6 +13,12 @@ import {
   addDoc,
   updateDoc,
   increment,
+  arrayUnion,
+  arrayRemove,
+  serverTimestamp,
+  query,
+  where,
+  orderBy,
 } from 'firebase/firestore';
 import { db } from '../firebase-config';
 
@@ -336,6 +342,76 @@ export const markNotificationAsRead = async (userId, notificationId) => {
   }
 };
 
+
+/**
+ * Prayer Wall functions
+ */
+export const getPrayerRequests = async (scope = 'national', district = null) => {
+  try {
+    const col = collection(db, 'prayerRequests');
+    let q;
+    if (scope === 'national') {
+      q = query(col, where('scope', '==', 'national'), orderBy('createdAt', 'desc'));
+    } else if (scope === 'district' && district) {
+      q = query(col, where('scope', '==', 'district'), where('district', '==', district), orderBy('createdAt', 'desc'));
+    } else {
+      q = query(col, orderBy('createdAt', 'desc'));
+    }
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ ...d.data(), id: d.id, createdAt: parseDate(d.data().createdAt) }));
+  } catch (error) {
+    console.error('Error fetching prayer requests:', error);
+    return [];
+  }
+};
+
+export const submitPrayerRequest = async (userId, { title, body, scope = 'national', district = null, congregation = null }) => {
+  try {
+    const payload = {
+      title,
+      body,
+      scope,
+      district: district || null,
+      congregation: congregation || null,
+      createdBy: userId,
+      createdAt: serverTimestamp(),
+      prayCount: 0,
+      prayingBy: [],
+    };
+    const ref = await addDoc(collection(db, 'prayerRequests'), payload);
+    return { success: true, id: ref.id };
+  } catch (error) {
+    console.error('Error submitting prayer request:', error);
+    throw { message: 'Failed to submit prayer request' };
+  }
+};
+
+export const prayForRequest = async (requestId, userId) => {
+  try {
+    const ref = doc(db, 'prayerRequests', requestId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) throw new Error('Not found');
+    const data = snap.data();
+    const already = Array.isArray(data.prayingBy) && data.prayingBy.includes(userId);
+    if (already) {
+      await updateDoc(ref, {
+        prayCount: increment(-1),
+        prayingBy: arrayRemove(userId),
+      });
+      return { success: true, action: 'removed' };
+    }
+
+    await updateDoc(ref, {
+      prayCount: increment(1),
+      prayingBy: arrayUnion(userId),
+    });
+    return { success: true, action: 'added' };
+  } catch (error) {
+    console.error('Error toggling pray for request:', error);
+    throw { message: 'Failed to update prayer' };
+  }
+};
+
 export default {
   // Events
   getUpcomingEvents,
@@ -360,4 +436,9 @@ export default {
   // Notifications
   getUserNotifications,
   markNotificationAsRead,
+
+  // Prayer Wall
+  getPrayerRequests,
+  submitPrayerRequest,
+  prayForRequest,
 };

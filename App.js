@@ -18,11 +18,12 @@ import MediaScreen from './screens/MediaScreen';
 import DistrictsScreen from './screens/DistrictsScreen';
 
 import EventsScreen from './screens/EventsScreen';
+import PrayerWallScreen from './screens/PrayerWallScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-const TAB_ICONS = { Home: '🏠', Media: '📺', Giving: '💝', Districts: '🗺', Profile: '👤' };
+const TAB_ICONS = { Home: '🏠', Media: '📺', Giving: '💝', Districts: '🗺', PrayerWall: '🙏', Profile: '👤' };
 
 function AppTabs() {
   const insets = useSafeAreaInsets();
@@ -50,6 +51,7 @@ function AppTabs() {
       <Tab.Screen name="Media" component={MediaScreen} options={{ tabBarLabel: 'Media' }} />
       <Tab.Screen name="Giving" component={GivingScreen} options={{ tabBarLabel: 'Give' }} />
       <Tab.Screen name="Districts" component={DistrictsScreen} options={{ tabBarLabel: 'Districts' }} />
+      <Tab.Screen name="PrayerWall" component={PrayerWallScreen} options={{ tabBarLabel: 'Prayer' }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarLabel: 'Profile' }} />
     </Tab.Navigator>
   );

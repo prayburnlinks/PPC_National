@@ -140,7 +140,7 @@ const HomeScreen = ({ navigation }) => {
 
           <TouchableOpacity
             style={[styles.quickCard, styles.quickCardWhite]}
-            onPress={() => alert('Prayer Wall coming soon 🙏')}
+            onPress={() => navigation.navigate('PrayerWall')}
           >
             <Text style={styles.quickIcon}>🙏</Text>
             <Text style={styles.quickTitleDark}>Prayer Wall</Text>
