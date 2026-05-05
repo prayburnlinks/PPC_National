@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   Text,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { getUpcomingEvents } from '../services/firestoreService';
@@ -48,7 +49,7 @@ const HomeScreen = ({ navigation }) => {
       <View style={[styles.heroHeader, { paddingTop: insets.top + spacing.md }]}>
         <View style={styles.headerTop}>
           <View style={styles.logoRow}>
-            <Text style={styles.logo}>🔥</Text>
+            <Image source={require('../assets/emblem.jpg')} style={styles.emblem} resizeMode="contain" />
             <View>
               <Text style={styles.logoName}>PPC for Jesus</Text>
               <Text style={styles.logoSub}>National Church · SA</Text>
@@ -201,8 +202,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
     paddingBottom: spacing.lg,
-    background: 'linear-gradient(150deg, #1A0A2E 0%, #4B1D8E 60%, #7C3FD4 100%)',
-    backgroundColor: colors.darkPurple,
+    backgroundColor: colors.darkBlue,
+  },
+  emblem: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.white,
   },
   headerTop: {
     flexDirection: 'row',

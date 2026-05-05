@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   Text,
   Alert,
+  Image,
 } from 'react-native';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { logoutUser } from '../services/authService';
@@ -43,7 +44,7 @@ const ProfileScreen = ({ navigation }) => {
       {/* Hero Header */}
       <View style={[styles.heroHeader, { paddingTop: insets.top + spacing.md }]}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>🙏</Text>
+          <Image source={require('../assets/emblem.jpg')} style={styles.emblem} resizeMode="contain" />
         </View>
         <Text style={styles.name}>{user?.name || 'Member'}</Text>
         <View style={styles.roleBadge}>
@@ -152,18 +153,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.blue,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
     borderWidth: 2.5,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
+    borderColor: colors.red,
+    overflow: 'hidden',
   },
-  avatarText: {
-    fontSize: typography.sizes.xxxl,
+  emblem: {
+    width: 68,
+    height: 68,
   },
   name: {
     color: colors.white,

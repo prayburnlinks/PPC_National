@@ -10,6 +10,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Text,
+  Image,
 } from 'react-native';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { DISTRICTS } from '../constants/config';
@@ -21,6 +22,7 @@ const DistrictsScreen = ({ navigation }) => {
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
       <View style={[styles.hero, { paddingTop: insets.top + spacing.md }]}>
+        <Image source={require('../assets/emblem.jpg')} style={styles.emblem} resizeMode="contain" />
         <Text style={styles.heroTitle}>PPC Districts</Text>
         <Text style={styles.heroSub}>National Church of South Africa</Text>
         <View style={styles.stats}>
@@ -63,8 +65,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  emblem: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.white,
+    marginBottom: spacing.sm,
+  },
   hero: {
-    backgroundColor: colors.darkPurple,
+    backgroundColor: colors.darkBlue,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
     paddingBottom: spacing.lg,

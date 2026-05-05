@@ -10,6 +10,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Text,
+  Image,
 } from 'react-native';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,6 +24,7 @@ const MediaScreen = ({ navigation }) => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
+        <Image source={require('../assets/emblem.jpg')} style={styles.emblem} resizeMode="contain" />
         <Text style={styles.heroTitle}>Media & Sermons</Text>
       </View>
 
@@ -87,6 +89,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  emblem: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.white,
   },
   hero: {
     backgroundColor: colors.darkBlue,

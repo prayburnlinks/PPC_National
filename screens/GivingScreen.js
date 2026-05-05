@@ -13,6 +13,7 @@ import {
   TextInput,
   Modal,
   Alert,
+  Image,
 } from 'react-native';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { logGivingTransaction } from '../services/firestoreService';
@@ -69,7 +70,7 @@ const GivingScreen = ({ navigation }) => {
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Hero Header */}
       <View style={[styles.heroHeader, { paddingTop: insets.top + spacing.md }]}>
-        <Text style={styles.heroIcon}>🙏</Text>
+        <Image source={require('../assets/emblem.jpg')} style={styles.emblem} resizeMode="contain" />
         <Text style={styles.heroTitle}>Give to God's Work</Text>
         <Text style={styles.heroVerse}>
           "Bring the whole tithe into the storehouse…" — Malachi 3:10
@@ -138,7 +139,7 @@ const GivingScreen = ({ navigation }) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Payment Method</Text>
           <View style={styles.methodCard}>
-            <View style={styles.methodIconBox}>🏦</View>
+            <View style={styles.methodIconBox}><Text style={styles.methodIconText}>🏦</Text></View>
             <View style={styles.methodInfo}>
               <Text style={styles.methodTitle}>EFT / Bank Transfer</Text>
               <Text style={styles.methodSub}>FNB · ABSA · Capitec · Nedbank</Text>
@@ -216,6 +217,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  emblem: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.white,
+    marginBottom: spacing.sm,
   },
   heroHeader: {
     backgroundColor: colors.red,
@@ -335,6 +343,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceLight,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  methodIconText: {
     fontSize: typography.sizes.lg,
   },
   methodInfo: {
