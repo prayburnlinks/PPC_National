@@ -70,12 +70,16 @@ const HomeScreen = ({ navigation }) => {
       </View>
 
       {/* Ticker Banner */}
-      <View style={styles.ticker}>
-        <Text style={styles.tickerBadge}>NOTICE</Text>
-        <Text style={styles.tickerText}>
-          National Convention 15–18 May · Orlando Stadium · Register now!
-        </Text>
-      </View>
+      {events.length > 0 && (
+        <View style={styles.ticker}>
+          <Text style={styles.tickerBadge}>NOTICE</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <Text style={styles.tickerText}>
+              {events.map(e => `${e.name} · ${new Date(e.eventDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}`).join('   •   ')}
+            </Text>
+          </ScrollView>
+        </View>
+      )}
 
       {/* Body Content */}
       <View style={styles.body}>

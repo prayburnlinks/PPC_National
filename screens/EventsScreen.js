@@ -30,6 +30,7 @@ const EventsScreen = ({ navigation }) => {
 
   const loadEvents = useCallback(async () => {
     setLoading(true);
+
     const { events: list } = await getAllEvents(20);
     setEvents(list);
 

@@ -105,9 +105,25 @@ export const loginUser = async (email, password) => {
     const userDoc = await getDoc(doc(db, 'users', user.uid));
     const userData = userDoc.data();
 
+    // Check if Firestore profile exists
+    if (!userDoc.exists()) {
+      // Create a basic profile for accounts created before Firestore was set up
+      await setDoc(doc(db, 'users', user.uid), {
+        uid: user.uid,
+        email: user.email,
+        name: user.displayName || user.email,
+        role: ROLES.MEMBER,
+        status: USER_STATUS.APPROVED,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        metadata: { lastLogin: new Date() },
+      });
+      const newDoc = await getDoc(doc(db, 'users', user.uid));
+      return { success: true, uid: user.uid, user: { ...newDoc.data(), uid: user.uid } };
+    }
+
     // Check if user is approved
-    if (userData && userData.status !== USER_STATUS.APPROVED) {
-      // Logout if not approved
+    if (userData.status !== USER_STATUS.APPROVED) {
       await signOut(auth);
       throw new Error('USER_NOT_APPROVED');
     }

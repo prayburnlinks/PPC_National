@@ -9,6 +9,7 @@ import {
   setDoc,
   getDoc,
   getDocs,
+  getDocsFromServer,
   query,
   where,
   orderBy,
@@ -34,13 +35,23 @@ import { db } from '../firebase-config';
 export const getUpcomingEvents = async (maxResults = 4) => {
   try {
     const now = new Date();
-    const snapshot = await getDocs(collection(db, 'events'));
+    const snapshot = await getDocsFromServer(collection(db, 'events'));
     return snapshot.docs
-      .map(doc => ({
-        ...doc.data(),
-        id: doc.id,
-        eventDate: doc.data().eventDate?.toDate?.() || new Date(doc.data().eventDate),
-      }))
+      .map(doc => {
+        const data = doc.data();
+        const rawDate = data.eventDate;
+        let eventDate;
+        if (rawDate?.toDate) {
+          eventDate = rawDate.toDate();
+        } else if (rawDate?.seconds) {
+          eventDate = new Date(rawDate.seconds * 1000);
+        } else if (rawDate) {
+          eventDate = new Date(rawDate);
+        } else {
+          eventDate = new Date('2099-01-01');
+        }
+        return { ...data, id: doc.id, eventDate };
+      })
       .filter(e => e.eventDate >= now)
       .sort((a, b) => a.eventDate - b.eventDate)
       .slice(0, maxResults);
@@ -55,18 +66,24 @@ export const getUpcomingEvents = async (maxResults = 4) => {
  */
 export const getAllEvents = async (pageSize = 20) => {
   try {
-    const now = new Date();
-    const snapshot = await getDocs(collection(db, 'events'));
-    console.log('Total events in Firestore:', snapshot.docs.length);
+    const snapshot = await getDocsFromServer(collection(db, 'events'));
     const all = snapshot.docs
       .map(doc => {
         const data = doc.data();
         const rawDate = data.eventDate;
-        const eventDate = rawDate?.toDate?.() || (rawDate ? new Date(rawDate) : new Date());
-        console.log('Event:', data.name, '| Date:', eventDate, '| Valid:', !isNaN(eventDate));
+        // Handle Firestore Timestamp, JS Date, numeric ms, or string
+        let eventDate;
+        if (rawDate?.toDate) {
+          eventDate = rawDate.toDate();
+        } else if (rawDate?.seconds) {
+          eventDate = new Date(rawDate.seconds * 1000);
+        } else if (rawDate) {
+          eventDate = new Date(rawDate);
+        } else {
+          eventDate = new Date('2099-01-01'); // no date = push to end
+        }
         return { ...data, id: doc.id, eventDate };
       })
-      .filter(e => !isNaN(e.eventDate))
       .sort((a, b) => a.eventDate - b.eventDate);
 
     return {
