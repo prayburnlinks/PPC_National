@@ -3,7 +3,7 @@
  * User profile and account settings
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   ScrollView,
@@ -14,13 +14,18 @@ import {
   Image,
 } from 'react-native';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
-import { logoutUser } from '../services/authService';
+import { logoutUser, getCurrentUser } from '../services/authService';
 import { useUser } from '../context/UserContext';
+import { ROLES } from '../constants/config';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const ProfileScreen = ({ navigation }) => {
-  const { user, onLogout } = useUser();
+  const { user, onLogin, onLogout } = useUser();
   const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    getCurrentUser().then(fresh => { if (fresh) onLogin(fresh); });
+  }, []);
   const handleLogout = async () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', onPress: () => {} },
@@ -128,6 +133,13 @@ const ProfileScreen = ({ navigation }) => {
             </View>
           </View>
         </View>
+
+        {/* Admin Panel — only for admins */}
+        {user?.role === ROLES.ADMIN && (
+          <TouchableOpacity style={styles.adminButton} onPress={() => navigation.navigate('Admin')}>
+            <Text style={styles.adminButtonText}>Admin Panel</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Logout Button */}
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -252,6 +264,18 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.xs,
     fontWeight: '700',
     color: colors.blue,
+  },
+  adminButton: {
+    backgroundColor: colors.darkBlue,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  adminButtonText: {
+    fontSize: typography.sizes.sm,
+    fontWeight: '600',
+    color: colors.white,
   },
   logoutButton: {
     backgroundColor: '#FFF0EE',
