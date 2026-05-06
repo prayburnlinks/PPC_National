@@ -51,8 +51,9 @@ export const DISTRICTS = [
   { id: 3, name: 'Free State', location: 'Free State', congregations: 1 },
   { id: 4, name: 'Gauteng', location: 'Gauteng', congregations: 1 },
   { id: 5, name: 'Central Cape', location: 'Cape Town', congregations: 3 },
-  { id: 6, name: 'Garden Route', location: 'George', congregations: 3 },
+  { id: 6, name: 'Garden Route', location: 'George', congregations: 10 },
   { id: 7, name: 'West Coast', location: 'West Coast', congregations: 1 },
+  { id: 8, name: 'Eden District', location: 'Oudtshoorn', congregations: 9 },
 ];
 
 // Bank Details for EFT
@@ -89,11 +90,80 @@ export const CONGREGATIONS = [
   { name: 'Beacon Valley', district: 'Central Cape' },
   { name: 'Eden', district: 'Central Cape' },
   // Garden Route
-  { name: 'Parkdene', district: 'Garden Route' },
-  { name: 'Rosemoore', district: 'Garden Route' },
-  { name: 'Pacaltsdorp', district: 'Garden Route' },
+  { name: 'Knysna', assemblyName: 'Galilee Assembly', pastor: 'Ps. Francious & Sally Muller', district: 'Garden Route' },
+  { name: 'Plettenberg Bay', assemblyName: null, pastor: 'Ps. Lenhard & Esmerelda Jonas', district: 'Garden Route' },
+  { name: 'Coldstream', assemblyName: null, pastor: 'Ps. Welcome Grootboom', district: 'Garden Route' },
+  { name: 'Keurhoek', assemblyName: null, pastor: 'Applikant', district: 'Garden Route' },
+  { name: 'Sedgefield', assemblyName: null, pastor: 'Ps. Eldrigde & Hillary Carolus', district: 'Garden Route' },
+  { name: 'Parkdene', assemblyName: 'Mount Calvary', pastor: 'Ps. Jeremy & Christene Bredenkamp', district: 'Garden Route' },
+  { name: 'Rosemoore', assemblyName: 'Calvary', pastor: 'Ps. Josef & Caroline Oosthuizen', district: 'Garden Route' },
+  { name: 'Pacaltsdorp', assemblyName: null, pastor: 'Distrik toesig', district: 'Garden Route' },
+  { name: 'Mosselbay', assemblyName: null, pastor: 'Elder Petrus & Ananda', district: 'Garden Route' },
+  { name: 'Albertinia', assemblyName: null, pastor: 'Applikant', district: 'Garden Route' },
   // West Coast
   { name: 'Laaiplek', district: 'West Coast' },
+  // Eden District
+  { name: 'Ladismith', assemblyName: 'Lofdal Gemeente', pastor: 'Ps. Dawid & Annelize De Villiers', district: 'Eden District' },
+  { name: 'Oudtshoorn', assemblyName: 'Emmanuel Gemeente', pastor: 'Ps. Dawid & Anette Botha', district: 'Eden District' },
+  { name: 'Dysselsdorp', assemblyName: 'Tikvah Embassy', pastor: 'Ps. Joey & Herculene Thorne', district: 'Eden District' },
+  { name: 'De Rust', assemblyName: 'Bethel Gemeente', pastor: 'Distrik Toesig', district: 'Eden District' },
+  { name: 'Prins Albert', assemblyName: 'Maranatha Gemeente', pastor: 'Ps. Adrian & Surayda May', district: 'Eden District' },
+  { name: 'Beaufort Wes', assemblyName: null, pastor: 'Ps. Klein', district: 'Eden District' },
+  { name: 'Graaff Reinet', assemblyName: 'House', pastor: 'Ps. Gavin & Vivian Kemp', district: 'Eden District' },
+  { name: 'Willowmore', assemblyName: 'Elim Gemeente', pastor: 'Applikant Ricardo & Caroline Human', district: 'Eden District' },
+  { name: 'Langkloof', assemblyName: 'Spirit Word', pastor: 'Ps. Patrick & Chantal Kemoeti', district: 'Eden District' },
+];
+
+// National Board Members
+export const NATIONAL_BOARD = [
+  {
+    id: 1,
+    name: 'Barend Magielies',
+    portfolio: 'President',
+    photo: null,
+  },
+  {
+    id: 2,
+    name: 'Nicklaas Koen',
+    portfolio: 'Vice President',
+    photo: null,
+  },
+  {
+    id: 3,
+    name: 'Isaac Jacobs',
+    portfolio: 'Secretary General',
+    photo: null,
+  },
+  {
+    id: 4,
+    name: 'Dino Colbert',
+    portfolio: 'Treasurer General',
+    photo: null,
+  },
+  {
+    id: 5,
+    name: 'Johannes Voorslag',
+    portfolio: 'Youth & Childrens Ministry',
+    photo: null,
+  },
+  {
+    id: 6,
+    name: 'Andrew Leeuw',
+    portfolio: 'Education Department',
+    photo: null,
+  },
+  {
+    id: 7,
+    name: 'George Links',
+    portfolio: 'Evangelism & Missions',
+    photo: null,
+  },
+  {
+    id: 8,
+    name: 'Joey Denvor Thorne',
+    portfolio: 'Infrastructure Development',
+    photo: null,
+  },
 ];
 
 // API/Firestore Limits

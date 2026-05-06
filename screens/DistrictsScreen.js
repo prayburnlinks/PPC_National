@@ -22,25 +22,42 @@ const DistrictsScreen = ({ navigation }) => {
   const toggleDistrict = (name) => setExpanded(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]);
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header */}
+    <View style={styles.container}>
+      {/* Frozen Header */}
       <View style={[styles.hero, { paddingTop: insets.top + spacing.md }]}>
         <Image source={require('../assets/emblem.jpg')} style={styles.emblem} resizeMode="contain" />
         <Text style={styles.heroTitle}>PPC Districts</Text>
         <Text style={styles.heroSub}>National Church of South Africa</Text>
         <View style={styles.stats}>
           <View style={styles.stat}>
-            <Text style={styles.statNum}>7</Text>
+            <Text style={styles.statNum}>8</Text>
             <Text style={styles.statLabel}>Districts</Text>
           </View>
           <View style={styles.stat}>
-            <Text style={styles.statNum}>21</Text>
+            <Text style={styles.statNum}>37</Text>
             <Text style={styles.statLabel}>Congregations</Text>
           </View>
         </View>
       </View>
 
+      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
       <View style={styles.content}>
+        {/* National Board Entry */}
+        <TouchableOpacity
+          style={styles.boardCard}
+          onPress={() => navigation.navigate('NationalBoard')}
+          activeOpacity={0.8}
+        >
+          <View style={styles.boardLeft}>
+            <Text style={styles.boardIcon}>👔</Text>
+            <View>
+              <Text style={styles.boardTitle}>National Board</Text>
+              <Text style={styles.boardSub}>Meet our leadership team</Text>
+            </View>
+          </View>
+          <Text style={styles.boardArrow}>›</Text>
+        </TouchableOpacity>
+
         {DISTRICTS.map((district, idx) => {
           const isOpen = expanded.includes(district.name);
           const congregations = CONGREGATIONS.filter(c => c.district === district.name);
@@ -69,7 +86,15 @@ const DistrictsScreen = ({ navigation }) => {
                 <View style={styles.congregationList}>
                   {congregations.map((c) => (
                     <View key={c.name} style={styles.congregationItem}>
-                      <Text style={styles.congregationText}>• {c.name}</Text>
+                      <View style={styles.congregationRow}>
+                        <Text style={styles.congregationText}>{c.name}</Text>
+                        {c.assemblyName && (
+                          <Text style={styles.assemblyName}>{c.assemblyName}</Text>
+                        )}
+                      </View>
+                      {c.pastor && (
+                        <Text style={styles.pastorText}>🙏 {c.pastor}</Text>
+                      )}
                     </View>
                   ))}
                 </View>
@@ -79,7 +104,8 @@ const DistrictsScreen = ({ navigation }) => {
         })}
         <View style={styles.spacer} />
       </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
@@ -128,6 +154,9 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.5)',
     fontSize: typography.sizes.xs,
     letterSpacing: 0.5,
+  },
+  scroll: {
+    flex: 1,
   },
   content: {
     paddingHorizontal: spacing.lg,
@@ -191,9 +220,57 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginBottom: spacing.sm,
   },
+  congregationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   congregationText: {
     fontSize: typography.sizes.sm,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  assemblyName: {
+    fontSize: typography.sizes.xs,
+    color: colors.blue,
+    fontWeight: '600',
+  },
+  pastorText: {
+    fontSize: typography.sizes.xs,
     color: colors.textSecondary,
+    marginTop: 2,
+  },
+  boardCard: {
+    backgroundColor: colors.darkBlue,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  boardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  boardIcon: {
+    fontSize: 24,
+  },
+  boardTitle: {
+    color: colors.white,
+    fontSize: typography.sizes.sm,
+    fontWeight: '700',
+  },
+  boardSub: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: typography.sizes.xs,
+    marginTop: 2,
+  },
+  boardArrow: {
+    color: colors.white,
+    fontSize: typography.sizes.xl,
   },
 });
 

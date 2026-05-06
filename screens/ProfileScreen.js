@@ -45,8 +45,8 @@ const ProfileScreen = ({ navigation }) => {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Hero Header */}
+    <View style={styles.container}>
+      {/* Frozen Header */}
       <View style={[styles.heroHeader, { paddingTop: insets.top + spacing.md }]}>
         <View style={styles.avatar}>
           <Image source={require('../assets/emblem.jpg')} style={styles.emblem} resizeMode="contain" />
@@ -58,6 +58,7 @@ const ProfileScreen = ({ navigation }) => {
           </Text>
         </View>
       </View>
+      <ScrollView showsVerticalScrollIndicator={false}>
 
       {/* Content */}
       <View style={styles.content}>
@@ -148,7 +149,8 @@ const ProfileScreen = ({ navigation }) => {
 
         <View style={styles.spacer} />
       </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
