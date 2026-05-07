@@ -38,6 +38,8 @@ const PrayerWallScreen = () => {
   const handleSubmit = async () => {
     if (!user) return Alert.alert('Please sign in to submit a request');
     if (!body.trim()) return Alert.alert('Please enter a prayer request');
+    if (title.trim().length > 100) return Alert.alert('Title too long', 'Title must be 100 characters or less');
+    if (body.trim().length > 500) return Alert.alert('Request too long', 'Prayer request must be 500 characters or less');
     try {
       await submitPrayerRequest(user.uid, { title: title.trim() || 'Prayer Request', body: body.trim(), scope, district: user?.district });
       setTitle('');

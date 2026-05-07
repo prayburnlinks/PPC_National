@@ -104,7 +104,7 @@ export default function App() {
             )}
             {!user && <Stack.Screen name="Register" component={RegisterScreen} />}
             {user && <Stack.Screen name="Events" component={EventsScreen} />}
-            {user && <Stack.Screen name="Admin" component={AdminScreen} />}
+            {user?.role === 'admin' && <Stack.Screen name="Admin" component={AdminScreen} />}
             {user && <Stack.Screen name="NationalBoard" component={NationalBoardScreen} />}
           </Stack.Navigator>
         </NavigationContainer>
