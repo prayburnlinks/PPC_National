@@ -20,6 +20,7 @@ import DistrictsScreen from './screens/DistrictsScreen';
 import EventsScreen from './screens/EventsScreen';
 import PrayerWallScreen from './screens/PrayerWallScreen';
 import AdminScreen from './screens/AdminScreen';
+import NationalBoardScreen from './screens/NationalBoardScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -104,6 +105,7 @@ export default function App() {
             {!user && <Stack.Screen name="Register" component={RegisterScreen} />}
             {user && <Stack.Screen name="Events" component={EventsScreen} />}
             {user && <Stack.Screen name="Admin" component={AdminScreen} />}
+            {user && <Stack.Screen name="NationalBoard" component={NationalBoardScreen} />}
           </Stack.Navigator>
         </NavigationContainer>
       </UserContext.Provider>

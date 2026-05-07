@@ -27,9 +27,17 @@ const DistrictDetailScreen = ({ route, navigation }) => {
         keyExtractor={(item, idx) => item.name + idx}
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.item} onPress={() => { /* future: navigate to congregation */ }}>
-            <Text style={styles.itemText}>{item.name}</Text>
-          </TouchableOpacity>
+          <View style={styles.item}>
+            <View style={styles.itemHeader}>
+              <Text style={styles.itemText}>{item.name}</Text>
+              {item.assemblyName && (
+                <Text style={styles.assemblyName}>{item.assemblyName}</Text>
+              )}
+            </View>
+            {item.pastor && (
+              <Text style={styles.pastor}>🙏 {item.pastor}</Text>
+            )}
+          </View>
         )}
         ListEmptyComponent={<Text style={styles.empty}>No congregations found for this district.</Text>}
       />
@@ -71,10 +79,25 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     marginBottom: spacing.md,
   },
+  itemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
   itemText: {
     fontSize: typography.sizes.sm,
     color: colors.textPrimary,
     fontWeight: '700',
+  },
+  assemblyName: {
+    fontSize: typography.sizes.xs,
+    color: colors.blue,
+    fontWeight: '600',
+  },
+  pastor: {
+    fontSize: typography.sizes.xs,
+    color: colors.textSecondary,
   },
   empty: {
     padding: spacing.lg,

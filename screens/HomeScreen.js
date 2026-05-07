@@ -18,6 +18,13 @@ import { getUpcomingEvents } from '../services/firestoreService';
 import { useUser } from '../context/UserContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+const getGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+};
+
 const HomeScreen = ({ navigation }) => {
   const { user } = useUser();
   const insets = useSafeAreaInsets();
@@ -51,8 +58,8 @@ const HomeScreen = ({ navigation }) => {
           <View style={styles.logoRow}>
             <Image source={require('../assets/emblem.jpg')} style={styles.emblem} resizeMode="contain" />
             <View>
-              <Text style={styles.logoName}>PPC for Jesus</Text>
-              <Text style={styles.logoSub}>National Church · SA</Text>
+              <Text style={styles.logoName}>I Love My Church</Text>
+              <Text style={styles.logoSub}>Pentecostal Protestant Church</Text>
             </View>
           </View>
           <TouchableOpacity
@@ -63,10 +70,10 @@ const HomeScreen = ({ navigation }) => {
             <View style={styles.notifDot} />
           </TouchableOpacity>
         </View>
-        <Text style={styles.greeting}>Good morning, beloved</Text>
+        <Text style={styles.greeting}>{getGreeting()}, beloved</Text>
         <Text style={styles.greetingName}>{user?.name || 'Member'} 🙌</Text>
         <View style={styles.districtChip}>
-          <Text style={styles.districtText}>📍 {user?.district || 'District'}</Text>
+          <Text style={styles.districtText}>📍 {user?.district ? `${user.district} District` : 'District'}</Text>
         </View>
       </View>
 
@@ -126,7 +133,7 @@ const HomeScreen = ({ navigation }) => {
           >
             <Text style={styles.quickIcon}>🗺</Text>
             <Text style={styles.quickTitle}>Districts</Text>
-            <Text style={styles.quickSub}>7 districts · 21 congs</Text>
+            <Text style={styles.quickSub}>8 districts · 37 congs</Text>
           </TouchableOpacity>
 
           <TouchableOpacity

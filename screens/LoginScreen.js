@@ -79,7 +79,7 @@ const LoginScreen = ({ navigation }) => {
             resizeMode="contain"
           />
         </View>
-        <Text style={styles.heroTitle}>PPC National Church</Text>
+        <Text style={styles.heroTitle}>I Love My Church</Text>
         <Text style={styles.heroSub}>Pentecostal Protestant Church</Text>
 
         {/* Red accent bar */}
