@@ -15,6 +15,7 @@ import {
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { loginUser, sendResetEmail } from '../services/authService';
 import { useUser } from '../context/UserContext';
+import { ROLES } from '../constants/config';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const LoginScreen = ({ navigation }) => {
@@ -166,6 +167,13 @@ const LoginScreen = ({ navigation }) => {
               <Text style={styles.signupLink}>Sign Up</Text>
             </TouchableOpacity>
           </View>
+
+          <TouchableOpacity
+            style={styles.visitorButton}
+            onPress={() => onLogin({ role: ROLES.VISITOR, name: 'Visitor' })}
+          >
+            <Text style={styles.visitorButtonText}>Continue as Visitor</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.footer}>
@@ -389,6 +397,17 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
     color: colors.blue,
     fontWeight: '700',
+  },
+  visitorButton: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  visitorButtonText: {
+    fontSize: typography.sizes.sm,
+    color: colors.textSecondary,
+    fontWeight: '500',
+    textDecorationLine: 'underline',
   },
   footer: {
     backgroundColor: colors.white,

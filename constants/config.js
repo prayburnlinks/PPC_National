@@ -11,6 +11,7 @@ export const appConfig = {
 
 // Role Constants
 export const ROLES = {
+  VISITOR: 'visitor', // unauthenticated/unverified — public content only
   MEMBER: 'member',
   LEADER: 'leader',
   ADMIN: 'admin',
