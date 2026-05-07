@@ -412,6 +412,16 @@ export const prayForRequest = async (requestId, userId) => {
   }
 };
 
+export const getLiveStatus = async () => {
+  try {
+    const snap = await getDoc(doc(db, 'config', 'liveStatus'));
+    if (!snap.exists()) return { isLive: false, platform: 'youtube', title: '' };
+    return snap.data();
+  } catch {
+    return { isLive: false, platform: 'youtube', title: '' };
+  }
+};
+
 export default {
   // Events
   getUpcomingEvents,
@@ -441,4 +451,7 @@ export default {
   getPrayerRequests,
   submitPrayerRequest,
   prayForRequest,
+
+  // Live Status
+  getLiveStatus,
 };
