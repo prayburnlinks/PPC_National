@@ -135,9 +135,14 @@ const ProfileScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Admin Panel — only for admins */}
-        {user?.role === ROLES.ADMIN && (
-          <TouchableOpacity style={styles.adminButton} onPress={() => navigation.navigate('Admin')}>
+        {/* Leadership Buttons — Admin and Leader only */}
+        {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && (
+          <TouchableOpacity style={styles.adminButton} onPress={() => navigation.navigate('Documents')}>
+            <Text style={styles.adminButtonText}>📁  Documents</Text>
+          </TouchableOpacity>
+        )}
+        {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && (
+          <TouchableOpacity style={[styles.adminButton, { marginTop: spacing.sm }]} onPress={() => navigation.navigate('Admin')}>
             <Text style={styles.adminButtonText}>Admin Panel</Text>
           </TouchableOpacity>
         )}

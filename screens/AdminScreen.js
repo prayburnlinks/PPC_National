@@ -8,35 +8,48 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  Modal,
+  Image,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { getPendingRegistrations, approveUser, rejectUser } from '../services/authService';
+import { getPendingPOPs, approvePOP, rejectPOP } from '../services/popService';
+import { useUser } from '../context/UserContext';
 
-const TABS = ['Pending', 'Actions'];
+const TABS = ['Pending', 'Payments', 'Actions'];
 
 const AdminScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const { user: reviewer } = useUser();
   const [pendingUsers, setPendingUsers] = useState([]);
+  const [pendingPOPs, setPendingPOPs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('Pending');
   const [processingUid, setProcessingUid] = useState(null);
+  const [processingPopId, setProcessingPopId] = useState(null);
+  const [viewingPOP, setViewingPOP] = useState(null);
 
-  const loadPending = useCallback(async () => {
-    const users = await getPendingRegistrations();
+  const loadAll = useCallback(async () => {
+    const [users, pops] = await Promise.all([
+      getPendingRegistrations(),
+      getPendingPOPs(reviewer?.role, reviewer?.congregation),
+    ]);
     setPendingUsers(users);
+    setPendingPOPs(pops);
     setLoading(false);
     setRefreshing(false);
-  }, []);
+  }, [reviewer]);
 
   useEffect(() => {
-    loadPending();
-  }, [loadPending]);
+    loadAll();
+  }, [loadAll]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadPending();
+    loadAll();
   };
 
   const handleApprove = (user) => {
@@ -115,9 +128,9 @@ const AdminScreen = ({ navigation }) => {
           <Text style={styles.headerSub}>User Management</Text>
         </View>
         <View style={styles.badgeWrap}>
-          {pendingUsers.length > 0 && (
+          {(pendingUsers.length + pendingPOPs.length) > 0 && (
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>{pendingUsers.length}</Text>
+              <Text style={styles.badgeText}>{pendingUsers.length + pendingPOPs.length}</Text>
             </View>
           )}
         </View>
@@ -132,7 +145,9 @@ const AdminScreen = ({ navigation }) => {
             onPress={() => setActiveTab(tab)}
           >
             <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-              {tab}{tab === 'Pending' && pendingUsers.length > 0 ? ` (${pendingUsers.length})` : ''}
+              {tab}
+              {tab === 'Pending' && pendingUsers.length > 0 ? ` (${pendingUsers.length})` : ''}
+              {tab === 'Payments' && pendingPOPs.length > 0 ? ` (${pendingPOPs.length})` : ''}
             </Text>
           </TouchableOpacity>
         ))}
@@ -216,6 +231,115 @@ const AdminScreen = ({ navigation }) => {
             ))
           )}
         </ScrollView>
+      ) : activeTab === 'Payments' ? (
+        <ScrollView
+          contentContainerStyle={styles.list}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.blue]} />}
+          showsVerticalScrollIndicator={false}
+        >
+          {pendingPOPs.length === 0 ? (
+            <View style={styles.empty}>
+              <Text style={styles.emptyIcon}>✅</Text>
+              <Text style={styles.emptyTitle}>All caught up!</Text>
+              <Text style={styles.emptyText}>No pending proof of payments.</Text>
+            </View>
+          ) : (
+            pendingPOPs.map(pop => (
+              <View key={pop.id} style={styles.card}>
+                <View style={styles.cardTop}>
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{pop.userName?.[0]?.toUpperCase() || '?'}</Text>
+                  </View>
+                  <View style={styles.cardInfo}>
+                    <Text style={styles.userName}>{pop.userName}</Text>
+                    <Text style={styles.userEmail}>{pop.congregation || 'No congregation'}</Text>
+                    <View style={[styles.rolePill, { borderColor: colors.blue }]}>
+                      <Text style={[styles.rolePillText, { color: colors.blue }]}>
+                        {pop.mimeType?.includes('pdf') ? '📄 PDF' : '🖼 Image'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                <View style={styles.meta}>
+                  <View style={styles.metaRow}>
+                    <Text style={styles.metaLabel}>District</Text>
+                    <Text style={styles.metaValue}>{pop.district || 'N/A'}</Text>
+                  </View>
+                  <View style={styles.metaRow}>
+                    <Text style={styles.metaLabel}>File</Text>
+                    <Text style={styles.metaValue} numberOfLines={1}>{pop.fileName}</Text>
+                  </View>
+                  <View style={styles.metaRow}>
+                    <Text style={styles.metaLabel}>Submitted</Text>
+                    <Text style={styles.metaValue}>{formatDate(pop.submittedAt?.toDate?.() || pop.submittedAt)}</Text>
+                  </View>
+                </View>
+                {/* View button */}
+                <TouchableOpacity
+                  style={styles.viewBtn}
+                  onPress={() => {
+                    if (pop.mimeType?.includes('pdf')) {
+                      Linking.openURL(pop.fileUrl).catch(() => Alert.alert('Error', 'Could not open file.'));
+                    } else {
+                      setViewingPOP(pop);
+                    }
+                  }}
+                >
+                  <Text style={styles.viewBtnText}>👁  View Proof of Payment</Text>
+                </TouchableOpacity>
+
+                {processingPopId === pop.id ? (
+                  <ActivityIndicator style={styles.spinner} color={colors.blue} />
+                ) : (
+                  <View style={styles.actions}>
+                    <TouchableOpacity
+                      style={styles.rejectBtn}
+                      onPress={() => {
+                        Alert.alert('Reject POP', `Reject proof of payment from ${pop.userName}?`, [
+                          { text: 'Cancel', style: 'cancel' },
+                          {
+                            text: 'Reject', style: 'destructive',
+                            onPress: async () => {
+                              setProcessingPopId(pop.id);
+                              try {
+                                await rejectPOP(pop.id, pop.userId, reviewer?.uid);
+                                setPendingPOPs(prev => prev.filter(p => p.id !== pop.id));
+                              } catch { Alert.alert('Error', 'Failed to reject.'); }
+                              finally { setProcessingPopId(null); }
+                            },
+                          },
+                        ]);
+                      }}
+                    >
+                      <Text style={styles.rejectBtnText}>Reject</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.approveBtn}
+                      onPress={() => {
+                        Alert.alert('Approve POP', `Approve proof of payment from ${pop.userName}?`, [
+                          { text: 'Cancel', style: 'cancel' },
+                          {
+                            text: 'Approve',
+                            onPress: async () => {
+                              setProcessingPopId(pop.id);
+                              try {
+                                await approvePOP(pop.id, pop.userId, reviewer?.uid);
+                                setPendingPOPs(prev => prev.filter(p => p.id !== pop.id));
+                              } catch { Alert.alert('Error', 'Failed to approve.'); }
+                              finally { setProcessingPopId(null); }
+                            },
+                          },
+                        ]);
+                      }}
+                    >
+                      <Text style={styles.approveBtnText}>Approve</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            ))
+          )}
+        </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
           <View style={styles.card}>
@@ -228,9 +352,43 @@ const AdminScreen = ({ navigation }) => {
               </View>
               <Text style={styles.actionArrow}>›</Text>
             </TouchableOpacity>
+            <TouchableOpacity style={styles.actionRow} onPress={() => setActiveTab('Payments')}>
+              <Text style={styles.actionIcon}>💳</Text>
+              <View style={styles.actionText}>
+                <Text style={styles.actionLabel}>Proof of Payments</Text>
+                <Text style={styles.actionSub}>{pendingPOPs.length} payments awaiting review</Text>
+              </View>
+              <Text style={styles.actionArrow}>›</Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       )}
+
+      {/* POP Image Viewer Modal */}
+      <Modal
+        visible={!!viewingPOP}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewingPOP(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{viewingPOP?.userName} — Proof of Payment</Text>
+              <TouchableOpacity onPress={() => setViewingPOP(null)} style={styles.modalClose}>
+                <Text style={styles.modalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            {viewingPOP?.fileUrl && (
+              <Image
+                source={{ uri: viewingPOP.fileUrl }}
+                style={styles.modalImage}
+                resizeMode="contain"
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -417,6 +575,66 @@ const styles = StyleSheet.create({
   },
   spinner: {
     marginVertical: spacing.md,
+  },
+  viewBtn: {
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  viewBtnText: {
+    fontSize: typography.sizes.sm,
+    fontWeight: '600',
+    color: colors.blue,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  modalBox: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    width: '100%',
+    maxHeight: '80%',
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modalTitle: {
+    fontSize: typography.sizes.sm,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  modalClose: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.surfaceLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCloseText: {
+    fontSize: typography.sizes.base,
+    color: colors.textSecondary,
+    fontWeight: '700',
+  },
+  modalImage: {
+    width: '100%',
+    height: 400,
   },
   actions: {
     flexDirection: 'row',

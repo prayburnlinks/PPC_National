@@ -19,6 +19,8 @@ import {
   isUserRegisteredForEvent,
   logGivingTransaction,
 } from '../services/firestoreService';
+import { submitPOP } from '../services/popService';
+import * as DocumentPicker from 'expo-document-picker';
 
 const EventsScreen = ({ navigation }) => {
   const { user } = useUser();
@@ -28,6 +30,7 @@ const EventsScreen = ({ navigation }) => {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [registering, setRegistering] = useState(false);
   const [registeredIds, setRegisteredIds] = useState(new Set());
+  const [popUploading, setPopUploading] = useState(false);
 
   const loadEvents = useCallback(async () => {
     setLoading(true);
@@ -88,6 +91,24 @@ const EventsScreen = ({ navigation }) => {
     } catch (error) {
       setRegistering(false);
       Alert.alert('Error', error.message || 'Failed to register');
+    }
+  };
+
+  const handleUploadPOP = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/jpeg', 'image/png', 'application/pdf'],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+      const file = result.assets[0];
+      setPopUploading(true);
+      await submitPOP(user, file);
+      Alert.alert('Submitted', 'Your proof of payment has been submitted and is awaiting review.');
+    } catch (error) {
+      Alert.alert('Upload Failed', error.message || 'Failed to upload proof of payment.');
+    } finally {
+      setPopUploading(false);
     }
   };
 
@@ -154,6 +175,11 @@ const EventsScreen = ({ navigation }) => {
                   <Text style={styles.eventName}>{event.name}</Text>
                   <Text style={styles.eventVenue}>📍 {event.venue}</Text>
                   <Text style={styles.eventDate}>🗓 {formatDate(event.eventDate)}</Text>
+                  {user?.popStatus === 'approved' && (
+                    <View style={styles.paidBadge}>
+                      <Text style={styles.paidBadgeText}>✅ Registered & Paid</Text>
+                    </View>
+                  )}
                 </View>
 
                 {isRegistered ? (
@@ -168,6 +194,36 @@ const EventsScreen = ({ navigation }) => {
               </TouchableOpacity>
             );
           })}
+          {/* Proof of Payment */}
+          <View style={styles.popSection}>
+            <Text style={styles.popSectionTitle}>Proof of Payment</Text>
+            {user?.popStatus === 'approved' ? (
+              <View style={styles.popApproved}>
+                <Text style={styles.popApprovedText}>✅ Payment verified — Registered & Paid</Text>
+              </View>
+            ) : user?.popStatus === 'pending' ? (
+              <View style={styles.popPending}>
+                <Text style={styles.popPendingText}>⏳ Proof of payment submitted — awaiting review</Text>
+              </View>
+            ) : user?.popStatus === 'rejected' ? (
+              <View>
+                <View style={styles.popRejected}>
+                  <Text style={styles.popRejectedText}>❌ Proof of payment was rejected. Please resubmit.</Text>
+                </View>
+                <TouchableOpacity style={styles.popUploadBtn} onPress={handleUploadPOP} disabled={popUploading}>
+                  {popUploading ? <ActivityIndicator color={colors.white} /> : <Text style={styles.popUploadBtnText}>Resubmit Proof of Payment</Text>}
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View>
+                <Text style={styles.popHint}>Upload your proof of payment (JPG, PNG or PDF)</Text>
+                <TouchableOpacity style={styles.popUploadBtn} onPress={handleUploadPOP} disabled={popUploading}>
+                  {popUploading ? <ActivityIndicator color={colors.white} /> : <Text style={styles.popUploadBtnText}>Upload Proof of Payment</Text>}
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
           <View style={{ height: spacing.xxxl }} />
         </ScrollView>
       )}
@@ -332,8 +388,9 @@ const styles = StyleSheet.create({
   list: { padding: spacing.lg },
   eventCard: {
     backgroundColor: colors.white, borderRadius: borderRadius.lg,
-    padding: spacing.md, marginBottom: spacing.md,
-    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: spacing.md, paddingVertical: spacing.lg,
+    marginBottom: spacing.md,
+    flexDirection: 'row', alignItems: 'flex-start',
     borderWidth: 1, borderColor: colors.border,
     gap: spacing.md,
   },
@@ -355,6 +412,19 @@ const styles = StyleSheet.create({
   eventName: { fontSize: typography.sizes.sm, fontWeight: '700', color: colors.textPrimary, marginBottom: 2 },
   eventVenue: { fontSize: typography.sizes.xs, color: colors.textSecondary, marginBottom: 2 },
   eventDate: { fontSize: typography.sizes.xs, color: colors.textSecondary },
+  paidBadge: {
+    backgroundColor: 'rgba(46, 173, 111, 0.15)',
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    marginTop: spacing.xs,
+    alignSelf: 'flex-start',
+  },
+  paidBadgeText: {
+    color: '#2EAD6F',
+    fontSize: typography.sizes.xs,
+    fontWeight: '700',
+  },
   registeredBadge: {
     width: 28, height: 28, borderRadius: 14,
     backgroundColor: colors.green, alignItems: 'center', justifyContent: 'center',
@@ -415,6 +485,25 @@ const styles = StyleSheet.create({
     alignItems: 'center', marginTop: spacing.sm,
   },
   closeButtonText: { color: colors.textSecondary, fontSize: typography.sizes.sm, fontWeight: '600' },
+  popSection: {
+    backgroundColor: colors.white, borderRadius: borderRadius.lg,
+    padding: spacing.lg, marginTop: spacing.md,
+    borderWidth: 1, borderColor: colors.border,
+  },
+  popSectionTitle: {
+    fontSize: typography.sizes.sm, fontWeight: '700',
+    color: colors.textSecondary, letterSpacing: 0.5,
+    marginBottom: spacing.md,
+  },
+  popApproved: { backgroundColor: '#F0FBF6', borderRadius: borderRadius.md, padding: spacing.md },
+  popApprovedText: { color: colors.green, fontSize: typography.sizes.sm, fontWeight: '600' },
+  popPending: { backgroundColor: '#FFFBEB', borderRadius: borderRadius.md, padding: spacing.md },
+  popPendingText: { color: colors.gold, fontSize: typography.sizes.sm, fontWeight: '600' },
+  popRejected: { backgroundColor: '#FFF0EE', borderRadius: borderRadius.md, padding: spacing.md, marginBottom: spacing.md },
+  popRejectedText: { color: colors.red, fontSize: typography.sizes.sm, fontWeight: '600' },
+  popHint: { fontSize: typography.sizes.xs, color: colors.textSecondary, marginBottom: spacing.md },
+  popUploadBtn: { backgroundColor: colors.blue, borderRadius: borderRadius.md, paddingVertical: spacing.md, alignItems: 'center' },
+  popUploadBtnText: { color: colors.white, fontSize: typography.sizes.sm, fontWeight: '600' },
 });
 
 export default EventsScreen;

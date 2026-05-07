@@ -15,6 +15,11 @@ service cloud.firestore {
       return u.role == 'admin' && u.status == 'approved';
     }
 
+    function isLeaderOrAdmin() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return u.status == 'approved' && u.role in ['admin', 'leader'];
+    }
+
     function isChangingProtectedField() {
       return request.resource.data.diff(resource.data).affectedKeys()
         .hasAny(['role', 'status', 'approvedAt']);
@@ -68,6 +73,11 @@ service cloud.firestore {
     match /notifications/{notificationId} {
       allow read:   if isAdmin();
       allow create: if isAuthenticated();
+    }
+
+    match /documents/{documentId} {
+      allow read: if isLeaderOrAdmin();
+      allow write: if isAdmin();
     }
 
     // Global giving analytics
