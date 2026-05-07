@@ -19,6 +19,7 @@ import {
   query,
   where,
   orderBy,
+  limit,
 } from 'firebase/firestore';
 import { db } from '../firebase-config';
 
@@ -351,11 +352,11 @@ export const getPrayerRequests = async (scope = 'national', district = null) => 
     const col = collection(db, 'prayerRequests');
     let q;
     if (scope === 'national') {
-      q = query(col, where('scope', '==', 'national'), orderBy('createdAt', 'desc'));
+      q = query(col, where('scope', '==', 'national'), orderBy('createdAt', 'desc'), limit(50));
     } else if (scope === 'district' && district) {
-      q = query(col, where('scope', '==', 'district'), where('district', '==', district), orderBy('createdAt', 'desc'));
+      q = query(col, where('scope', '==', 'district'), where('district', '==', district), orderBy('createdAt', 'desc'), limit(50));
     } else {
-      q = query(col, orderBy('createdAt', 'desc'));
+      q = query(col, orderBy('createdAt', 'desc'), limit(50));
     }
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ ...d.data(), id: d.id, createdAt: parseDate(d.data().createdAt) }));

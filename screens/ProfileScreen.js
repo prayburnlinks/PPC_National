@@ -24,7 +24,7 @@ const ProfileScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
-    getCurrentUser().then(fresh => { if (fresh) onLogin(fresh); });
+    getCurrentUser().then(fresh => { if (fresh) onLogin(fresh); }).catch(console.error);
   }, []);
   const handleLogout = async () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
