@@ -9,6 +9,7 @@ import {
   signOut,
   sendPasswordResetEmail,
   updateProfile,
+  deleteUser,
 } from 'firebase/auth';
 import {
   collection,
@@ -39,22 +40,18 @@ export const registerUser = async (userData) => {
     role = ROLES.MEMBER,
   } = userData;
 
+  let createdAuthUser = null;
   try {
-    // Create auth user
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
+    createdAuthUser = userCredential.user;
 
-    // Update auth profile
-    await updateProfile(user, { displayName: name });
+    await updateProfile(createdAuthUser, { displayName: name });
 
-    // Determine status based on role
-    // Members auto-approve, Leaders/Admins require approval
     const status = role === ROLES.MEMBER ? USER_STATUS.APPROVED : USER_STATUS.PENDING;
 
-    // Create user document in Firestore
-    const userRef = doc(db, 'users', user.uid);
+    const userRef = doc(db, 'users', createdAuthUser.uid);
     await setDoc(userRef, {
-      uid: user.uid,
+      uid: createdAuthUser.uid,
       email,
       name,
       phone,
@@ -72,19 +69,25 @@ export const registerUser = async (userData) => {
       },
     });
 
-    // Trigger notifications via Cloud Function
-    // (Cloud Functions will handle email sending and admin notifications)
-    await notifyAdminOfNewRegistration(user.uid, { email, name, role, status });
+    // Fire-and-forget: a hang or failure here must not block the registration return.
+    notifyAdminOfNewRegistration(createdAuthUser.uid, { email, name, role, status });
 
     return {
       success: true,
-      uid: user.uid,
+      uid: createdAuthUser.uid,
       status,
       message: status === USER_STATUS.APPROVED
         ? 'Registration successful! Welcome to PPC National Church.'
         : 'Registration submitted. Awaiting admin approval.',
     };
   } catch (error) {
+    // Rollback: delete the Auth user if Firestore write failed so the account
+    // cannot silently re-register as an approved member on next login.
+    if (createdAuthUser) {
+      try { await deleteUser(createdAuthUser); } catch (deleteError) {
+        console.error('Failed to delete orphaned auth user:', deleteError);
+      }
+    }
     console.error('Registration error:', error);
     throw {
       code: error.code,
@@ -126,7 +129,11 @@ export const loginUser = async (email, password) => {
     // Check if user is approved
     if (userData.status !== USER_STATUS.APPROVED) {
       await signOut(auth);
-      throw new Error('USER_NOT_APPROVED');
+      const statusErrorCode = {
+        [USER_STATUS.REJECTED]: 'USER_REJECTED',
+        [USER_STATUS.INACTIVE]: 'USER_INACTIVE',
+      }[userData.status] || 'USER_NOT_APPROVED';
+      throw new Error(statusErrorCode);
     }
 
     // Update last login
@@ -203,7 +210,7 @@ export const getPendingRegistrations = async () => {
     return querySnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id }));
   } catch (error) {
     console.error('Get pending registrations error:', error);
-    return [];
+    throw { message: 'Failed to load pending registrations' };
   }
 };
 
@@ -221,6 +228,9 @@ export const approveUser = async (uid) => {
     return { success: true, message: 'User approved' };
   } catch (error) {
     console.error('Approve user error:', error);
+    if (error.code === 'permission-denied') {
+      throw { message: 'Unauthorized: Admin access required to approve users' };
+    }
     throw { message: 'Failed to approve user' };
   }
 };
@@ -239,6 +249,9 @@ export const rejectUser = async (uid, reason = '') => {
     return { success: true, message: 'User rejected' };
   } catch (error) {
     console.error('Reject user error:', error);
+    if (error.code === 'permission-denied') {
+      throw { message: 'Unauthorized: Admin access required to reject users' };
+    }
     throw { message: 'Failed to reject user' };
   }
 };
@@ -276,7 +289,10 @@ const getErrorMessage = (code) => {
     'auth/email-already-in-use': 'Email already in use',
     'auth/weak-password': 'Password should be at least 6 characters',
     'auth/operation-not-allowed': 'Operation not allowed',
-    'USER_NOT_APPROVED': 'Your account is pending admin approval',
+    'auth/too-many-requests': 'Too many attempts. Please try again later.',
+    'USER_NOT_APPROVED': 'Your account is pending admin approval.',
+    'USER_REJECTED': 'Your registration was not approved. Please contact the church office.',
+    'USER_INACTIVE': 'Your account has been deactivated. Please contact an admin.',
     default: 'An error occurred. Please try again.',
   };
 

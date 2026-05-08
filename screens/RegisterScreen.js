@@ -18,7 +18,7 @@ import {
   FlatList,
 } from 'react-native';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
-import { registerUser, logoutUser, getCurrentUser } from '../services/authService';
+import { registerUser, logoutUser } from '../services/authService';
 import { ROLES, CONGREGATIONS } from '../constants/config';
 import { useUser } from '../context/UserContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -47,6 +47,11 @@ const RegisterScreen = ({ navigation }) => {
         Alert.alert('Error', 'Please fill in all fields');
         return;
       }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.trim())) {
+        Alert.alert('Error', 'Please enter a valid email address');
+        return;
+      }
       if (password !== confirmPassword) {
         Alert.alert('Error', 'Passwords do not match');
         return;
@@ -73,8 +78,9 @@ const RegisterScreen = ({ navigation }) => {
 
     setLoading(true);
     try {
+      const trimmedEmail = email.trim();
       const result = await registerUser({
-        email,
+        email: trimmedEmail,
         password,
         name,
         phone,
@@ -83,10 +89,23 @@ const RegisterScreen = ({ navigation }) => {
         role,
       });
 
-      setLoading(false);
-
       if (result.status === 'approved') {
-        const userProfile = await getCurrentUser();
+        // Build the profile from registration data — avoids a second Firestore
+        // read that could hang if the write hasn't replicated yet.
+        const userProfile = {
+          uid: result.uid,
+          email: trimmedEmail,
+          name,
+          phone,
+          congregation,
+          district,
+          role,
+          status: result.status,
+          createdAt: new Date(),
+          approvedAt: new Date(),
+          emailVerified: false,
+          metadata: { lastLogin: new Date() },
+        };
         Alert.alert('Welcome!', result.message, [
           { text: 'OK', onPress: () => onLogin(userProfile) }
         ]);
@@ -97,12 +116,14 @@ const RegisterScreen = ({ navigation }) => {
         ]);
       }
     } catch (error) {
-      setLoading(false);
       Alert.alert('Registration Failed', error.message || 'An error occurred');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleBack = () => {
+    if (loading) return;
     if (step > 1) {
       setStep(step - 1);
     } else {
@@ -228,7 +249,7 @@ const RegisterScreen = ({ navigation }) => {
               Choose the role that best describes you in the church
             </Text>
 
-            {Object.values(ROLES).map(r => (
+            {Object.values(ROLES).filter(r => r !== ROLES.VISITOR).map(r => (
               <TouchableOpacity
                 key={r}
                 style={[

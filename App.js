@@ -8,7 +8,7 @@ import { auth } from './firebase-config';
 import { onAuthStateChanged } from 'firebase/auth';
 import { getCurrentUser } from './services/authService';
 import { colors } from './constants/theme';
-import { ROLES } from './constants/config';
+import { ROLES, USER_STATUS } from './constants/config';
 import { UserContext } from './context/UserContext';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
@@ -103,7 +103,15 @@ export default function App() {
       try {
         if (authUser) {
           const userProfile = await getCurrentUser();
-          setUser(userProfile);
+          // If status changed since last login, block app access but do NOT
+          // call signOut here — doing so mid-registration closes the Firestore
+          // connection and leaves in-flight setDoc/addDoc awaits permanently stuck.
+          // Explicit signOut happens in loginUser (status check) and handleRegister.
+          if (userProfile && userProfile.status !== USER_STATUS.APPROVED) {
+            setUser(null);
+          } else {
+            setUser(userProfile);
+          }
         } else {
           setUser(null);
         }
