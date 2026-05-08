@@ -47,14 +47,42 @@ export const GIVING_FUNDS = [
 
 // Districts
 export const DISTRICTS = [
-  { id: 1, name: 'Southern Cape', location: 'Cape Town', congregations: 10 },
-  { id: 2, name: 'Northern Cape', location: 'Northern Cape', congregations: 1 },
-  { id: 3, name: 'Free State', location: 'Free State', congregations: 1 },
-  { id: 4, name: 'Gauteng', location: 'Gauteng', congregations: 1 },
-  { id: 5, name: 'Central Cape', location: 'Cape Town', congregations: 3 },
-  { id: 6, name: 'Garden Route', location: 'George', congregations: 10 },
-  { id: 7, name: 'West Coast', location: 'West Coast', congregations: 1 },
-  { id: 8, name: 'Eden District', location: 'Oudtshoorn', congregations: 9 },
+  {
+    id: 1, name: 'Southern Cape', location: 'Cape Town', congregations: 10,
+    board: { chairperson: 'G. Links', deputy: 'J. Louw', secretary: 'J. Vlotman', treasurer: 'Blok' },
+  },
+  {
+    id: 2, name: 'Northern Cape', location: 'Northern Cape', congregations: 1,
+    board: { chairperson: 'TBA', deputy: 'TBA', secretary: 'TBA', treasurer: 'TBA' },
+  },
+  {
+    id: 3, name: 'Free State', location: 'Free State', congregations: 1,
+    board: { chairperson: 'TBA', deputy: 'TBA', secretary: 'TBA', treasurer: 'TBA' },
+  },
+  {
+    id: 4, name: 'Gauteng', location: 'Gauteng', congregations: 1,
+    board: { chairperson: 'A. Leeuw', deputy: 'TBA', secretary: 'TBA', treasurer: 'TBA' },
+  },
+  {
+    id: 5, name: 'Central Cape', location: 'Cape Town', congregations: 3,
+    board: { chairperson: 'TBA', deputy: 'TBA', secretary: 'TBA', treasurer: 'TBA' },
+  },
+  {
+    id: 6, name: 'Garden Route', location: 'George', congregations: 10,
+    board: { chairperson: 'F. Muller', deputy: 'L. Jonas', secretary: 'J. Oosthuizen', treasurer: 'J. Bredenkamp' },
+  },
+  {
+    id: 7, name: 'West Coast', location: 'West Coast', congregations: 1,
+    board: { chairperson: 'TBA', deputy: 'TBA', secretary: 'TBA', treasurer: 'TBA' },
+  },
+  {
+    id: 8, name: 'Eden District', location: 'Oudtshoorn', congregations: 9,
+    board: { chairperson: 'JD Thorne', deputy: 'D. De Villiers', secretary: 'D. Botha', treasurer: 'G. Kemp' },
+  },
+  {
+    id: 9, name: 'Eastern Cape', location: 'Eastern Cape', congregations: 0,
+    board: { chairperson: 'B. Magielies', deputy: 'J. Voorslag', secretary: 'D. Fortein', treasurer: 'N. Kerspuy' },
+  },
 ];
 
 // Bank Details for EFT

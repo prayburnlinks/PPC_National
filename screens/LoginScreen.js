@@ -58,7 +58,7 @@ const LoginScreen = ({ navigation }) => {
     }
     setLoading(true);
     try {
-      const result = await loginUser(email, password);
+      const result = await loginUser(email.trim(), password);
       setLoading(false);
       if (result.success) {
         onLogin(result.user);
@@ -193,7 +193,7 @@ const LoginScreen = ({ navigation }) => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Reset Password</Text>
-            <Text style={styles.modalSubtitle}>Enter your email to receive a reset link.</Text>
+            <Text style={styles.modalSubtitle}>If an account with this email exists, you'll receive a reset link.</Text>
             <TextInput
               style={styles.modalInput}
               placeholder="your@email.com"

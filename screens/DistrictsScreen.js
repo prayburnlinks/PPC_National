@@ -30,11 +30,11 @@ const DistrictsScreen = ({ navigation }) => {
         <Text style={styles.heroSub}>National Church of South Africa</Text>
         <View style={styles.stats}>
           <View style={styles.stat}>
-            <Text style={styles.statNum}>8</Text>
+            <Text style={styles.statNum}>{DISTRICTS.length}</Text>
             <Text style={styles.statLabel}>Districts</Text>
           </View>
           <View style={styles.stat}>
-            <Text style={styles.statNum}>37</Text>
+            <Text style={styles.statNum}>{CONGREGATIONS.length}</Text>
             <Text style={styles.statLabel}>Congregations</Text>
           </View>
         </View>
@@ -83,7 +83,27 @@ const DistrictsScreen = ({ navigation }) => {
               </TouchableOpacity>
 
               {isOpen && (
-                <View style={styles.congregationList}>
+                <View style={styles.expandedPanel}>
+                  {/* District Board */}
+                  <Text style={styles.sectionLabel}>DISTRICT BOARD</Text>
+                  <View style={styles.boardGrid}>
+                    {[
+                      { role: 'Chairperson',        name: district.board?.chairperson },
+                      { role: 'Deputy Chairperson', name: district.board?.deputy },
+                      { role: 'Secretary',          name: district.board?.secretary },
+                      { role: 'Treasurer',          name: district.board?.treasurer },
+                    ].map(({ role, name }) => (
+                      <View key={role} style={styles.boardCell}>
+                        <Text style={styles.boardCellRole}>{role}</Text>
+                        <Text style={[styles.boardCellName, name === 'TBA' && styles.boardCellTBA]}>
+                          {name || 'TBA'}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  {/* Congregations */}
+                  <Text style={styles.sectionLabel}>CONGREGATIONS</Text>
                   {congregations.map((c) => (
                     <View key={c.name} style={styles.congregationItem}>
                       <View style={styles.congregationRow}>
@@ -210,10 +230,49 @@ const styles = StyleSheet.create({
   spacer: {
     height: spacing.lg,
   },
-  congregationList: {
+  expandedPanel: {
     paddingHorizontal: spacing.lg + 8,
     paddingBottom: spacing.md,
-    backgroundColor: 'transparent',
+  },
+  sectionLabel: {
+    fontSize: typography.sizes.xs,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    letterSpacing: 1,
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+    paddingHorizontal: 12,
+  },
+  boardGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+    paddingHorizontal: 4,
+  },
+  boardCell: {
+    width: '47%',
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  boardCellRole: {
+    fontSize: typography.sizes.xs,
+    color: colors.textSecondary,
+    fontWeight: '600',
+    marginBottom: 3,
+  },
+  boardCellName: {
+    fontSize: typography.sizes.sm,
+    color: colors.textPrimary,
+    fontWeight: '700',
+  },
+  boardCellTBA: {
+    color: colors.placeholder,
+    fontStyle: 'italic',
+    fontWeight: '400',
   },
   congregationItem: {
     paddingVertical: 8,
