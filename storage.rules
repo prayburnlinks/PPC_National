@@ -2,17 +2,21 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // Proof of payment uploads — authenticated users can upload to their own folder only
+    // Proof of payment uploads — only the uploader or leaders/admins can read
     match /pop/{userId}/{fileName} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null && (
+        request.auth.uid == userId ||
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'leader']
+      );
       allow write: if request.auth != null && request.auth.uid == userId
-                   && request.resource.size < 5 * 1024 * 1024  // 5 MB max
+                   && request.resource.size < 5 * 1024 * 1024
                    && request.resource.contentType.matches('image/jpeg|image/png|application/pdf');
     }
 
-    // Leadership documents — authenticated users can download, no uploads from app
+    // Leadership documents — leaders and admins only
     match /documents/{fileName} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'leader'];
       allow write: if false;
     }
 

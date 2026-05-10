@@ -17,6 +17,7 @@ import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { getUpcomingEvents } from '../services/firestoreService';
 import { useUser } from '../context/UserContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { DISTRICTS, CONGREGATIONS } from '../constants/config';
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -133,7 +134,7 @@ const HomeScreen = ({ navigation }) => {
           >
             <Text style={styles.quickIcon}>🗺</Text>
             <Text style={styles.quickTitle}>Districts</Text>
-            <Text style={styles.quickSub}>8 districts · 37 congs</Text>
+            <Text style={styles.quickSub}>{DISTRICTS.length} districts · {CONGREGATIONS.length} congs</Text>
           </TouchableOpacity>
 
           <TouchableOpacity

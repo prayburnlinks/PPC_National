@@ -16,6 +16,7 @@ import {
   arrayUnion,
   arrayRemove,
   serverTimestamp,
+  runTransaction,
   query,
   where,
   orderBy,
@@ -390,23 +391,19 @@ export const submitPrayerRequest = async (userId, { title, body, scope = 'nation
 export const prayForRequest = async (requestId, userId) => {
   try {
     const ref = doc(db, 'prayerRequests', requestId);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) throw new Error('Not found');
-    const data = snap.data();
-    const already = Array.isArray(data.prayingBy) && data.prayingBy.includes(userId);
-    if (already) {
-      await updateDoc(ref, {
-        prayCount: increment(-1),
-        prayingBy: arrayRemove(userId),
-      });
-      return { success: true, action: 'removed' };
-    }
-
-    await updateDoc(ref, {
-      prayCount: increment(1),
-      prayingBy: arrayUnion(userId),
+    const action = await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists()) throw new Error('Not found');
+      const data = snap.data();
+      const already = Array.isArray(data.prayingBy) && data.prayingBy.includes(userId);
+      if (already) {
+        tx.update(ref, { prayCount: increment(-1), prayingBy: arrayRemove(userId) });
+        return 'removed';
+      }
+      tx.update(ref, { prayCount: increment(1), prayingBy: arrayUnion(userId) });
+      return 'added';
     });
-    return { success: true, action: 'added' };
+    return { success: true, action };
   } catch (error) {
     console.error('Error toggling pray for request:', error);
     throw { message: 'Failed to update prayer' };

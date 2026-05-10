@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   FlatList,
   Alert,
+  Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
@@ -26,11 +27,11 @@ const PrayerWallScreen = () => {
 
   useEffect(() => {
     loadRequests();
-  }, []);
+  }, [scope]);
 
   const loadRequests = async () => {
     setLoading(true);
-    const list = await getPrayerRequests('national', user?.district);
+    const list = await getPrayerRequests(scope, user?.district);
     setRequests(list);
     setLoading(false);
   };
@@ -41,6 +42,7 @@ const PrayerWallScreen = () => {
     if (title.trim().length > 100) return Alert.alert('Title too long', 'Title must be 100 characters or less');
     if (body.trim().length > 500) return Alert.alert('Request too long', 'Prayer request must be 500 characters or less');
     try {
+      Keyboard.dismiss();
       await submitPrayerRequest(user.uid, { title: title.trim() || 'Prayer Request', body: body.trim(), scope, district: user?.district });
       setTitle('');
       setBody('');
@@ -53,10 +55,12 @@ const PrayerWallScreen = () => {
   const handlePray = async (id) => {
     if (!user) return Alert.alert('Sign in to pray for requests');
     try {
-      await prayForRequest(id, user.uid);
-      // Optimistic refresh
-      setRequests(prev => prev.map(r => r.id === id ? { ...r, prayCount: (r.prayCount || 0) + 1 } : r));
-      loadRequests();
+      const { action } = await prayForRequest(id, user.uid);
+      setRequests(prev => prev.map(r => {
+        if (r.id !== id) return r;
+        const delta = action === 'added' ? 1 : -1;
+        return { ...r, prayCount: (r.prayCount || 0) + delta };
+      }));
     } catch (e) {
       Alert.alert('Error', 'Failed to update prayer count');
     }
