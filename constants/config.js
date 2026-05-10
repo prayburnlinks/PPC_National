@@ -172,7 +172,7 @@ export const NATIONAL_BOARD = [
   {
     id: 5,
     name: 'Johannes Voorslag',
-    portfolio: 'Youth & Childrens Ministry',
+    portfolio: "Youth & Children's Ministry",
     photo: null,
   },
   {

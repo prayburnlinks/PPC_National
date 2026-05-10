@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
+import { ROLES } from '../constants/config';
 import { getPendingRegistrations, approveUser, rejectUser } from '../services/authService';
 import { getPendingPOPs, approvePOP, rejectPOP } from '../services/popService';
 import { useUser } from '../context/UserContext';
@@ -33,14 +34,19 @@ const AdminScreen = ({ navigation }) => {
   const [viewingPOP, setViewingPOP] = useState(null);
 
   const loadAll = useCallback(async () => {
-    const [users, pops] = await Promise.all([
-      getPendingRegistrations(),
-      getPendingPOPs(reviewer?.role, reviewer?.congregation),
-    ]);
-    setPendingUsers(users);
-    setPendingPOPs(pops);
-    setLoading(false);
-    setRefreshing(false);
+    try {
+      const [users, pops] = await Promise.all([
+        getPendingRegistrations(),
+        getPendingPOPs(reviewer?.role, reviewer?.congregation),
+      ]);
+      setPendingUsers(users);
+      setPendingPOPs(pops);
+    } catch {
+      Alert.alert('Error', 'Failed to load admin data. Please try again.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, [reviewer]);
 
   useEffect(() => {
@@ -101,6 +107,47 @@ const AdminScreen = ({ navigation }) => {
     );
   };
 
+  const handleApprovePOP = (pop) => {
+    Alert.alert('Approve POP', `Approve proof of payment from ${pop.userName}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Approve',
+        onPress: async () => {
+          setProcessingPopId(pop.id);
+          try {
+            await approvePOP(pop.id, pop.userId, reviewer?.uid);
+            setPendingPOPs(prev => prev.filter(p => p.id !== pop.id));
+          } catch {
+            Alert.alert('Error', 'Failed to approve payment. Please try again.');
+          } finally {
+            setProcessingPopId(null);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleRejectPOP = (pop) => {
+    Alert.alert('Reject POP', `Reject proof of payment from ${pop.userName}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Reject',
+        style: 'destructive',
+        onPress: async () => {
+          setProcessingPopId(pop.id);
+          try {
+            await rejectPOP(pop.id, pop.userId, reviewer?.uid);
+            setPendingPOPs(prev => prev.filter(p => p.id !== pop.id));
+          } catch {
+            Alert.alert('Error', 'Failed to reject payment. Please try again.');
+          } finally {
+            setProcessingPopId(null);
+          }
+        },
+      },
+    ]);
+  };
+
   const formatDate = (date) => {
     if (!date) return 'N/A';
     return new Date(date).toLocaleDateString('en-ZA', {
@@ -111,8 +158,8 @@ const AdminScreen = ({ navigation }) => {
   };
 
   const roleColor = (role) => {
-    if (role === 'admin') return colors.red;
-    if (role === 'leader') return colors.blue;
+    if (role === ROLES.ADMIN) return colors.red;
+    if (role === ROLES.LEADER) return colors.blue;
     return colors.textSecondary;
   };
 
@@ -294,43 +341,13 @@ const AdminScreen = ({ navigation }) => {
                   <View style={styles.actions}>
                     <TouchableOpacity
                       style={styles.rejectBtn}
-                      onPress={() => {
-                        Alert.alert('Reject POP', `Reject proof of payment from ${pop.userName}?`, [
-                          { text: 'Cancel', style: 'cancel' },
-                          {
-                            text: 'Reject', style: 'destructive',
-                            onPress: async () => {
-                              setProcessingPopId(pop.id);
-                              try {
-                                await rejectPOP(pop.id, pop.userId, reviewer?.uid);
-                                setPendingPOPs(prev => prev.filter(p => p.id !== pop.id));
-                              } catch { Alert.alert('Error', 'Failed to reject.'); }
-                              finally { setProcessingPopId(null); }
-                            },
-                          },
-                        ]);
-                      }}
+                      onPress={() => handleRejectPOP(pop)}
                     >
                       <Text style={styles.rejectBtnText}>Reject</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.approveBtn}
-                      onPress={() => {
-                        Alert.alert('Approve POP', `Approve proof of payment from ${pop.userName}?`, [
-                          { text: 'Cancel', style: 'cancel' },
-                          {
-                            text: 'Approve',
-                            onPress: async () => {
-                              setProcessingPopId(pop.id);
-                              try {
-                                await approvePOP(pop.id, pop.userId, reviewer?.uid);
-                                setPendingPOPs(prev => prev.filter(p => p.id !== pop.id));
-                              } catch { Alert.alert('Error', 'Failed to approve.'); }
-                              finally { setProcessingPopId(null); }
-                            },
-                          },
-                        ]);
-                      }}
+                      onPress={() => handleApprovePOP(pop)}
                     >
                       <Text style={styles.approveBtnText}>Approve</Text>
                     </TouchableOpacity>

@@ -4,6 +4,7 @@ import {
   addDoc,
   getDocs,
   updateDoc,
+  writeBatch,
   query,
   where,
   orderBy,
@@ -34,7 +35,9 @@ export const submitPOP = async (user, file) => {
   try {
     const fileUrl = await uploadPOP(user.uid, file);
 
-    const popRef = await addDoc(collection(db, 'proofOfPayments'), {
+    const batch = writeBatch(db);
+    const popRef = doc(collection(db, 'proofOfPayments'));
+    batch.set(popRef, {
       userId: user.uid,
       userName: user.name,
       congregation: user.congregation || null,
@@ -48,12 +51,11 @@ export const submitPOP = async (user, file) => {
       reviewedAt: null,
       rejectionReason: null,
     });
-
-    // Mark user's popStatus as pending
-    await updateDoc(doc(db, 'users', user.uid), {
+    batch.update(doc(db, 'users', user.uid), {
       popStatus: 'pending',
       updatedAt: new Date(),
     });
+    await batch.commit();
 
     return { success: true, popId: popRef.id };
   } catch (error) {

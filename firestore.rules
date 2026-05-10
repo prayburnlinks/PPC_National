@@ -86,5 +86,28 @@ service cloud.firestore {
       allow read:   if isAdmin();
       allow create: if isAuthenticated();
     }
+
+    match /prayerRequests/{requestId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated()
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isAuthenticated()
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['prayCount', 'prayingBy']);
+      allow delete: if isAuthenticated() && isOwner(resource.data.createdBy);
+    }
+
+    match /proofOfPayments/{popId} {
+      allow read: if isLeaderOrAdmin();
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if isLeaderOrAdmin();
+      allow delete: if false;
+    }
+
+    match /config/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
   }
 }
