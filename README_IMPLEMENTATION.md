@@ -1,10 +1,10 @@
-# PPC National Church Mobile App
+# PPC I Love My Church Mobile App
 
 🔥 A vibrant mobile application for the Pentecostal Protestant Church (PPC) National organization in South Africa.
 
 ## Overview
 
-The PPC National Church App enables church members to:
+The PPC I Love My Church App enables church members to:
 - **Register & Authenticate** — Join the church community with role-based access (Member, Leader, Admin)
 - **Discover Events** — Browse upcoming church events and register to attend
 - **Give & Tithe** — Make secure EFT contributions to various church funds

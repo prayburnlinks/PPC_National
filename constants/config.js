@@ -4,7 +4,7 @@
  */
 
 export const appConfig = {
-  name: 'PPC National Church',
+  name: 'PPC I Love My Church',
   version: '1.0.0',
   environment: 'development',
 };
@@ -88,7 +88,7 @@ export const DISTRICTS = [
 // Bank Details for EFT
 export const BANK_DETAILS = {
   bank: 'First National Bank',
-  accountName: 'PPC National Church',
+  accountName: 'PPC I Love My Church',
   accountNumber: '62 8473 8291',
   branchCode: '250 655',
   accountType: 'Cheque / Current',

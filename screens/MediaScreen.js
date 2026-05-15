@@ -98,7 +98,7 @@ const ScriptureBoard = () => {
         </View>
         <Text style={styles.scriptureDateText}>{getDayLabel()}</Text>
       </View>
-      <Text style={styles.scriptureQuote}>"</Text>
+      <View style={styles.scriptureAccentBar} />
       <Text style={styles.scriptureVerse}>{scripture.verse}</Text>
       <View style={styles.scriptureDivider} />
       <Text style={styles.scriptureRef}>{scripture.ref}</Text>
@@ -398,13 +398,12 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.4)',
     fontSize: typography.sizes.xs,
   },
-  scriptureQuote: {
-    color: colors.gold,
-    fontSize: 72,
-    lineHeight: 60,
-    fontWeight: '900',
-    marginBottom: spacing.xs,
+  scriptureAccentBar: {
+    width: 32,
+    height: 3,
+    backgroundColor: colors.gold,
     opacity: 0.5,
+    marginBottom: spacing.md,
   },
   scriptureVerse: {
     color: colors.white,
