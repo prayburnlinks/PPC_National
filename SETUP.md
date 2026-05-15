@@ -1,8 +1,8 @@
-# PPC National Church App - Setup Guide
+# PPC I Love My Church App - Setup Guide
 
 ## 🚀 Getting Started
 
-This guide walks you through setting up the PPC National Church mobile app for development.
+This guide walks you through setting up the PPC I Love My Church mobile app for development.
 
 ---
 

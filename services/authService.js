@@ -77,7 +77,7 @@ export const registerUser = async (userData) => {
       uid: createdAuthUser.uid,
       status,
       message: status === USER_STATUS.APPROVED
-        ? 'Registration successful! Welcome to PPC National Church.'
+        ? 'Registration successful! Welcome to PPC I Love My Church.'
         : 'Registration submitted. Awaiting admin approval.',
     };
   } catch (error) {

@@ -1,4 +1,4 @@
-# 📋 PPC National Church App - Getting Started Checklist
+# 📋 PPC I Love My Church App - Getting Started Checklist
 
 ## Pre-Requisites (✓ if you have)
 
@@ -162,7 +162,7 @@ File: `screens/GivingScreen.js` or `constants/config.js`
 // Find BANK_DETAILS and update:
 export const BANK_DETAILS = {
   bank: 'YOUR_BANK_NAME',
-  accountName: 'PPC National Church',
+  accountName: 'PPC I Love My Church',
   accountNumber: 'YOUR_ACCOUNT_NUMBER',
   branchCode: 'YOUR_BRANCH_CODE',
   // ... rest remains same
