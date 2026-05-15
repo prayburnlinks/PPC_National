@@ -78,15 +78,7 @@ const ProfileScreen = ({ navigation }) => {
             </View>
             <Text style={styles.rowValue}>{user?.district || 'N/A'}</Text>
           </View>
-          <View style={styles.row}>
-            <View style={styles.rowLeft}>
-              <Text style={styles.rowIcon}>📅</Text>
-              <Text style={styles.rowLabel}>Member Since</Text>
-            </View>
-            <Text style={styles.rowValue}>
-              {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
-            </Text>
-          </View>
+
         </View>
 
         {/* Account Card */}
@@ -129,9 +121,7 @@ const ProfileScreen = ({ navigation }) => {
             <View style={styles.ministryChip}>
               <Text style={styles.ministryChipText}>Member</Text>
             </View>
-            <View style={styles.ministryChip}>
-              <Text style={styles.ministryChipText}>Worship Team</Text>
-            </View>
+
           </View>
         </View>
 
