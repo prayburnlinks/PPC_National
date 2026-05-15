@@ -141,9 +141,9 @@ const HomeScreen = ({ navigation }) => {
             style={[styles.quickCard, styles.quickCardWhite]}
             onPress={() => navigation.navigate('Media')}
           >
-            <Text style={styles.quickIcon}>🎬</Text>
-            <Text style={styles.quickTitleDark}>Sermons</Text>
-            <Text style={styles.quickSubDark}>Watch & listen</Text>
+            <Text style={styles.quickIcon}>📺</Text>
+            <Text style={styles.quickTitleDark}>Media</Text>
+            <Text style={styles.quickSubDark}>Videos & more</Text>
           </TouchableOpacity>
 
           <TouchableOpacity

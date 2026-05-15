@@ -25,7 +25,7 @@ const GivingScreen = ({ navigation }) => {
   const { user } = useUser();
   const insets = useSafeAreaInsets();
   const [selectedFund, setSelectedFund] = useState(GIVING_FUNDS[0].id);
-  const [selectedAmount, setSelectedAmount] = useState('250');
+  const [selectedAmount, setSelectedAmount] = useState('100');
   const [customAmount, setCustomAmount] = useState('');
   const [showBankModal, setShowBankModal] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -67,8 +67,8 @@ const GivingScreen = ({ navigation }) => {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Hero Header */}
+    <View style={styles.container}>
+      {/* Frozen Header */}
       <View style={[styles.heroHeader, { paddingTop: insets.top + spacing.md }]}>
         <Image source={require('../assets/emblem.jpg')} style={styles.emblem} resizeMode="contain" />
         <Text style={styles.heroTitle}>Give to God's Work</Text>
@@ -77,93 +77,95 @@ const GivingScreen = ({ navigation }) => {
         </Text>
       </View>
 
-      <View style={styles.content}>
-        {/* Fund Selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Select Fund</Text>
-          <View style={styles.fundGrid}>
-            {GIVING_FUNDS.map((fund) => (
-              <TouchableOpacity
-                key={fund.id}
-                style={[
-                  styles.fundCard,
-                  selectedFund === fund.id && styles.fundCardSelected,
-                ]}
-                onPress={() => setSelectedFund(fund.id)}
-              >
-                <Text style={styles.fundIcon}>{fund.icon}</Text>
-                <Text style={styles.fundName}>{fund.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Amount Selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Amount (ZAR)</Text>
-          <View style={styles.amountGrid}>
-            {['100', '250', '500', '1000', '2500', 'other'].map((amt) => (
-              <TouchableOpacity
-                key={amt}
-                style={[
-                  styles.amountButton,
-                  selectedAmount === amt && styles.amountButtonSelected,
-                ]}
-                onPress={() => setSelectedAmount(amt)}
-              >
-                <Text
+      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+        <View style={styles.content}>
+          {/* Fund Selection */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Select Fund</Text>
+            <View style={styles.fundGrid}>
+              {GIVING_FUNDS.map((fund) => (
+                <TouchableOpacity
+                  key={fund.id}
                   style={[
-                    styles.amountButtonText,
-                    selectedAmount === amt && styles.amountButtonTextSelected,
+                    styles.fundCard,
+                    selectedFund === fund.id && styles.fundCardSelected,
                   ]}
+                  onPress={() => setSelectedFund(fund.id)}
                 >
-                  {amt === 'other' ? 'Other' : `R${amt}`}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {selectedAmount === 'other' && (
-            <TextInput
-              style={styles.customAmountInput}
-              placeholder="Enter amount in ZAR"
-              placeholderTextColor={colors.placeholder}
-              keyboardType="numeric"
-              value={customAmount}
-              onChangeText={setCustomAmount}
-            />
-          )}
-        </View>
-
-        {/* Payment Method */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Payment Method</Text>
-          <View style={styles.methodCard}>
-            <View style={styles.methodIconBox}><Text style={styles.methodIconText}>🏦</Text></View>
-            <View style={styles.methodInfo}>
-              <Text style={styles.methodTitle}>EFT / Bank Transfer</Text>
-              <Text style={styles.methodSub}>FNB · ABSA · Capitec · Nedbank</Text>
-            </View>
-            <View style={styles.radioButton}>
-              <View style={styles.radioDot} />
+                  <Text style={styles.fundIcon}>{fund.icon}</Text>
+                  <Text style={styles.fundName}>{fund.name}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
+
+          {/* Amount Selection */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Amount (ZAR)</Text>
+            <View style={styles.amountGrid}>
+              {['50', '100', '250', '500', '1000', 'other'].map((amt) => (
+                <TouchableOpacity
+                  key={amt}
+                  style={[
+                    styles.amountButton,
+                    selectedAmount === amt && styles.amountButtonSelected,
+                  ]}
+                  onPress={() => setSelectedAmount(amt)}
+                >
+                  <Text
+                    style={[
+                      styles.amountButtonText,
+                      selectedAmount === amt && styles.amountButtonTextSelected,
+                    ]}
+                  >
+                    {amt === 'other' ? 'Other' : `R${amt}`}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {selectedAmount === 'other' && (
+              <TextInput
+                style={styles.customAmountInput}
+                placeholder="Enter amount in ZAR"
+                placeholderTextColor={colors.placeholder}
+                keyboardType="numeric"
+                value={customAmount}
+                onChangeText={setCustomAmount}
+              />
+            )}
+          </View>
+
+          {/* Payment Method */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Payment Method</Text>
+            <View style={styles.methodCard}>
+              <View style={styles.methodIconBox}><Text style={styles.methodIconText}>🏦</Text></View>
+              <View style={styles.methodInfo}>
+                <Text style={styles.methodTitle}>EFT / Bank Transfer</Text>
+                <Text style={styles.methodSub}>FNB · ABSA · Capitec · Nedbank</Text>
+              </View>
+              <View style={styles.radioButton}>
+                <View style={styles.radioDot} />
+              </View>
+            </View>
+          </View>
+
+          {/* CTA Button */}
+          <TouchableOpacity
+            style={[styles.giveButton, loading && styles.giveButtonDisabled]}
+            onPress={handleProceedToGive}
+            disabled={loading}
+          >
+            <Text style={styles.giveButtonText}>
+              Proceed to Give {getDisplayAmount()} →
+            </Text>
+          </TouchableOpacity>
+
+          <Text style={styles.secureNote}>🔒 All transactions are secure and encrypted</Text>
+          <View style={styles.spacer} />
         </View>
-
-        {/* CTA Button */}
-        <TouchableOpacity
-          style={[styles.giveButton, loading && styles.giveButtonDisabled]}
-          onPress={handleProceedToGive}
-          disabled={loading}
-        >
-          <Text style={styles.giveButtonText}>
-            Proceed to Give {getDisplayAmount()} →
-          </Text>
-        </TouchableOpacity>
-
-        <Text style={styles.secureNote}>🔒 All transactions are secure and encrypted</Text>
-        <View style={styles.spacer} />
-      </View>
+      </ScrollView>
 
       {/* Bank Details Modal */}
       <Modal visible={showBankModal} transparent animationType="slide">
@@ -209,7 +211,7 @@ const GivingScreen = ({ navigation }) => {
           </View>
         </View>
       </Modal>
-    </ScrollView>
+    </View>
   );
 };
 
@@ -217,6 +219,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  scroll: {
+    flex: 1,
   },
   emblem: {
     width: 52,
@@ -397,7 +402,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   spacer: {
-    height: spacing.lg,
+    height: spacing.xxl,
   },
   // Modal styles
   modalOverlay: {
