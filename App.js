@@ -70,7 +70,7 @@ const SignInPromptScreen = ({ navigation }) => {
       <Text style={{ fontSize: 40, marginBottom: 16 }}>🔑</Text>
       <Text style={{ fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 8, textAlign: 'center' }}>Sign In for Full Access</Text>
       <Text style={{ fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginBottom: 32 }}>
-        Create an account or sign in to access Prayer Wall, Giving, and your Profile.
+        Create an account or sign in to access the Prayer Wall, Districts, and your Profile.
       </Text>
       <TouchableOpacity
         onPress={() => onLogout()}
@@ -88,7 +88,7 @@ function VisitorTabs() {
     <Tab.Navigator screenOptions={tabBarScreenOptions(insets)}>
       <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: 'Home' }} />
       <Tab.Screen name="Media" component={MediaScreen} options={{ tabBarLabel: 'Media' }} />
-      <Tab.Screen name="Districts" component={DistrictsScreen} options={{ tabBarLabel: 'Districts' }} />
+      <Tab.Screen name="Giving" component={GivingScreen} options={{ tabBarLabel: 'Give' }} />
       <Tab.Screen name="SignIn" component={SignInPromptScreen} options={{ tabBarLabel: 'Sign In' }} />
     </Tab.Navigator>
   );
