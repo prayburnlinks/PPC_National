@@ -60,7 +60,7 @@ service cloud.firestore {
     }
 
     match /events/{eventId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow write: if isAdmin();
     }
 
