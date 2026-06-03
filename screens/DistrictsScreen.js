@@ -149,13 +149,13 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: colors.white,
-    fontSize: typography.sizes.xxl,
+    fontSize: typography.sizes.xxxl,
     fontWeight: '700',
     marginBottom: spacing.xs,
   },
   heroSub: {
     color: 'rgba(255, 255, 255, 0.55)',
-    fontSize: typography.sizes.base,
+    fontSize: typography.sizes.md,
     marginBottom: spacing.lg,
   },
   stats: {
@@ -167,12 +167,12 @@ const styles = StyleSheet.create({
   },
   statNum: {
     color: colors.gold,
-    fontSize: typography.sizes.xxxl,
+    fontSize: typography.sizes.h1,
     fontWeight: '800',
   },
   statLabel: {
     color: 'rgba(255, 255, 255, 0.5)',
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.sm,
     letterSpacing: 0.5,
   },
   scroll: {
@@ -210,21 +210,21 @@ const styles = StyleSheet.create({
   },
   districtNumText: {
     color: colors.white,
-    fontSize: typography.sizes.sm,
+    fontSize: typography.sizes.base,
     fontWeight: '700',
   },
   districtName: {
-    fontSize: typography.sizes.sm,
+    fontSize: typography.sizes.base,
     fontWeight: '700',
     color: colors.textPrimary,
     marginBottom: spacing.xs,
   },
   districtCong: {
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.sm,
     color: colors.textSecondary,
   },
   districtArrow: {
-    fontSize: typography.sizes.lg,
+    fontSize: typography.sizes.xl,
     color: '#ccc',
   },
   spacer: {
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
   },
   sectionLabel: {
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.sm,
     fontWeight: '700',
     color: colors.textSecondary,
     letterSpacing: 1,
@@ -259,13 +259,13 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   boardCellRole: {
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.sm,
     color: colors.textSecondary,
     fontWeight: '600',
     marginBottom: 3,
   },
   boardCellName: {
-    fontSize: typography.sizes.sm,
+    fontSize: typography.sizes.base,
     color: colors.textPrimary,
     fontWeight: '700',
   },
@@ -285,17 +285,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   congregationText: {
-    fontSize: typography.sizes.sm,
+    fontSize: typography.sizes.base,
     fontWeight: '700',
     color: colors.textPrimary,
   },
   assemblyName: {
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.sm,
     color: colors.blue,
     fontWeight: '600',
   },
   pastorText: {
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.sm,
     color: colors.textSecondary,
     marginTop: 2,
   },
@@ -315,21 +315,21 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   boardIcon: {
-    fontSize: 24,
+    fontSize: 28,
   },
   boardTitle: {
     color: colors.white,
-    fontSize: typography.sizes.sm,
+    fontSize: typography.sizes.base,
     fontWeight: '700',
   },
   boardSub: {
     color: 'rgba(255,255,255,0.55)',
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.sm,
     marginTop: 2,
   },
   boardArrow: {
     color: colors.white,
-    fontSize: typography.sizes.xl,
+    fontSize: typography.sizes.xxl,
   },
 });
 
