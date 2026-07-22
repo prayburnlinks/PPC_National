@@ -17,6 +17,7 @@ import { getLiveStatus } from '../services/firestoreService';
 const YOUTUBE_CHANNEL_URL = 'https://www.youtube.com/@PPCNationalChurch';
 const YOUTUBE_LIVE_URL    = 'https://www.youtube.com/@PPCNationalChurch/live';
 const FACEBOOK_PAGE_URL   = 'https://www.facebook.com/PPCNationalChurch';
+const FACEBOOK_REEL_URL   = 'https://www.facebook.com/reel/1572688079823036';
 
 const openURL = (url) => Linking.openURL(url).catch(() => {});
 
@@ -208,6 +209,24 @@ const MediaScreen = ({ navigation }) => {
             <View style={styles.featuredRight}>
               <Text style={styles.featuredAssembly}>Ebenezer Assembly</Text>
               <Text style={styles.featuredDistrict}>Southern Cape District</Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Featured Facebook Reel */}
+          <TouchableOpacity
+            style={styles.featuredCard}
+            onPress={() => openURL(FACEBOOK_REEL_URL)}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.featuredThumb, styles.featuredThumbFacebook]}>
+              <Text style={styles.featuredPlay}>f</Text>
+            </View>
+            <View style={styles.featuredInfo}>
+              <Text style={[styles.featuredLabel, styles.featuredLabelFacebook]}>FACEBOOK</Text>
+              <Text style={styles.featuredSub}>Tap to open reel</Text>
+            </View>
+            <View style={styles.featuredRight}>
+              <Text style={styles.featuredAssembly}>Ebenezer Assembly</Text>
             </View>
           </TouchableOpacity>
 
@@ -444,6 +463,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  featuredThumbFacebook: {
+    backgroundColor: '#1877F2',
+  },
   featuredPlay: {
     color: colors.white,
     fontSize: typography.sizes.xl,
@@ -451,12 +473,28 @@ const styles = StyleSheet.create({
   featuredInfo: {
     flex: 1,
   },
+  featuredRight: {
+    alignItems: 'flex-end',
+  },
+  featuredAssembly: {
+    fontSize: typography.sizes.sm,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  featuredDistrict: {
+    fontSize: typography.sizes.xs,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
   featuredLabel: {
     fontSize: typography.sizes.xs,
     fontWeight: '700',
     color: colors.red,
     letterSpacing: 1,
     marginBottom: 2,
+  },
+  featuredLabelFacebook: {
+    color: '#1877F2',
   },
   featuredTitle: {
     fontSize: typography.sizes.sm,

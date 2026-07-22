@@ -23,6 +23,10 @@ import PrayerWallScreen from './screens/PrayerWallScreen';
 import AdminScreen from './screens/AdminScreen';
 import NationalBoardScreen from './screens/NationalBoardScreen';
 import DocumentsScreen from './screens/DocumentsScreen';
+import GivingHistoryScreen from './screens/GivingHistoryScreen';
+import MyEventsScreen from './screens/MyEventsScreen';
+import MyPrayerRequestsScreen from './screens/MyPrayerRequestsScreen';
+import NotificationsScreen from './screens/NotificationsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -152,6 +156,10 @@ export default function App() {
             {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && <Stack.Screen name="Admin" component={AdminScreen} />}
             {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && <Stack.Screen name="Documents" component={DocumentsScreen} />}
             {user && <Stack.Screen name="NationalBoard" component={NationalBoardScreen} />}
+            {user && user.role !== ROLES.VISITOR && <Stack.Screen name="GivingHistory" component={GivingHistoryScreen} />}
+            {user && user.role !== ROLES.VISITOR && <Stack.Screen name="MyEvents" component={MyEventsScreen} />}
+            {user && user.role !== ROLES.VISITOR && <Stack.Screen name="MyPrayerRequests" component={MyPrayerRequestsScreen} />}
+            {user && user.role !== ROLES.VISITOR && <Stack.Screen name="Notifications" component={NotificationsScreen} />}
           </Stack.Navigator>
         </NavigationContainer>
       </UserContext.Provider>

@@ -52,8 +52,8 @@ const HomeScreen = ({ navigation }) => {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Hero Header */}
+    <View style={styles.container}>
+      {/* Frozen Hero Header */}
       <View style={[styles.heroHeader, { paddingTop: insets.top + spacing.md }]}>
         <View style={styles.headerTop}>
           <View style={styles.logoRow}>
@@ -78,20 +78,21 @@ const HomeScreen = ({ navigation }) => {
         </View>
       </View>
 
-      {/* Ticker Banner */}
-      {events.length > 0 && (
-        <View style={styles.ticker}>
-          <Text style={styles.tickerBadge}>NOTICE</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <Text style={styles.tickerText}>
-              {events.map(e => `${e.name} · ${new Date(e.eventDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}`).join('   •   ')}
-            </Text>
-          </ScrollView>
-        </View>
-      )}
+      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* Ticker Banner */}
+        {events.length > 0 && (
+          <View style={styles.ticker}>
+            <Text style={styles.tickerBadge}>NOTICE</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <Text style={styles.tickerText}>
+                {events.map(e => `${e.name} · ${new Date(e.eventDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}`).join('   •   ')}
+              </Text>
+            </ScrollView>
+          </View>
+        )}
 
-      {/* Body Content */}
-      <View style={styles.body}>
+        {/* Body Content */}
+        <View style={styles.body}>
         {/* Live Now Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -110,7 +111,7 @@ const HomeScreen = ({ navigation }) => {
               <Text style={styles.liveBadgeText}>LIVE</Text>
             </View>
             <Text style={styles.liveTitle}>Sunday Morning Service</Text>
-            <Text style={styles.liveMeta}>🎤 Ps. David Mokoena · 👁 2.4k watching</Text>
+            <Text style={styles.liveMeta}>🎤 Ps. George Links · 👁 2.4k watching</Text>
             <View style={styles.livePlayButton}>
               <Text style={styles.livePlayIcon}>▶</Text>
             </View>
@@ -197,7 +198,8 @@ const HomeScreen = ({ navigation }) => {
 
         <View style={styles.spacer} />
       </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
@@ -205,6 +207,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  scroll: {
+    flex: 1,
   },
   heroHeader: {
     paddingHorizontal: spacing.lg,
@@ -230,16 +235,16 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   logo: {
-    fontSize: typography.sizes.xxxl,
+    fontSize: typography.sizes.h1,
   },
   logoName: {
     color: colors.white,
-    fontSize: typography.sizes.md,
+    fontSize: typography.sizes.lg,
     fontWeight: '700',
   },
   logoSub: {
     color: 'rgba(255, 255, 255, 0.5)',
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.sm,
     letterSpacing: 1,
   },
   notifBell: {
@@ -252,7 +257,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   notifIcon: {
-    fontSize: typography.sizes.lg,
+    fontSize: typography.sizes.xl,
   },
   notifDot: {
     position: 'absolute',
@@ -267,12 +272,12 @@ const styles = StyleSheet.create({
   },
   greeting: {
     color: 'rgba(255, 255, 255, 0.55)',
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.sm,
     marginBottom: spacing.xs,
   },
   greetingName: {
     color: colors.white,
-    fontSize: typography.sizes.xxl,
+    fontSize: typography.sizes.xxxl,
     fontWeight: '700',
     marginBottom: spacing.md,
   },
@@ -288,7 +293,7 @@ const styles = StyleSheet.create({
   },
   districtText: {
     color: colors.gold,
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.sm,
     fontWeight: '600',
   },
   ticker: {
@@ -302,7 +307,7 @@ const styles = StyleSheet.create({
   tickerBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
     color: colors.white,
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.sm,
     fontWeight: '700',
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
@@ -311,7 +316,7 @@ const styles = StyleSheet.create({
   },
   tickerText: {
     color: colors.white,
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.sm,
     fontWeight: '500',
     flex: 1,
   },
@@ -330,7 +335,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   sectionTitle: {
-    fontSize: typography.sizes.md,
+    fontSize: typography.sizes.lg,
     fontWeight: '700',
     color: colors.textPrimary,
   },
@@ -351,12 +356,12 @@ const styles = StyleSheet.create({
   },
   liveBadgeText: {
     color: colors.white,
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.sm,
     fontWeight: '700',
     letterSpacing: 1,
   },
   seeAllButton: {
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.sm,
     color: colors.lightPurple,
     fontWeight: '600',
   },
@@ -379,13 +384,13 @@ const styles = StyleSheet.create({
   },
   liveTitle: {
     color: colors.white,
-    fontSize: typography.sizes.md,
+    fontSize: typography.sizes.lg,
     fontWeight: '700',
     marginBottom: spacing.xs,
   },
   liveMeta: {
     color: 'rgba(255, 255, 255, 0.55)',
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.sm,
   },
   livePlayButton: {
     position: 'absolute',
@@ -400,7 +405,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   livePlayIcon: {
-    fontSize: typography.sizes.lg,
+    fontSize: typography.sizes.xl,
     color: colors.white,
   },
   quickGrid: {
@@ -428,27 +433,27 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   quickIcon: {
-    fontSize: typography.sizes.xxxl,
+    fontSize: typography.sizes.h1,
     marginBottom: spacing.sm,
   },
   quickTitle: {
     color: colors.white,
-    fontSize: typography.sizes.sm,
+    fontSize: typography.sizes.base,
     fontWeight: '700',
   },
   quickTitleDark: {
     color: colors.textPrimary,
-    fontSize: typography.sizes.sm,
+    fontSize: typography.sizes.base,
     fontWeight: '700',
   },
   quickSub: {
     color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.sm,
     marginTop: spacing.xs,
   },
   quickSubDark: {
     color: colors.textSecondary,
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.sm,
     marginTop: spacing.xs,
   },
   eventCard: {
@@ -470,12 +475,12 @@ const styles = StyleSheet.create({
   },
   eventDay: {
     color: colors.white,
-    fontSize: typography.sizes.xl,
+    fontSize: typography.sizes.xxl,
     fontWeight: '800',
   },
   eventMonth: {
     color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.sm,
     letterSpacing: 0.5,
   },
   eventInfo: {
@@ -483,13 +488,13 @@ const styles = StyleSheet.create({
   },
   eventTitle: {
     color: colors.textPrimary,
-    fontSize: typography.sizes.sm,
+    fontSize: typography.sizes.base,
     fontWeight: '700',
     marginBottom: spacing.xs,
   },
   eventVenue: {
     color: colors.textSecondary,
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.sm,
     marginBottom: spacing.sm,
   },
   eventTag: {
@@ -501,13 +506,13 @@ const styles = StyleSheet.create({
   },
   eventTagText: {
     color: colors.purple,
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.sm,
     fontWeight: '700',
   },
   emptyText: {
     textAlign: 'center',
     color: colors.textSecondary,
-    fontSize: typography.sizes.base,
+    fontSize: typography.sizes.md,
     paddingVertical: spacing.xl,
   },
   spacer: {

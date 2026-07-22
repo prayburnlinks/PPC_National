@@ -12,6 +12,11 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase-config';
+import { createUserNotification } from './firestoreService';
+
+// storage.rules only allows these — must always send one, since an
+// undefined contentType fails the rule's regex match outright.
+const MIME_BY_EXT = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', pdf: 'application/pdf' };
 
 export const uploadPOP = async (userId, file) => {
   try {
@@ -19,9 +24,10 @@ export const uploadPOP = async (userId, file) => {
     const response = await fetch(file.uri);
     const blob = await response.blob();
 
-    const ext = file.name?.split('.').pop() || (file.mimeType?.includes('pdf') ? 'pdf' : 'jpg');
+    const ext = file.name?.split('.').pop()?.toLowerCase() || (file.mimeType?.includes('pdf') ? 'pdf' : 'jpg');
+    const contentType = file.mimeType || MIME_BY_EXT[ext] || 'image/jpeg';
     const storageRef = ref(storage, `pop/${userId}/${Date.now()}.${ext}`);
-    await uploadBytes(storageRef, blob, { contentType: file.mimeType });
+    await uploadBytes(storageRef, blob, { contentType });
     const downloadUrl = await getDownloadURL(storageRef);
 
     return downloadUrl;
@@ -102,6 +108,11 @@ export const approvePOP = async (popId, userId, reviewerUid) => {
       popStatus: 'approved',
       updatedAt: new Date(),
     });
+    createUserNotification(userId, {
+      type: 'pop_status',
+      title: 'Payment Approved',
+      body: 'Your proof of payment has been approved. Thank you for your giving!',
+    });
     return { success: true };
   } catch (error) {
     console.error('Approve POP error:', error);
@@ -120,6 +131,13 @@ export const rejectPOP = async (popId, userId, reviewerUid, reason = '') => {
     await updateDoc(doc(db, 'users', userId), {
       popStatus: 'rejected',
       updatedAt: new Date(),
+    });
+    createUserNotification(userId, {
+      type: 'pop_status',
+      title: 'Payment Not Approved',
+      body: reason
+        ? `Your proof of payment was rejected: ${reason}`
+        : 'Your proof of payment was not approved. Please resubmit or contact the church office.',
     });
     return { success: true };
   } catch (error) {

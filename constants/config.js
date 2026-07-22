@@ -45,43 +45,43 @@ export const GIVING_FUNDS = [
   { id: 'welfare', name: 'Church Welfare', icon: '🤝', description: 'Support for church members' },
 ];
 
-// Districts
+// Districts (alphabetical by name)
 export const DISTRICTS = [
   {
-    id: 1, name: 'Southern Cape', location: 'Cape Town', congregations: 10,
-    board: { chairperson: 'G. Links', deputy: 'J. Louw', secretary: 'J. Vlotman', treasurer: 'Blok' },
-  },
-  {
-    id: 2, name: 'Northern Cape', location: 'Northern Cape', congregations: 1,
+    id: 1, name: 'Boland', location: 'Boland', congregations: 12,
     board: { chairperson: 'TBA', deputy: 'TBA', secretary: 'TBA', treasurer: 'TBA' },
   },
   {
-    id: 3, name: 'Free State', location: 'Free State', congregations: 1,
+    id: 2, name: 'Central Cape', location: 'Cape Town', congregations: 10,
     board: { chairperson: 'TBA', deputy: 'TBA', secretary: 'TBA', treasurer: 'TBA' },
   },
   {
-    id: 4, name: 'Gauteng', location: 'Gauteng', congregations: 1,
-    board: { chairperson: 'A. Leeuw', deputy: 'TBA', secretary: 'TBA', treasurer: 'TBA' },
+    id: 3, name: 'Eastern Cape', location: 'Eastern Cape', congregations: 9,
+    board: { chairperson: 'B. Magielies', deputy: 'J. Voorslag', secretary: 'D. Fortein', treasurer: 'N. Kerspuy' },
   },
   {
-    id: 5, name: 'Central Cape', location: 'Cape Town', congregations: 3,
-    board: { chairperson: 'TBA', deputy: 'TBA', secretary: 'TBA', treasurer: 'TBA' },
-  },
-  {
-    id: 6, name: 'Garden Route', location: 'George', congregations: 10,
-    board: { chairperson: 'F. Muller', deputy: 'L. Jonas', secretary: 'J. Oosthuizen', treasurer: 'J. Bredenkamp' },
-  },
-  {
-    id: 7, name: 'West Coast', location: 'West Coast', congregations: 1,
-    board: { chairperson: 'TBA', deputy: 'TBA', secretary: 'TBA', treasurer: 'TBA' },
-  },
-  {
-    id: 8, name: 'Eden District', location: 'Oudtshoorn', congregations: 9,
+    id: 4, name: 'Eden', location: 'Oudtshoorn', congregations: 9,
     board: { chairperson: 'JD Thorne', deputy: 'D. De Villiers', secretary: 'D. Botha', treasurer: 'G. Kemp' },
   },
   {
-    id: 9, name: 'Eastern Cape', location: 'Eastern Cape', congregations: 0,
-    board: { chairperson: 'B. Magielies', deputy: 'J. Voorslag', secretary: 'D. Fortein', treasurer: 'N. Kerspuy' },
+    id: 5, name: 'Free State', location: 'Free State', congregations: 7,
+    board: { chairperson: 'TBA', deputy: 'TBA', secretary: 'TBA', treasurer: 'TBA' },
+  },
+  {
+    id: 6, name: 'Garden Route', location: 'George', congregations: 9,
+    board: { chairperson: 'F. Muller', deputy: 'L. Jonas', secretary: 'J. Oosthuizen', treasurer: 'J. Bredenkamp' },
+  },
+  {
+    id: 7, name: 'Gauteng', location: 'Gauteng', congregations: 8,
+    board: { chairperson: 'A. Leeuw', deputy: 'TBA', secretary: 'TBA', treasurer: 'TBA' },
+  },
+  {
+    id: 8, name: 'Northern Cape', location: 'Northern Cape', congregations: 6,
+    board: { chairperson: 'TBA', deputy: 'TBA', secretary: 'TBA', treasurer: 'TBA' },
+  },
+  {
+    id: 9, name: 'Southern Cape', location: 'Cape Town', congregations: 11,
+    board: { chairperson: 'G. Links', deputy: 'J. Louw', secretary: 'J. Vlotman', treasurer: 'Blok' },
   },
 ];
 
@@ -95,52 +95,99 @@ export const BANK_DETAILS = {
   referenceFormat: 'Name + Congregation',
 };
 
-// Congregations mapped to their district
+// Congregations (assemblies) mapped to their district
+// Grouped by district (alphabetical, matching DISTRICTS order); each group sorted alphabetically
 export const CONGREGATIONS = [
-  // Southern Cape
-  { name: 'Ebenezer', district: 'Southern Cape' },
-  { name: 'Ravensmead', district: 'Southern Cape' },
-  { name: 'Kraaifontein', district: 'Southern Cape' },
-  { name: 'Factreton', district: 'Southern Cape' },
-  { name: 'Mount Carmel', district: 'Southern Cape' },
-  { name: 'Mount Horeb', district: 'Southern Cape' },
-  { name: 'Ocean View', district: 'Southern Cape' },
-  { name: 'Emmanuel', district: 'Southern Cape' },
-  { name: 'Belhar', district: 'Southern Cape' },
-  { name: 'Atlantis', district: 'Southern Cape' },
-  // Northern Cape
-  { name: 'Congregation 01', district: 'Northern Cape' },
-  // Free State
-  { name: 'Congregation 02', district: 'Free State' },
-  // Gauteng
-  { name: 'Congregation 03', district: 'Gauteng' },
+  // Boland
+  { name: 'Botrivier', district: 'Boland' },
+  { name: 'Ceres', district: 'Boland' },
+  { name: 'De Doorns', district: 'Boland' },
+  { name: 'Grabouw', district: 'Boland' },
+  { name: 'Groenland', district: 'Boland' },
+  { name: 'Macassar', district: 'Boland' },
+  { name: 'Paarl', district: 'Boland' },
+  { name: 'Rawsonville', district: 'Boland' },
+  { name: 'Riviersonderend', district: 'Boland' },
+  { name: 'Swellendam', district: 'Boland' },
+  { name: 'Villiersdorp', district: 'Boland' },
+  { name: 'Worcester (Ebed)', district: 'Boland' },
   // Central Cape
-  { name: 'Mount Olive', district: 'Central Cape' },
-  { name: 'Beacon Valley', district: 'Central Cape' },
+  { name: 'Beaconvalley', district: 'Central Cape' },
+  { name: 'Crawford', district: 'Central Cape' },
   { name: 'Eden', district: 'Central Cape' },
+  { name: 'Hannover Park', district: 'Central Cape' },
+  { name: 'Heideveldt', district: 'Central Cape' },
+  { name: 'Lotusriver', district: 'Central Cape' },
+  { name: 'Mt Olive', district: 'Central Cape' },
+  { name: 'Ottery', district: 'Central Cape' },
+  { name: 'Searidge Park', district: 'Central Cape' },
+  { name: 'Seawinds', district: 'Central Cape' },
+  // Eastern Cape
+  { name: 'Despatch', district: 'Eastern Cape' },
+  { name: 'Gelvandale', district: 'Eastern Cape' },
+  { name: 'Hephzibah', district: 'Eastern Cape' },
+  { name: 'Humansdorp', district: 'Eastern Cape' },
+  { name: 'Jeffreys Baai', district: 'Eastern Cape' },
+  { name: 'Oos-London', district: 'Eastern Cape' },
+  { name: 'Steytlerville', district: 'Eastern Cape' },
+  { name: 'Uitenhage', district: 'Eastern Cape' },
+  { name: 'Woodlands', district: 'Eastern Cape' },
+  // Eden
+  { name: 'Beaufort Wes', district: 'Eden' },
+  { name: 'De Rust', district: 'Eden' },
+  { name: 'Dysselsdorp', district: 'Eden' },
+  { name: 'Graaff-Reinet', district: 'Eden' },
+  { name: 'Ladysmith', district: 'Eden' },
+  { name: 'Langkloof', district: 'Eden' },
+  { name: 'Oudtshoorn', district: 'Eden' },
+  { name: 'Prins Albert', district: 'Eden' },
+  { name: 'Willowmore', district: 'Eden' },
+  // Free State
+  { name: 'Bloemspruit', district: 'Free State' },
+  { name: 'Colesberg', district: 'Free State' },
+  { name: 'Gariepdam', district: 'Free State' },
+  { name: 'HVG/Bloemfontein', district: 'Free State' },
+  { name: 'Kroonstad', district: 'Free State' },
+  { name: 'Oppermans', district: 'Free State' },
+  { name: 'Word of Healing', district: 'Free State' },
   // Garden Route
-  { name: 'Knysna', assemblyName: 'Galilee Assembly', pastor: 'Ps. Francious & Sally Muller', district: 'Garden Route' },
-  { name: 'Plettenberg Bay', assemblyName: null, pastor: 'Ps. Lenhard & Esmerelda Jonas', district: 'Garden Route' },
-  { name: 'Coldstream', assemblyName: null, pastor: 'Ps. Welcome Grootboom', district: 'Garden Route' },
-  { name: 'Keurhoek', assemblyName: null, pastor: 'Applikant', district: 'Garden Route' },
-  { name: 'Sedgefield', assemblyName: null, pastor: 'Ps. Eldrigde & Hillary Carolus', district: 'Garden Route' },
-  { name: 'Parkdene', assemblyName: 'Mount Calvary', pastor: 'Ps. Jeremy & Christene Bredenkamp', district: 'Garden Route' },
-  { name: 'Rosemoore', assemblyName: 'Calvary', pastor: 'Ps. Josef & Caroline Oosthuizen', district: 'Garden Route' },
-  { name: 'Pacaltsdorp', assemblyName: null, pastor: 'Distrik toesig', district: 'Garden Route' },
-  { name: 'Mosselbay', assemblyName: null, pastor: 'Elder Petrus & Ananda', district: 'Garden Route' },
-  { name: 'Albertinia', assemblyName: null, pastor: 'Applikant', district: 'Garden Route' },
-  // West Coast
-  { name: 'Laaiplek', district: 'West Coast' },
-  // Eden District
-  { name: 'Ladismith', assemblyName: 'Lofdal Gemeente', pastor: 'Ps. Dawid & Annelize De Villiers', district: 'Eden District' },
-  { name: 'Oudtshoorn', assemblyName: 'Emmanuel Gemeente', pastor: 'Ps. Dawid & Anette Botha', district: 'Eden District' },
-  { name: 'Dysselsdorp', assemblyName: 'Tikvah Embassy', pastor: 'Ps. Joey & Herculene Thorne', district: 'Eden District' },
-  { name: 'De Rust', assemblyName: 'Bethel Gemeente', pastor: 'Distrik Toesig', district: 'Eden District' },
-  { name: 'Prins Albert', assemblyName: 'Maranatha Gemeente', pastor: 'Ps. Adrian & Surayda May', district: 'Eden District' },
-  { name: 'Beaufort Wes', assemblyName: null, pastor: 'Ps. Klein', district: 'Eden District' },
-  { name: 'Graaff Reinet', assemblyName: 'House', pastor: 'Ps. Gavin & Vivian Kemp', district: 'Eden District' },
-  { name: 'Willowmore', assemblyName: 'Elim Gemeente', pastor: 'Applikant Ricardo & Caroline Human', district: 'Eden District' },
-  { name: 'Langkloof', assemblyName: 'Spirit Word', pastor: 'Ps. Patrick & Chantal Kemoeti', district: 'Eden District' },
+  { name: 'Coldstream', district: 'Garden Route' },
+  { name: 'Keurhoek Rheenendal', district: 'Garden Route' },
+  { name: 'Knysna/Hornlee', district: 'Garden Route' },
+  { name: 'Mosselbaai/Mispa', district: 'Garden Route' },
+  { name: 'New Horizon/Plettenberg Baai', district: 'Garden Route' },
+  { name: 'Pacaltsdorp', district: 'Garden Route' },
+  { name: 'Parkdene/Mt Calvary', district: 'Garden Route' },
+  { name: 'Rosemoor (Calvary)', district: 'Garden Route' },
+  { name: 'Sedgefield', district: 'Garden Route' },
+  // Gauteng
+  { name: 'EdenPark', district: 'Gauteng' },
+  { name: 'Eerste Rus', district: 'Gauteng' },
+  { name: 'Eldorado Park', district: 'Gauteng' },
+  { name: 'Fochville', district: 'Gauteng' },
+  { name: 'Kilpspruit-Wes', district: 'Gauteng' },
+  { name: 'Potchefstroom', district: 'Gauteng' },
+  { name: 'Riverlea', district: 'Gauteng' },
+  { name: 'Rustervaal', district: 'Gauteng' },
+  // Northern Cape
+  { name: 'Britstown/De Aar', district: 'Northern Cape' },
+  { name: 'Kathu', district: 'Northern Cape' },
+  { name: 'Kimberley/Colville', district: 'Northern Cape' },
+  { name: 'Olifantshoek', district: 'Northern Cape' },
+  { name: 'Pescodia', district: 'Northern Cape' },
+  { name: 'Upington', district: 'Northern Cape' },
+  // Southern Cape
+  { name: 'Atlantis', district: 'Southern Cape' },
+  { name: 'Belhar', district: 'Southern Cape' },
+  { name: 'Concordia', district: 'Southern Cape' },
+  { name: 'Ebenhaeser', district: 'Southern Cape' },
+  { name: 'Emmanuel', district: 'Southern Cape' },
+  { name: 'Factreton', district: 'Southern Cape' },
+  { name: 'Kraaifontein', district: 'Southern Cape' },
+  { name: 'Mt Carmel', district: 'Southern Cape' },
+  { name: 'Mt Horeb', district: 'Southern Cape' },
+  { name: 'Ocean View', district: 'Southern Cape' },
+  { name: 'Ravensmead', district: 'Southern Cape' },
 ];
 
 // National Board Members

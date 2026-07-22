@@ -19,16 +19,18 @@ import { getPendingRegistrations, approveUser, rejectUser } from '../services/au
 import { getPendingPOPs, approvePOP, rejectPOP } from '../services/popService';
 import { useUser } from '../context/UserContext';
 
-const TABS = ['Pending', 'Payments', 'Actions'];
-
 const AdminScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const { user: reviewer } = useUser();
+  // Only Admins can approve/reject user registrations (firestore.rules
+  // grants that to isAdmin() only) — Leaders get Payments review instead.
+  const isAdminReviewer = reviewer?.role === ROLES.ADMIN;
+  const TABS = isAdminReviewer ? ['Pending', 'Payments', 'Actions'] : ['Payments', 'Actions'];
   const [pendingUsers, setPendingUsers] = useState([]);
   const [pendingPOPs, setPendingPOPs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState('Pending');
+  const [activeTab, setActiveTab] = useState(isAdminReviewer ? 'Pending' : 'Payments');
   const [processingUid, setProcessingUid] = useState(null);
   const [processingPopId, setProcessingPopId] = useState(null);
   const [viewingPOP, setViewingPOP] = useState(null);
@@ -36,7 +38,7 @@ const AdminScreen = ({ navigation }) => {
   const loadAll = useCallback(async () => {
     try {
       const [users, pops] = await Promise.all([
-        getPendingRegistrations(),
+        isAdminReviewer ? getPendingRegistrations() : Promise.resolve([]),
         getPendingPOPs(reviewer?.role, reviewer?.congregation),
       ]);
       setPendingUsers(users);
@@ -47,7 +49,7 @@ const AdminScreen = ({ navigation }) => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [reviewer]);
+  }, [reviewer, isAdminReviewer]);
 
   useEffect(() => {
     loadAll();
@@ -361,14 +363,16 @@ const AdminScreen = ({ navigation }) => {
         <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Quick Actions</Text>
-            <TouchableOpacity style={styles.actionRow} onPress={() => setActiveTab('Pending')}>
-              <Text style={styles.actionIcon}>⏳</Text>
-              <View style={styles.actionText}>
-                <Text style={styles.actionLabel}>Pending Approvals</Text>
-                <Text style={styles.actionSub}>{pendingUsers.length} users awaiting approval</Text>
-              </View>
-              <Text style={styles.actionArrow}>›</Text>
-            </TouchableOpacity>
+            {isAdminReviewer && (
+              <TouchableOpacity style={styles.actionRow} onPress={() => setActiveTab('Pending')}>
+                <Text style={styles.actionIcon}>⏳</Text>
+                <View style={styles.actionText}>
+                  <Text style={styles.actionLabel}>Pending Approvals</Text>
+                  <Text style={styles.actionSub}>{pendingUsers.length} users awaiting approval</Text>
+                </View>
+                <Text style={styles.actionArrow}>›</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity style={styles.actionRow} onPress={() => setActiveTab('Payments')}>
               <Text style={styles.actionIcon}>💳</Text>
               <View style={styles.actionText}>

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(brew list *)",
+      "Bash(osascript)",
+      "Bash(python3 /private/tmp/claude-502/-Users-macbookpro15-Documents-VScode-PPC-National/e339e4d0-ee52-467b-bf76-15fbbe333cb0/scratchpad/pptx_to_pdf.py)",
+      "Bash(python3 /private/tmp/claude-502/-Users-macbookpro15-Documents-VScode-PPC-National/e339e4d0-ee52-467b-bf76-15fbbe333cb0/scratchpad/build_pptx.py)",
+      "Bash(ls -lh /Users/macbookpro15/Documents/VScode/PPC_National/PPC_National_App_Presentation.* 2>/dev/null && ls /private/tmp/claude-502/ 2>/dev/null)",
+      "Read(//private/tmp/claude-502/**)",
+      "Bash(brew --version)"
+    ]
+  }
+}

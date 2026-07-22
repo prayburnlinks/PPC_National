@@ -84,28 +84,28 @@ const ProfileScreen = ({ navigation }) => {
         {/* Account Card */}
         <View style={styles.card}>
           <Text style={styles.cardHeader}>Account</Text>
-          <TouchableOpacity style={styles.row} onPress={() => alert('Coming soon')}>
+          <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('Notifications')}>
             <View style={styles.rowLeft}>
               <Text style={styles.rowIcon}>🔔</Text>
               <Text style={styles.rowLabel}>Notifications</Text>
             </View>
             <Text style={styles.rowArrow}>›</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.row} onPress={() => alert('Coming soon')}>
+          <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('GivingHistory')}>
             <View style={styles.rowLeft}>
               <Text style={styles.rowIcon}>💝</Text>
               <Text style={styles.rowLabel}>Giving History</Text>
             </View>
             <Text style={styles.rowArrow}>›</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.row} onPress={() => alert('Coming soon')}>
+          <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('MyPrayerRequests')}>
             <View style={styles.rowLeft}>
               <Text style={styles.rowIcon}>🙏</Text>
               <Text style={styles.rowLabel}>Prayer Requests</Text>
             </View>
             <Text style={styles.rowArrow}>›</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.row} onPress={() => alert('Coming soon')}>
+          <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('MyEvents')}>
             <View style={styles.rowLeft}>
               <Text style={styles.rowIcon}>📋</Text>
               <Text style={styles.rowLabel}>My Events</Text>
@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
   },
   name: {
     color: colors.white,
-    fontSize: typography.sizes.xxl,
+    fontSize: typography.sizes.xxxl,
     fontWeight: '700',
     marginBottom: spacing.md,
   },
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   },
   roleBadgeText: {
     color: colors.white,
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.sm,
     fontWeight: '600',
   },
   content: {
@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   cardHeader: {
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.sm,
     fontWeight: '700',
     color: colors.textSecondary,
     letterSpacing: 0.5,
@@ -231,19 +231,19 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   rowIcon: {
-    fontSize: typography.sizes.lg,
+    fontSize: typography.sizes.xl,
   },
   rowLabel: {
-    fontSize: typography.sizes.sm,
+    fontSize: typography.sizes.base,
     fontWeight: '500',
     color: colors.textPrimary,
   },
   rowValue: {
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.sm,
     color: colors.textSecondary,
   },
   rowArrow: {
-    fontSize: typography.sizes.lg,
+    fontSize: typography.sizes.xl,
     color: colors.textSecondary,
   },
   ministryChips: {
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   ministryChipText: {
-    fontSize: typography.sizes.xs,
+    fontSize: typography.sizes.sm,
     fontWeight: '700',
     color: colors.blue,
   },
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   adminButtonText: {
-    fontSize: typography.sizes.sm,
+    fontSize: typography.sizes.base,
     fontWeight: '600',
     color: colors.white,
   },
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   logoutButtonText: {
-    fontSize: typography.sizes.sm,
+    fontSize: typography.sizes.base,
     fontWeight: '600',
     color: colors.red,
   },
