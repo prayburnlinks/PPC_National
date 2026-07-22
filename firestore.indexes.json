@@ -18,6 +18,14 @@
       ]
     },
     {
+      "collectionGroup": "prayerRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "createdBy", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "proofOfPayments",
       "queryScope": "COLLECTION",
       "fields": [

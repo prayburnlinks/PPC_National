@@ -201,28 +201,34 @@ export const isUserRegisteredForEvent = async (userId, eventId) => {
  */
 
 /**
- * Log a giving transaction
+ * Log a giving transaction.
+ * Pass a falsy `userId` (e.g. an unauthenticated visitor) to log an
+ * anonymous transaction — it's recorded only in the global
+ * `givingTransactions` collection, not in a per-user subcollection.
  */
 export const logGivingTransaction = async (userId, transactionData) => {
   try {
-    const givingRef = collection(db, 'users', userId, 'givingHistory');
-
     const transaction = {
       ...transactionData,
       createdAt: new Date(),
       status: 'pending', // manual EFT payment
     };
 
-    const docRef = await addDoc(givingRef, transaction);
+    let docRef;
+    if (userId) {
+      const givingRef = collection(db, 'users', userId, 'givingHistory');
+      docRef = await addDoc(givingRef, transaction);
+    }
 
     // Also create a global giving record for analytics
-    await addDoc(collection(db, 'givingTransactions'), {
+    const globalRef = await addDoc(collection(db, 'givingTransactions'), {
       ...transaction,
-      userId,
-      transactionId: docRef.id,
+      userId: userId || null,
+      isAnonymous: !userId,
+      transactionId: docRef?.id || null,
     });
 
-    return { success: true, transactionId: docRef.id };
+    return { success: true, transactionId: docRef?.id || globalRef.id };
   } catch (error) {
     console.error('Error logging giving transaction:', error);
     throw { message: 'Failed to save transaction' };
@@ -331,6 +337,30 @@ export const getUserNotifications = async (userId, maxResults = 10) => {
 };
 
 /**
+ * Create a notification in a user's feed. Only leaders/admins can do this
+ * (firestore.rules) — it's meant for system/reviewer-triggered notices
+ * (registration approved, payment reviewed, etc.), not self-service.
+ * Fire-and-forget by design: a notification failing to write should never
+ * block the action that triggered it.
+ */
+export const createUserNotification = async (userId, { type, title, body }) => {
+  try {
+    const notificationsRef = collection(db, 'users', userId, 'notifications');
+    await addDoc(notificationsRef, {
+      type,
+      title,
+      body,
+      read: false,
+      createdAt: new Date(),
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('Error creating notification:', error);
+    return { success: false };
+  }
+};
+
+/**
  * Mark notification as read
  */
 export const markNotificationAsRead = async (userId, notificationId) => {
@@ -385,6 +415,24 @@ export const submitPrayerRequest = async (userId, { title, body, scope = 'nation
   } catch (error) {
     console.error('Error submitting prayer request:', error);
     throw { message: 'Failed to submit prayer request' };
+  }
+};
+
+/**
+ * Get a user's own submitted prayer requests
+ */
+export const getUserPrayerRequests = async (userId) => {
+  try {
+    const q = query(
+      collection(db, 'prayerRequests'),
+      where('createdBy', '==', userId),
+      orderBy('createdAt', 'desc')
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ ...d.data(), id: d.id, createdAt: parseDate(d.data().createdAt) }));
+  } catch (error) {
+    console.error('Error fetching user prayer requests:', error);
+    return [];
   }
 };
 
@@ -443,10 +491,12 @@ export default {
 
   // Notifications
   getUserNotifications,
+  createUserNotification,
   markNotificationAsRead,
 
   // Prayer Wall
   getPrayerRequests,
+  getUserPrayerRequests,
   submitPrayerRequest,
   prayForRequest,
 

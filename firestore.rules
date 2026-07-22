@@ -25,6 +25,25 @@ service cloud.firestore {
         .hasAny(['role', 'status', 'approvedAt']);
     }
 
+    // Shared shape check for a giving/tithe transaction doc — used by both
+    // the per-user givingHistory subcollection and the global
+    // givingTransactions collection so a client can't write a negative,
+    // zero, or already-settled donation record.
+    function isValidGivingWrite() {
+      return request.resource.data.amount is number
+        && request.resource.data.amount > 0
+        && request.resource.data.status == 'pending'
+        && request.resource.data.paymentMethod == 'eft';
+    }
+
+    // A user submitting their own proof of payment resets their own
+    // popStatus to 'pending' — that's the one self-service value allowed;
+    // 'approved'/'rejected' must come from a leader/admin review below.
+    function isSelfSubmittingPop() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['popStatus', 'updatedAt'])
+        && request.resource.data.popStatus == 'pending';
+    }
+
     match /users/{userId} {
       allow read: if isAuthenticated() && (isOwner(userId) || isLeaderOrAdmin());
 
@@ -34,11 +53,18 @@ service cloud.firestore {
         (request.resource.data.role in ['leader', 'admin'] && request.resource.data.status == 'pending')
       );
 
-      // Users can update their own profile but cannot touch protected fields
-      allow update: if isAuthenticated() && isOwner(userId) && !isChangingProtectedField();
+      // Users can update their own profile but cannot touch protected fields,
+      // and can't set their own popStatus to anything but 'pending' (no self-approval).
+      allow update: if isAuthenticated() && isOwner(userId) && !isChangingProtectedField()
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['popStatus']) || isSelfSubmittingPop());
 
       // Admins can update anything (approval, role changes)
       allow update: if isAdmin();
+
+      // Leaders can review proof-of-payment status — nothing else on the profile
+      allow update: if isAuthenticated() && isLeaderOrAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['popStatus', 'updatedAt'])
+        && request.resource.data.popStatus in ['approved', 'rejected'];
 
       allow delete: if false;
 
@@ -48,11 +74,18 @@ service cloud.firestore {
 
       match /givingHistory/{transactionId} {
         allow read:   if isAuthenticated() && isOwner(userId);
-        allow create: if isAuthenticated() && isOwner(userId);
+        allow create: if isAuthenticated() && isOwner(userId) && isValidGivingWrite();
       }
 
       match /notifications/{notificationId} {
         allow read: if isAuthenticated() && isOwner(userId);
+        // System/reviewer-triggered only (registration approval, POP review,
+        // etc.) — never self-service, and shape-restricted.
+        allow create: if isLeaderOrAdmin()
+          && request.resource.data.read == false
+          && request.resource.data.type is string
+          && request.resource.data.title is string
+          && request.resource.data.body is string;
         // Only allow marking as read — no other field changes
         allow update: if isAuthenticated() && isOwner(userId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
@@ -62,6 +95,12 @@ service cloud.firestore {
     match /events/{eventId} {
       allow read: if true;
       allow write: if isAdmin();
+
+      // Any signed-in member registering for an event bumps the counter —
+      // scoped to exactly that single-field, single-step increment.
+      allow update: if isAuthenticated()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['attendeeCount'])
+        && request.resource.data.attendeeCount == resource.data.attendeeCount + 1;
     }
 
     match /districts/{districtId} {
@@ -83,8 +122,21 @@ service cloud.firestore {
 
     // Global giving analytics
     match /givingTransactions/{transactionId} {
-      allow read:   if isAdmin();
-      allow create: if isAuthenticated();
+      allow read: if isAdmin();
+
+      // Signed-in members
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.isAnonymous == false
+        && isValidGivingWrite();
+
+      // Unauthenticated visitors: no auth to check, so lock the write down
+      // to the exact anonymous shape the app sends — no arbitrary fields,
+      // no impersonating a real userId.
+      allow create: if !isAuthenticated()
+        && request.resource.data.userId == null
+        && request.resource.data.isAnonymous == true
+        && isValidGivingWrite();
     }
 
     match /prayerRequests/{requestId} {
@@ -98,16 +150,30 @@ service cloud.firestore {
     }
 
     match /proofOfPayments/{popId} {
-      allow read: if isLeaderOrAdmin();
+      // Admins see every POP; leaders only their own congregation's.
+      allow read: if isAdmin() || (
+        isLeaderOrAdmin() &&
+        resource.data.congregation == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.congregation
+      );
       allow create: if isAuthenticated()
-        && request.resource.data.userId == request.auth.uid;
-      allow update: if isLeaderOrAdmin();
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'pending';
+      allow update: if isLeaderOrAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'reviewedBy', 'reviewedAt', 'rejectionReason'])
+        && request.resource.data.status in ['approved', 'rejected'];
       allow delete: if false;
     }
 
     match /config/{docId} {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
+    }
+
+    // Live-stream banner is shown on the Media tab, which visitors can see
+    // without signing in — this doc needs to be readable without auth.
+    match /config/liveStatus {
+      allow read: if true;
     }
   }
 }

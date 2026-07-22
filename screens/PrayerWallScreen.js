@@ -24,6 +24,8 @@ const PrayerWallScreen = () => {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [scope, setScope] = useState('national');
+  const [submitting, setSubmitting] = useState(false);
+  const [prayingIds, setPrayingIds] = useState([]);
 
   useEffect(() => {
     loadRequests();
@@ -41,19 +43,24 @@ const PrayerWallScreen = () => {
     if (!body.trim()) return Alert.alert('Please enter a prayer request');
     if (title.trim().length > 100) return Alert.alert('Title too long', 'Title must be 100 characters or less');
     if (body.trim().length > 500) return Alert.alert('Request too long', 'Prayer request must be 500 characters or less');
+    setSubmitting(true);
     try {
       Keyboard.dismiss();
       await submitPrayerRequest(user.uid, { title: title.trim() || 'Prayer Request', body: body.trim(), scope, district: user?.district });
       setTitle('');
       setBody('');
-      loadRequests();
+      await loadRequests();
     } catch (e) {
       Alert.alert('Error', 'Failed to submit prayer request');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handlePray = async (id) => {
     if (!user) return Alert.alert('Sign in to pray for requests');
+    if (prayingIds.includes(id)) return;
+    setPrayingIds(prev => [...prev, id]);
     try {
       const { action } = await prayForRequest(id, user.uid);
       setRequests(prev => prev.map(r => {
@@ -63,24 +70,33 @@ const PrayerWallScreen = () => {
       }));
     } catch (e) {
       Alert.alert('Error', 'Failed to update prayer count');
+    } finally {
+      setPrayingIds(prev => prev.filter(pid => pid !== id));
     }
   };
 
-  const renderItem = ({ item }) => (
-    <View style={styles.requestCard}>
-      <View style={styles.requestHeader}>
-        <Text style={styles.requestTitle}>{item.title || 'Prayer'}</Text>
-        <Text style={styles.requestCount}>{item.prayCount || 0} praying</Text>
+  const renderItem = ({ item }) => {
+    const isPraying = prayingIds.includes(item.id);
+    return (
+      <View style={styles.requestCard}>
+        <View style={styles.requestHeader}>
+          <Text style={styles.requestTitle}>{item.title || 'Prayer'}</Text>
+          <Text style={styles.requestCount}>{item.prayCount || 0} praying</Text>
+        </View>
+        <Text style={styles.requestBody}>{item.body}</Text>
+        <View style={styles.requestFooter}>
+          <Text style={styles.requestMeta}>📅 {new Date(item.createdAt).toLocaleDateString()}</Text>
+          <TouchableOpacity
+            style={[styles.prayButton, isPraying && styles.prayButtonDisabled]}
+            onPress={() => handlePray(item.id)}
+            disabled={isPraying}
+          >
+            <Text style={styles.prayText}>Praying 🙏</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-      <Text style={styles.requestBody}>{item.body}</Text>
-      <View style={styles.requestFooter}>
-        <Text style={styles.requestMeta}>📅 {new Date(item.createdAt).toLocaleDateString()}</Text>
-        <TouchableOpacity style={styles.prayButton} onPress={() => handlePray(item.id)}>
-          <Text style={styles.prayText}>Praying 🙏</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -120,8 +136,16 @@ const PrayerWallScreen = () => {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <Text style={styles.submitText}>Submit Request</Text>
+        <TouchableOpacity
+          style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
+          onPress={handleSubmit}
+          disabled={submitting}
+        >
+          {submitting ? (
+            <ActivityIndicator size="small" color={colors.white} />
+          ) : (
+            <Text style={styles.submitText}>Submit Request</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -156,6 +180,7 @@ const styles = StyleSheet.create({
   scopeText: { color: colors.textSecondary },
   scopeTextActive: { color: colors.white },
   submitButton: { backgroundColor: colors.purple, padding: spacing.md, borderRadius: borderRadius.md, alignItems: 'center', marginTop: spacing.sm },
+  submitButtonDisabled: { opacity: 0.6 },
   submitText: { color: colors.white, fontWeight: '700' },
   listContainer: { flex: 1 },
   requestCard: { backgroundColor: colors.white, marginBottom: spacing.md, borderRadius: borderRadius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
@@ -166,6 +191,7 @@ const styles = StyleSheet.create({
   requestFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   requestMeta: { color: colors.textSecondary, fontSize: typography.sizes.xs },
   prayButton: { backgroundColor: colors.gold, paddingVertical: 6, paddingHorizontal: 10, borderRadius: borderRadius.sm },
+  prayButtonDisabled: { opacity: 0.5 },
   prayText: { color: colors.darkBlue, fontWeight: '700' },
   empty: { padding: spacing.lg, color: colors.textSecondary },
 });

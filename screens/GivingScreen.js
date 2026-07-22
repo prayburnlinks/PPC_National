@@ -15,6 +15,7 @@ import {
   Alert,
   Image,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { logGivingTransaction } from '../services/firestoreService';
 import { GIVING_FUNDS, BANK_DETAILS } from '../constants/config';
@@ -24,15 +25,23 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 const GivingScreen = ({ navigation }) => {
   const { user } = useUser();
   const insets = useSafeAreaInsets();
+  const isVisitor = !user?.uid;
   const [selectedFund, setSelectedFund] = useState(GIVING_FUNDS[0].id);
   const [selectedAmount, setSelectedAmount] = useState('100');
   const [customAmount, setCustomAmount] = useState('');
+  const [visitorName, setVisitorName] = useState('');
   const [showBankModal, setShowBankModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [givingReference, setGivingReference] = useState('');
 
   const getDisplayAmount = () => {
     if (selectedAmount === 'other') return customAmount ? `R${customAmount}` : 'Enter amount';
     return `R${selectedAmount}`;
+  };
+
+  const getReferenceText = () => {
+    if (isVisitor) return `${visitorName.trim() || 'Anonymous Visitor'} (Visitor)`;
+    return `${user.name} · ${user.congregation}`;
   };
 
   const handleProceedToGive = async () => {
@@ -50,14 +59,16 @@ const GivingScreen = ({ navigation }) => {
 
     setLoading(true);
     try {
-      
-      await logGivingTransaction(user.uid, {
+      const reference = getReferenceText();
+
+      await logGivingTransaction(user?.uid, {
         fund: selectedFund,
         amount: Math.round(amount * 100) / 100,
         paymentMethod: 'eft',
-        reference: `${user.name} · ${user.congregation}`,
+        reference,
       });
 
+      setGivingReference(reference);
       setLoading(false);
       setShowBankModal(true);
     } catch (error) {
@@ -136,6 +147,20 @@ const GivingScreen = ({ navigation }) => {
             )}
           </View>
 
+          {/* Visitor Name (only shown when not signed in) */}
+          {isVisitor && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Your Name (optional)</Text>
+              <TextInput
+                style={styles.customAmountInput}
+                placeholder="For your giving reference"
+                placeholderTextColor={colors.placeholder}
+                value={visitorName}
+                onChangeText={setVisitorName}
+              />
+            </View>
+          )}
+
           {/* Payment Method */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Payment Method</Text>
@@ -184,7 +209,8 @@ const GivingScreen = ({ navigation }) => {
                   {(key === 'accountNumber' || key === 'branchCode') && (
                     <TouchableOpacity
                       style={styles.copyButton}
-                      onPress={() => {
+                      onPress={async () => {
+                        await Clipboard.setStringAsync(value);
                         Alert.alert('Copied', `"${value}" copied to clipboard!`);
                       }}
                     >
@@ -198,7 +224,7 @@ const GivingScreen = ({ navigation }) => {
             <View style={styles.referenceInfo}>
               <Text style={styles.referenceTitle}>📌 Your Reference:</Text>
               <Text style={styles.referenceExample}>
-                <Text style={{ fontWeight: '700' }}>{user?.name} · {user?.congregation}</Text>
+                <Text style={{ fontWeight: '700' }}>{givingReference}</Text>
               </Text>
             </View>
 
@@ -231,7 +257,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   heroHeader: {
-    backgroundColor: colors.red,
+    backgroundColor: colors.darkBlue,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
     paddingBottom: spacing.xl,

@@ -24,6 +24,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '../firebase-config';
 import { ROLES, USER_STATUS } from '../constants/config';
+import { createUserNotification } from './firestoreService';
 
 /**
  * Register a new user
@@ -225,6 +226,12 @@ export const approveUser = async (uid) => {
       updatedAt: new Date(),
     });
 
+    createUserNotification(uid, {
+      type: 'approval_status',
+      title: 'Account Approved',
+      body: 'Your account has been approved. Welcome to PPC I Love My Church!',
+    });
+
     return { success: true, message: 'User approved' };
   } catch (error) {
     console.error('Approve user error:', error);
@@ -244,6 +251,14 @@ export const rejectUser = async (uid, reason = '') => {
       status: USER_STATUS.REJECTED,
       rejectionReason: reason,
       updatedAt: new Date(),
+    });
+
+    createUserNotification(uid, {
+      type: 'approval_status',
+      title: 'Registration Not Approved',
+      body: reason
+        ? `Your registration was not approved: ${reason}`
+        : 'Your registration was not approved. Please contact the church office.',
     });
 
     return { success: true, message: 'User rejected' };
