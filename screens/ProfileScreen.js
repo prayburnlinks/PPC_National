@@ -112,6 +112,13 @@ const ProfileScreen = ({ navigation }) => {
             </View>
             <Text style={styles.rowArrow}>›</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('MyOrders')}>
+            <View style={styles.rowLeft}>
+              <Text style={styles.rowIcon}>🛍️</Text>
+              <Text style={styles.rowLabel}>My Orders</Text>
+            </View>
+            <Text style={styles.rowArrow}>›</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Ministries Card */}

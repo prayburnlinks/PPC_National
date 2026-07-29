@@ -8,7 +8,7 @@ import { auth } from './firebase-config';
 import { onAuthStateChanged } from 'firebase/auth';
 import { getCurrentUser } from './services/authService';
 import { colors } from './constants/theme';
-import { ROLES, USER_STATUS } from './constants/config';
+import { ROLES, USER_STATUS, NATIONAL_WOMENS_BOARD } from './constants/config';
 import { UserContext } from './context/UserContext';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
@@ -27,6 +27,9 @@ import GivingHistoryScreen from './screens/GivingHistoryScreen';
 import MyEventsScreen from './screens/MyEventsScreen';
 import MyPrayerRequestsScreen from './screens/MyPrayerRequestsScreen';
 import NotificationsScreen from './screens/NotificationsScreen';
+import StoreScreen from './screens/StoreScreen';
+import MyOrdersScreen from './screens/MyOrdersScreen';
+import AdminMerchItemsScreen from './screens/AdminMerchItemsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -155,11 +158,21 @@ export default function App() {
             {user && <Stack.Screen name="Events" component={EventsScreen} />}
             {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && <Stack.Screen name="Admin" component={AdminScreen} />}
             {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && <Stack.Screen name="Documents" component={DocumentsScreen} />}
+            {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && <Stack.Screen name="AdminMerchItems" component={AdminMerchItemsScreen} />}
             {user && <Stack.Screen name="NationalBoard" component={NationalBoardScreen} />}
+            {user && (
+              <Stack.Screen
+                name="NationalWomensBoard"
+                component={NationalBoardScreen}
+                initialParams={{ title: "National Women's Board", board: NATIONAL_WOMENS_BOARD }}
+              />
+            )}
             {user && user.role !== ROLES.VISITOR && <Stack.Screen name="GivingHistory" component={GivingHistoryScreen} />}
             {user && user.role !== ROLES.VISITOR && <Stack.Screen name="MyEvents" component={MyEventsScreen} />}
             {user && user.role !== ROLES.VISITOR && <Stack.Screen name="MyPrayerRequests" component={MyPrayerRequestsScreen} />}
             {user && user.role !== ROLES.VISITOR && <Stack.Screen name="Notifications" component={NotificationsScreen} />}
+            {user && user.role !== ROLES.VISITOR && <Stack.Screen name="Store" component={StoreScreen} />}
+            {user && user.role !== ROLES.VISITOR && <Stack.Screen name="MyOrders" component={MyOrdersScreen} />}
           </Stack.Navigator>
         </NavigationContainer>
       </UserContext.Provider>

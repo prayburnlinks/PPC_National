@@ -165,6 +165,33 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /merchandise/{itemId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /merchOrders/{orderId} {
+      allow read: if isAdmin() || isOwner(resource.data.userId) || (
+        isLeaderOrAdmin() &&
+        resource.data.congregation == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.congregation
+      );
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'awaiting_payment';
+      // Owner attaches payment proof
+      allow update: if isAuthenticated() && isOwner(resource.data.userId)
+        && resource.data.status == 'awaiting_payment'
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['fileUrl', 'fileName', 'mimeType', 'status', 'paymentSubmittedAt'])
+        && request.resource.data.status == 'payment_submitted';
+      // Admin/leader reviews
+      allow update: if isLeaderOrAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'reviewedBy', 'reviewedAt', 'rejectionReason'])
+        && request.resource.data.status in ['approved', 'rejected'];
+      allow delete: if false;
+    }
+
     match /config/{docId} {
       allow read: if isAuthenticated();
       allow write: if isAdmin();

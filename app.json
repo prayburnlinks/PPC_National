@@ -12,7 +12,8 @@
       "backgroundColor": "#0A1F44"
     },
     "updates": {
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/4159b7fe-4875-4e33-a6e7-ab4b38b2b314"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -43,6 +44,15 @@
           }
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "4159b7fe-4875-4e33-a6e7-ab4b38b2b314"
+      }
+    },
+    "owner": "prayburnl",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    }
   }
 }

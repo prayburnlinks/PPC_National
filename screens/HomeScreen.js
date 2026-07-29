@@ -110,6 +110,7 @@ const HomeScreen = ({ navigation }) => {
               <View style={styles.liveDot} />
               <Text style={styles.liveBadgeText}>LIVE</Text>
             </View>
+            <Text style={styles.liveMediaLabel}>Media</Text>
             <Text style={styles.liveTitle}>Sunday Morning Service</Text>
             <Text style={styles.liveMeta}>🎤 Ps. George Links · 👁 2.4k watching</Text>
             <View style={styles.livePlayButton}>
@@ -140,20 +141,20 @@ const HomeScreen = ({ navigation }) => {
 
           <TouchableOpacity
             style={[styles.quickCard, styles.quickCardWhite]}
-            onPress={() => navigation.navigate('Media')}
-          >
-            <Text style={styles.quickIcon}>📺</Text>
-            <Text style={styles.quickTitleDark}>Media</Text>
-            <Text style={styles.quickSubDark}>Videos & more</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.quickCard, styles.quickCardWhite]}
             onPress={() => navigation.navigate('PrayerWall')}
           >
             <Text style={styles.quickIcon}>🙏</Text>
             <Text style={styles.quickTitleDark}>Prayer Wall</Text>
             <Text style={styles.quickSubDark}>Submit requests</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.quickCard, styles.quickCardWhite]}
+            onPress={() => navigation.navigate('Store')}
+          >
+            <Text style={styles.quickIcon}>🛍️</Text>
+            <Text style={styles.quickTitleDark}>Store</Text>
+            <Text style={styles.quickSubDark}>Church merchandise</Text>
           </TouchableOpacity>
         </View>
 
@@ -381,6 +382,13 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.full,
     alignSelf: 'flex-start',
     marginBottom: spacing.md,
+  },
+  liveMediaLabel: {
+    color: 'rgba(255, 255, 255, 0.55)',
+    fontSize: typography.sizes.xs,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginBottom: spacing.xs,
   },
   liveTitle: {
     color: colors.white,

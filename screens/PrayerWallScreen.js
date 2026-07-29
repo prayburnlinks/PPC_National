@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -26,6 +26,11 @@ const PrayerWallScreen = () => {
   const [scope, setScope] = useState('national');
   const [submitting, setSubmitting] = useState(false);
   const [prayingIds, setPrayingIds] = useState([]);
+  // Refs mirror the state above but update synchronously — state updates are
+  // batched by React, so two taps in the same tick could both read the same
+  // stale (pre-update) state before a re-render happens. Refs close that gap.
+  const submittingRef = useRef(false);
+  const prayingRef = useRef(new Set());
 
   useEffect(() => {
     loadRequests();
@@ -43,6 +48,8 @@ const PrayerWallScreen = () => {
     if (!body.trim()) return Alert.alert('Please enter a prayer request');
     if (title.trim().length > 100) return Alert.alert('Title too long', 'Title must be 100 characters or less');
     if (body.trim().length > 500) return Alert.alert('Request too long', 'Prayer request must be 500 characters or less');
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       Keyboard.dismiss();
@@ -53,13 +60,15 @@ const PrayerWallScreen = () => {
     } catch (e) {
       Alert.alert('Error', 'Failed to submit prayer request');
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
 
   const handlePray = async (id) => {
     if (!user) return Alert.alert('Sign in to pray for requests');
-    if (prayingIds.includes(id)) return;
+    if (prayingRef.current.has(id)) return;
+    prayingRef.current.add(id);
     setPrayingIds(prev => [...prev, id]);
     try {
       const { action } = await prayForRequest(id, user.uid);
@@ -71,6 +80,7 @@ const PrayerWallScreen = () => {
     } catch (e) {
       Alert.alert('Error', 'Failed to update prayer count');
     } finally {
+      prayingRef.current.delete(id);
       setPrayingIds(prev => prev.filter(pid => pid !== id));
     }
   };

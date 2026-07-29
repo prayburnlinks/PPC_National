@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   ScrollView,
@@ -6,13 +6,18 @@ import {
   TouchableOpacity,
   Text,
   Image,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { NATIONAL_BOARD } from '../constants/config';
 
-const NationalBoardScreen = ({ navigation }) => {
+const NationalBoardScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
+  const [previewMember, setPreviewMember] = useState(null);
+
+  const title = route?.params?.title || 'National Board';
+  const board = route?.params?.board || NATIONAL_BOARD;
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -22,7 +27,7 @@ const NationalBoardScreen = ({ navigation }) => {
           <Text style={styles.backText}>‹</Text>
         </TouchableOpacity>
         <Image source={require('../assets/emblem.jpg')} style={styles.emblem} resizeMode="contain" />
-        <Text style={styles.heroTitle}>National Board</Text>
+        <Text style={styles.heroTitle}>{title}</Text>
         <Text style={styles.heroSub}>Pentecostal Protestant Church · SA</Text>
       </View>
 
@@ -30,11 +35,16 @@ const NationalBoardScreen = ({ navigation }) => {
       <View style={styles.content}>
         <Text style={styles.sectionLabel}>BOARD MEMBERS</Text>
 
-        {NATIONAL_BOARD.map((member) => (
+        {board.map((member) => (
           <View key={member.id} style={styles.card}>
-            <View style={styles.photoWrap}>
+            <TouchableOpacity
+              style={styles.photoWrap}
+              activeOpacity={member.photoFull ? 0.7 : 1}
+              onPress={() => member.photoFull && setPreviewMember(member)}
+              disabled={!member.photoFull}
+            >
               {member.photo ? (
-                <Image source={{ uri: member.photo }} style={styles.photo} />
+                <Image source={member.photo} style={styles.photo} />
               ) : (
                 <View style={styles.photoPlaceholder}>
                   <Text style={styles.photoInitials}>
@@ -42,7 +52,7 @@ const NationalBoardScreen = ({ navigation }) => {
                   </Text>
                 </View>
               )}
-            </View>
+            </TouchableOpacity>
             <View style={styles.info}>
               <Text style={styles.name}>{member.name}</Text>
               <Text style={styles.portfolio}>{member.portfolio}</Text>
@@ -50,8 +60,29 @@ const NationalBoardScreen = ({ navigation }) => {
           </View>
         ))}
 
-        <View style={styles.spacer} />
+        <View style={[styles.spacer, { height: spacing.xxxl + insets.bottom }]} />
       </View>
+
+      <Modal
+        visible={!!previewMember}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewMember(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setPreviewMember(null)}
+        >
+          {previewMember && (
+            <View style={styles.modalContent}>
+              <Image source={previewMember.photoFull} style={styles.modalPhoto} resizeMode="cover" />
+              <Text style={styles.modalName}>{previewMember.name}</Text>
+              <Text style={styles.modalPortfolio}>{previewMember.portfolio}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </Modal>
     </ScrollView>
   );
 };
@@ -156,6 +187,32 @@ const styles = StyleSheet.create({
   },
   spacer: {
     height: spacing.xxxl,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+  },
+  modalContent: {
+    alignItems: 'center',
+  },
+  modalPhoto: {
+    width: 300,
+    height: 400,
+    borderRadius: borderRadius.lg,
+  },
+  modalName: {
+    color: colors.white,
+    fontSize: typography.sizes.lg,
+    fontWeight: '700',
+    marginTop: spacing.lg,
+  },
+  modalPortfolio: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: typography.sizes.sm,
+    marginTop: spacing.xs,
   },
 });
 

@@ -195,7 +195,7 @@ const GivingScreen = ({ navigation }) => {
       {/* Bank Details Modal */}
       <Modal visible={showBankModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { paddingBottom: spacing.lg + insets.bottom }]}>
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>EFT Banking Details</Text>
 

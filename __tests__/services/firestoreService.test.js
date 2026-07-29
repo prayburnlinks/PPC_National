@@ -1,5 +1,6 @@
 import {
   getPrayerRequests,
+  getUserPrayerRequests,
   submitPrayerRequest,
   prayForRequest,
   getLiveStatus,
@@ -7,6 +8,8 @@ import {
   getUpcomingEvents,
   getUserProfile,
   updateUserProfile,
+  logGivingTransaction,
+  createUserNotification,
 } from '../../services/firestoreService';
 
 jest.mock('firebase/firestore', () => ({
@@ -85,6 +88,29 @@ describe('getPrayerRequests', () => {
     getDocs.mockRejectedValue(new Error('Network error'));
 
     const result = await getPrayerRequests('national', null);
+
+    expect(result).toEqual([]);
+  });
+});
+
+describe('getUserPrayerRequests', () => {
+  it("returns the user's own submitted requests", async () => {
+    getDocs.mockResolvedValue(
+      makeQuerySnap([
+        ['req-1', { title: 'Mine', body: 'Body', createdBy: 'uid-1', createdAt: null }],
+      ])
+    );
+
+    const result = await getUserPrayerRequests('uid-1');
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('req-1');
+  });
+
+  it('returns empty array on error', async () => {
+    getDocs.mockRejectedValue(new Error('Network error'));
+
+    const result = await getUserPrayerRequests('uid-1');
 
     expect(result).toEqual([]);
   });
@@ -288,5 +314,84 @@ describe('updateUserProfile', () => {
     expect(updates).toHaveProperty('name', 'Bob');
     expect(updates).not.toHaveProperty('role');
     expect(updates).not.toHaveProperty('status');
+  });
+});
+
+describe('logGivingTransaction', () => {
+  const txData = { fund: 'tithes', amount: 100, paymentMethod: 'eft', reference: 'Alice · Ebenezer' };
+
+  it('writes to both givingHistory and givingTransactions for a signed-in user', async () => {
+    addDoc
+      .mockResolvedValueOnce({ id: 'history-doc-1' })
+      .mockResolvedValueOnce({ id: 'global-doc-1' });
+
+    const result = await logGivingTransaction('uid-1', txData);
+
+    expect(addDoc).toHaveBeenCalledTimes(2);
+    const [, globalPayload] = addDoc.mock.calls[1];
+    expect(globalPayload).toMatchObject({
+      userId: 'uid-1',
+      isAnonymous: false,
+      transactionId: 'history-doc-1',
+    });
+    expect(result).toMatchObject({ success: true, transactionId: 'history-doc-1' });
+  });
+
+  it('writes only to givingTransactions for an anonymous visitor (no userId)', async () => {
+    addDoc.mockResolvedValueOnce({ id: 'global-doc-2' });
+
+    const result = await logGivingTransaction(null, txData);
+
+    expect(addDoc).toHaveBeenCalledTimes(1);
+    const [, globalPayload] = addDoc.mock.calls[0];
+    expect(globalPayload).toMatchObject({
+      userId: null,
+      isAnonymous: true,
+      transactionId: null,
+    });
+    expect(result).toMatchObject({ success: true, transactionId: 'global-doc-2' });
+  });
+
+  it('throws on failure', async () => {
+    addDoc.mockRejectedValue(new Error('Write failed'));
+
+    await expect(logGivingTransaction('uid-1', txData)).rejects.toMatchObject({
+      message: 'Failed to save transaction',
+    });
+  });
+});
+
+describe('createUserNotification', () => {
+  it('writes a notification doc with the expected shape', async () => {
+    addDoc.mockResolvedValue({ id: 'notif-1' });
+
+    const result = await createUserNotification('uid-1', {
+      type: 'pop_status',
+      title: 'Payment Approved',
+      body: 'Thank you for your giving!',
+    });
+
+    expect(addDoc).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        type: 'pop_status',
+        title: 'Payment Approved',
+        body: 'Thank you for your giving!',
+        read: false,
+      })
+    );
+    expect(result.success).toBe(true);
+  });
+
+  it('never throws — returns success:false on failure', async () => {
+    addDoc.mockRejectedValue(new Error('Permission denied'));
+
+    const result = await createUserNotification('uid-1', {
+      type: 'approval_status',
+      title: 'x',
+      body: 'x',
+    });
+
+    expect(result.success).toBe(false);
   });
 });

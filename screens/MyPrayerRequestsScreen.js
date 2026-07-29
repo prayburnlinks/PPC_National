@@ -72,7 +72,7 @@ const MyPrayerRequestsScreen = ({ navigation }) => {
               </View>
             </View>
           ))}
-          <View style={{ height: spacing.xxxl }} />
+          <View style={{ height: spacing.xxxl + insets.bottom }} />
         </ScrollView>
       )}
     </View>
