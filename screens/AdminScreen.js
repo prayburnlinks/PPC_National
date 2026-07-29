@@ -17,6 +17,7 @@ import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { ROLES } from '../constants/config';
 import { getPendingRegistrations, approveUser, rejectUser } from '../services/authService';
 import { getPendingPOPs, approvePOP, rejectPOP } from '../services/popService';
+import { getPendingMerchOrders, approveMerchOrder, rejectMerchOrder } from '../services/merchService';
 import { useUser } from '../context/UserContext';
 
 const AdminScreen = ({ navigation }) => {
@@ -25,24 +26,29 @@ const AdminScreen = ({ navigation }) => {
   // Only Admins can approve/reject user registrations (firestore.rules
   // grants that to isAdmin() only) — Leaders get Payments review instead.
   const isAdminReviewer = reviewer?.role === ROLES.ADMIN;
-  const TABS = isAdminReviewer ? ['Pending', 'Payments', 'Actions'] : ['Payments', 'Actions'];
+  const TABS = isAdminReviewer ? ['Pending', 'Payments', 'Merch Orders', 'Actions'] : ['Payments', 'Merch Orders', 'Actions'];
   const [pendingUsers, setPendingUsers] = useState([]);
   const [pendingPOPs, setPendingPOPs] = useState([]);
+  const [pendingMerchOrders, setPendingMerchOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState(isAdminReviewer ? 'Pending' : 'Payments');
   const [processingUid, setProcessingUid] = useState(null);
   const [processingPopId, setProcessingPopId] = useState(null);
+  const [processingOrderId, setProcessingOrderId] = useState(null);
   const [viewingPOP, setViewingPOP] = useState(null);
+  const [viewingOrderProof, setViewingOrderProof] = useState(null);
 
   const loadAll = useCallback(async () => {
     try {
-      const [users, pops] = await Promise.all([
+      const [users, pops, orders] = await Promise.all([
         isAdminReviewer ? getPendingRegistrations() : Promise.resolve([]),
         getPendingPOPs(reviewer?.role, reviewer?.congregation),
+        getPendingMerchOrders(reviewer?.role, reviewer?.congregation),
       ]);
       setPendingUsers(users);
       setPendingPOPs(pops);
+      setPendingMerchOrders(orders);
     } catch {
       Alert.alert('Error', 'Failed to load admin data. Please try again.');
     } finally {
@@ -150,6 +156,47 @@ const AdminScreen = ({ navigation }) => {
     ]);
   };
 
+  const handleApproveMerchOrder = (order) => {
+    Alert.alert('Approve Order', `Approve ${order.itemName} order from ${order.userName}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Approve',
+        onPress: async () => {
+          setProcessingOrderId(order.id);
+          try {
+            await approveMerchOrder(order.id, order.userId, reviewer?.uid);
+            setPendingMerchOrders(prev => prev.filter(o => o.id !== order.id));
+          } catch {
+            Alert.alert('Error', 'Failed to approve order. Please try again.');
+          } finally {
+            setProcessingOrderId(null);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleRejectMerchOrder = (order) => {
+    Alert.alert('Reject Order', `Reject ${order.itemName} order from ${order.userName}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Reject',
+        style: 'destructive',
+        onPress: async () => {
+          setProcessingOrderId(order.id);
+          try {
+            await rejectMerchOrder(order.id, order.userId, reviewer?.uid);
+            setPendingMerchOrders(prev => prev.filter(o => o.id !== order.id));
+          } catch {
+            Alert.alert('Error', 'Failed to reject order. Please try again.');
+          } finally {
+            setProcessingOrderId(null);
+          }
+        },
+      },
+    ]);
+  };
+
   const formatDate = (date) => {
     if (!date) return 'N/A';
     return new Date(date).toLocaleDateString('en-ZA', {
@@ -177,9 +224,9 @@ const AdminScreen = ({ navigation }) => {
           <Text style={styles.headerSub}>User Management</Text>
         </View>
         <View style={styles.badgeWrap}>
-          {(pendingUsers.length + pendingPOPs.length) > 0 && (
+          {(pendingUsers.length + pendingPOPs.length + pendingMerchOrders.length) > 0 && (
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>{pendingUsers.length + pendingPOPs.length}</Text>
+              <Text style={styles.badgeText}>{pendingUsers.length + pendingPOPs.length + pendingMerchOrders.length}</Text>
             </View>
           )}
         </View>
@@ -197,6 +244,7 @@ const AdminScreen = ({ navigation }) => {
               {tab}
               {tab === 'Pending' && pendingUsers.length > 0 ? ` (${pendingUsers.length})` : ''}
               {tab === 'Payments' && pendingPOPs.length > 0 ? ` (${pendingPOPs.length})` : ''}
+              {tab === 'Merch Orders' && pendingMerchOrders.length > 0 ? ` (${pendingMerchOrders.length})` : ''}
             </Text>
           </TouchableOpacity>
         ))}
@@ -209,7 +257,7 @@ const AdminScreen = ({ navigation }) => {
         </View>
       ) : activeTab === 'Pending' ? (
         <ScrollView
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, { paddingBottom: spacing.xxxl + insets.bottom }]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.blue]} />}
           showsVerticalScrollIndicator={false}
         >
@@ -282,7 +330,7 @@ const AdminScreen = ({ navigation }) => {
         </ScrollView>
       ) : activeTab === 'Payments' ? (
         <ScrollView
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, { paddingBottom: spacing.xxxl + insets.bottom }]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.blue]} />}
           showsVerticalScrollIndicator={false}
         >
@@ -359,8 +407,86 @@ const AdminScreen = ({ navigation }) => {
             ))
           )}
         </ScrollView>
+      ) : activeTab === 'Merch Orders' ? (
+        <ScrollView
+          contentContainerStyle={[styles.list, { paddingBottom: spacing.xxxl + insets.bottom }]}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.blue]} />}
+          showsVerticalScrollIndicator={false}
+        >
+          {pendingMerchOrders.length === 0 ? (
+            <View style={styles.empty}>
+              <Text style={styles.emptyIcon}>✅</Text>
+              <Text style={styles.emptyTitle}>All caught up!</Text>
+              <Text style={styles.emptyText}>No merch orders awaiting review.</Text>
+            </View>
+          ) : (
+            pendingMerchOrders.map(order => (
+              <View key={order.id} style={styles.card}>
+                <View style={styles.cardTop}>
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{order.userName?.[0]?.toUpperCase() || '?'}</Text>
+                  </View>
+                  <View style={styles.cardInfo}>
+                    <Text style={styles.userName}>{order.userName}</Text>
+                    <Text style={styles.userEmail}>{order.itemName}</Text>
+                    <View style={[styles.rolePill, { borderColor: colors.blue }]}>
+                      <Text style={[styles.rolePillText, { color: colors.blue }]}>
+                        {order.size ? `Size ${order.size} · ` : ''}Qty {order.quantity}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                <View style={styles.meta}>
+                  <View style={styles.metaRow}>
+                    <Text style={styles.metaLabel}>Amount</Text>
+                    <Text style={styles.metaValue}>{order.currency}{order.totalAmount}</Text>
+                  </View>
+                  <View style={styles.metaRow}>
+                    <Text style={styles.metaLabel}>District</Text>
+                    <Text style={styles.metaValue}>{order.district || 'N/A'}</Text>
+                  </View>
+                  <View style={styles.metaRow}>
+                    <Text style={styles.metaLabel}>Submitted</Text>
+                    <Text style={styles.metaValue}>{formatDate(order.paymentSubmittedAt?.toDate?.() || order.paymentSubmittedAt)}</Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={styles.viewBtn}
+                  onPress={() => {
+                    if (order.mimeType?.includes('pdf')) {
+                      Linking.openURL(order.fileUrl).catch(() => Alert.alert('Error', 'Could not open file.'));
+                    } else {
+                      setViewingOrderProof(order);
+                    }
+                  }}
+                >
+                  <Text style={styles.viewBtnText}>👁  View Proof of Payment</Text>
+                </TouchableOpacity>
+
+                {processingOrderId === order.id ? (
+                  <ActivityIndicator style={styles.spinner} color={colors.blue} />
+                ) : (
+                  <View style={styles.actions}>
+                    <TouchableOpacity
+                      style={styles.rejectBtn}
+                      onPress={() => handleRejectMerchOrder(order)}
+                    >
+                      <Text style={styles.rejectBtnText}>Reject</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.approveBtn}
+                      onPress={() => handleApproveMerchOrder(order)}
+                    >
+                      <Text style={styles.approveBtnText}>Approve</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            ))
+          )}
+        </ScrollView>
       ) : (
-        <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.list, { paddingBottom: spacing.xxxl + insets.bottom }]} showsVerticalScrollIndicator={false}>
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Quick Actions</Text>
             {isAdminReviewer && (
@@ -378,6 +504,22 @@ const AdminScreen = ({ navigation }) => {
               <View style={styles.actionText}>
                 <Text style={styles.actionLabel}>Proof of Payments</Text>
                 <Text style={styles.actionSub}>{pendingPOPs.length} payments awaiting review</Text>
+              </View>
+              <Text style={styles.actionArrow}>›</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionRow} onPress={() => setActiveTab('Merch Orders')}>
+              <Text style={styles.actionIcon}>🛍️</Text>
+              <View style={styles.actionText}>
+                <Text style={styles.actionLabel}>Merch Orders</Text>
+                <Text style={styles.actionSub}>{pendingMerchOrders.length} orders awaiting review</Text>
+              </View>
+              <Text style={styles.actionArrow}>›</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionRow} onPress={() => navigation.navigate('AdminMerchItems')}>
+              <Text style={styles.actionIcon}>🏷️</Text>
+              <View style={styles.actionText}>
+                <Text style={styles.actionLabel}>Manage Merchandise</Text>
+                <Text style={styles.actionSub}>Add or edit store items</Text>
               </View>
               <Text style={styles.actionArrow}>›</Text>
             </TouchableOpacity>
@@ -403,6 +545,32 @@ const AdminScreen = ({ navigation }) => {
             {viewingPOP?.fileUrl && (
               <Image
                 source={{ uri: viewingPOP.fileUrl }}
+                style={styles.modalImage}
+                resizeMode="contain"
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Merch Order Proof Viewer Modal */}
+      <Modal
+        visible={!!viewingOrderProof}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewingOrderProof(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{viewingOrderProof?.userName} — Proof of Payment</Text>
+              <TouchableOpacity onPress={() => setViewingOrderProof(null)} style={styles.modalClose}>
+                <Text style={styles.modalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            {viewingOrderProof?.fileUrl && (
+              <Image
+                source={{ uri: viewingOrderProof.fileUrl }}
                 style={styles.modalImage}
                 resizeMode="contain"
               />

@@ -19,7 +19,7 @@ jest.mock('firebase/auth', () => ({
 }));
 
 jest.mock('firebase/firestore', () => ({
-  collection: jest.fn(),
+  collection: jest.fn((db, ...segments) => ({ path: segments.join('/') })),
   doc: jest.fn((db, ...segments) => ({ path: segments.join('/') })),
   setDoc: jest.fn(),
   addDoc: jest.fn(),
@@ -182,6 +182,7 @@ describe('registerUser', () => {
 describe('approveUser', () => {
   it('calls updateDoc with approved status', async () => {
     updateDoc.mockResolvedValue();
+    addDoc.mockResolvedValue({ id: 'notif-1' });
 
     const result = await approveUser('uid-123');
 
@@ -190,6 +191,22 @@ describe('approveUser', () => {
       expect.objectContaining({ status: 'approved' })
     );
     expect(result.success).toBe(true);
+  });
+
+  it('creates an approval_status notification for the approved user', async () => {
+    updateDoc.mockResolvedValue();
+    addDoc.mockResolvedValue({ id: 'notif-1' });
+
+    await approveUser('uid-123');
+
+    expect(addDoc).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        type: 'approval_status',
+        title: 'Account Approved',
+        read: false,
+      })
+    );
   });
 
   it('throws friendly message on permission-denied', async () => {
@@ -204,6 +221,7 @@ describe('approveUser', () => {
 describe('rejectUser', () => {
   it('calls updateDoc with rejected status', async () => {
     updateDoc.mockResolvedValue();
+    addDoc.mockResolvedValue({ id: 'notif-1' });
 
     const result = await rejectUser('uid-123', 'Not a member');
 
@@ -212,6 +230,21 @@ describe('rejectUser', () => {
       expect.objectContaining({ status: 'rejected', rejectionReason: 'Not a member' })
     );
     expect(result.success).toBe(true);
+  });
+
+  it('creates an approval_status notification including the rejection reason', async () => {
+    updateDoc.mockResolvedValue();
+    addDoc.mockResolvedValue({ id: 'notif-1' });
+
+    await rejectUser('uid-123', 'Not a member');
+
+    expect(addDoc).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        type: 'approval_status',
+        body: expect.stringContaining('Not a member'),
+      })
+    );
   });
 
   it('throws friendly message on permission-denied', async () => {

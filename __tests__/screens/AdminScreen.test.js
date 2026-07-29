@@ -15,6 +15,12 @@ jest.mock('../../services/popService', () => ({
   rejectPOP: jest.fn(),
 }));
 
+jest.mock('../../services/merchService', () => ({
+  getPendingMerchOrders: jest.fn(),
+  approveMerchOrder: jest.fn(),
+  rejectMerchOrder: jest.fn(),
+}));
+
 import {
   getPendingRegistrations,
   approveUser,
@@ -22,12 +28,21 @@ import {
 } from '../../services/authService';
 
 import { getPendingPOPs } from '../../services/popService';
+import { getPendingMerchOrders } from '../../services/merchService';
 
 const mockAdmin = {
   uid: 'admin-uid',
   name: 'Admin User',
   role: 'admin',
   status: 'approved',
+};
+
+const mockLeader = {
+  uid: 'leader-uid',
+  name: 'Leader User',
+  role: 'leader',
+  status: 'approved',
+  congregation: 'Ebenezer',
 };
 
 const mockPendingUsers = [
@@ -56,6 +71,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   getPendingRegistrations.mockResolvedValue(mockPendingUsers);
   getPendingPOPs.mockResolvedValue([]);
+  getPendingMerchOrders.mockResolvedValue([]);
 });
 
 describe('AdminScreen rendering', () => {
@@ -187,5 +203,41 @@ describe('AdminScreen approve/reject', () => {
     await waitFor(() => {
       expect(alertSpy).toHaveBeenCalledWith('Error', expect.stringContaining('approve'));
     });
+  });
+});
+
+describe('AdminScreen leader role (cannot approve/reject user registrations)', () => {
+  it('does not show the Pending tab, only Payments and Actions', async () => {
+    const { getByText, queryByText } = renderAdmin(mockLeader);
+    await waitFor(() => getByText('Payments'));
+
+    expect(queryByText('Pending')).toBeFalsy();
+    expect(getByText('Actions')).toBeTruthy();
+  });
+
+  it('defaults to the Payments tab instead of Pending', async () => {
+    const { getByText } = renderAdmin(mockLeader);
+    await waitFor(() => {
+      expect(getByText('No pending proof of payments.')).toBeTruthy();
+    });
+  });
+
+  it('never calls getPendingRegistrations for a leader reviewer', async () => {
+    renderAdmin(mockLeader);
+    await waitFor(() => expect(getPendingPOPs).toHaveBeenCalled());
+
+    expect(getPendingRegistrations).not.toHaveBeenCalled();
+  });
+
+  it('hides the "Pending Approvals" quick action', async () => {
+    const { getByText, queryByText } = renderAdmin(mockLeader);
+    await waitFor(() => getByText('Actions'));
+
+    await act(async () => {
+      fireEvent.press(getByText('Actions'));
+    });
+
+    expect(queryByText('Pending Approvals')).toBeFalsy();
+    expect(getByText('Proof of Payments')).toBeTruthy();
   });
 });

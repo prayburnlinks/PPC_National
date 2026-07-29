@@ -18,6 +18,7 @@ const TYPE_ICONS = {
   pop_status: '💳',
   event_reminder: '📅',
   giving_receipt: '💝',
+  merch_order_status: '🛍️',
 };
 
 const NotificationsScreen = ({ navigation }) => {
@@ -85,7 +86,7 @@ const NotificationsScreen = ({ navigation }) => {
               {!item.read && <View style={styles.unreadDot} />}
             </TouchableOpacity>
           ))}
-          <View style={{ height: spacing.xxxl }} />
+          <View style={{ height: spacing.xxxl + insets.bottom }} />
         </ScrollView>
       )}
     </View>

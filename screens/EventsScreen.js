@@ -224,7 +224,7 @@ const EventsScreen = ({ navigation }) => {
             )}
           </View>
 
-          <View style={{ height: spacing.xxxl }} />
+          <View style={{ height: spacing.xxxl + insets.bottom }} />
         </ScrollView>
       )}
 
@@ -237,7 +237,7 @@ const EventsScreen = ({ navigation }) => {
       >
         {selectedEvent && (
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
+            <View style={[styles.modalContent, { paddingBottom: spacing.lg + insets.bottom }]}>
               <View style={styles.modalHandle} />
 
               <ScrollView showsVerticalScrollIndicator={false}>

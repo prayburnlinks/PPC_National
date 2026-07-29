@@ -95,7 +95,7 @@ const MyEventsScreen = ({ navigation }) => {
               </View>
             );
           })}
-          <View style={{ height: spacing.xxxl }} />
+          <View style={{ height: spacing.xxxl + insets.bottom }} />
         </ScrollView>
       )}
     </View>

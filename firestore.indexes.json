@@ -41,6 +41,31 @@
         { "fieldPath": "congregation", "order": "ASCENDING" },
         { "fieldPath": "submittedAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "merchOrders",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "merchOrders",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "paymentSubmittedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "merchOrders",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "congregation", "order": "ASCENDING" },
+        { "fieldPath": "paymentSubmittedAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

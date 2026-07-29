@@ -200,3 +200,48 @@ describe('PrayerWallScreen praying', () => {
     });
   });
 });
+
+describe('PrayerWallScreen double-submit guards', () => {
+  it('replaces the submit button with a spinner while in flight and only submits once', async () => {
+    let resolveSubmit;
+    submitPrayerRequest.mockReturnValue(new Promise((resolve) => { resolveSubmit = resolve; }));
+
+    const { getByText, queryByText, getByPlaceholderText } = renderPrayerWall();
+    await waitFor(() => getByText('Submit Request'));
+
+    fireEvent.changeText(getByPlaceholderText(/Write your prayer request/i), 'Pray for my family');
+
+    await act(async () => {
+      fireEvent.press(getByText('Submit Request'));
+    });
+
+    // Button is swapped for a spinner while submitting — it can't be tapped again
+    expect(queryByText('Submit Request')).toBeFalsy();
+    expect(submitPrayerRequest).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveSubmit({ success: true, id: 'new-req' });
+    });
+
+    await waitFor(() => expect(getByText('Submit Request')).toBeTruthy());
+  });
+
+  it('does not call prayForRequest twice for the same request when tapped rapidly', async () => {
+    let resolvePray;
+    prayForRequest.mockReturnValue(new Promise((resolve) => { resolvePray = resolve; }));
+
+    const { getByText, getAllByText } = renderPrayerWall();
+    await waitFor(() => getByText('Pray for healing'));
+
+    await act(async () => {
+      fireEvent.press(getAllByText('Praying 🙏')[0]);
+      fireEvent.press(getAllByText('Praying 🙏')[0]);
+    });
+
+    expect(prayForRequest).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolvePray({ success: true, action: 'added' });
+    });
+  });
+});

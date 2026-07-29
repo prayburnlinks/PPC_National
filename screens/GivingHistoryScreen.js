@@ -98,7 +98,7 @@ const GivingHistoryScreen = ({ navigation }) => {
               );
             })
           )}
-          <View style={{ height: spacing.xxxl }} />
+          <View style={{ height: spacing.xxxl + insets.bottom }} />
         </ScrollView>
       )}
     </View>

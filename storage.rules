@@ -13,6 +13,24 @@ service firebase.storage {
                    && request.resource.contentType.matches('image/jpeg|image/png|application/pdf');
     }
 
+    // Merch order payment proof — same shape as pop/
+    match /merchOrders/{userId}/{fileName} {
+      allow read: if request.auth != null && (
+        request.auth.uid == userId ||
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'leader']
+      );
+      allow write: if request.auth != null && request.auth.uid == userId
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/jpeg|image/png|application/pdf');
+    }
+
+    // Merch item photos — admin-uploaded catalog images
+    match /merchandise/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
     // Leadership documents — leaders and admins only
     match /documents/{fileName} {
       allow read: if request.auth != null &&

@@ -28,6 +28,7 @@ import {
   getDocs,
   updateDoc,
   writeBatch,
+  addDoc,
 } from 'firebase/firestore';
 
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -91,6 +92,34 @@ describe('submitPOP', () => {
       message: expect.stringContaining('Failed to upload'),
     });
   });
+
+  it('falls back to an inferred contentType when the file has no mimeType', async () => {
+    ref.mockReturnValue('storage-ref');
+    uploadBytes.mockResolvedValue();
+    getDownloadURL.mockResolvedValue('https://storage.example.com/pop.png');
+    writeBatch.mockReturnValue({ set: jest.fn(), update: jest.fn(), commit: jest.fn().mockResolvedValue() });
+
+    await submitPOP(mockUser, { uri: 'file:///tmp/pop.png', name: 'pop.png' });
+
+    expect(uploadBytes).toHaveBeenCalledWith(
+      'storage-ref',
+      expect.anything(),
+      { contentType: 'image/png' }
+    );
+  });
+
+  it('never sends an undefined contentType to Storage (would fail the rules regex)', async () => {
+    ref.mockReturnValue('storage-ref');
+    uploadBytes.mockResolvedValue();
+    getDownloadURL.mockResolvedValue('https://storage.example.com/pop');
+    writeBatch.mockReturnValue({ set: jest.fn(), update: jest.fn(), commit: jest.fn().mockResolvedValue() });
+
+    // No mimeType and no recognizable extension
+    await submitPOP(mockUser, { uri: 'file:///tmp/pop', name: 'pop' });
+
+    const [, , metadata] = uploadBytes.mock.calls[0];
+    expect(metadata.contentType).toBeDefined();
+  });
 });
 
 describe('getPendingPOPs', () => {
@@ -147,6 +176,18 @@ describe('approvePOP', () => {
       message: 'Failed to approve payment.',
     });
   });
+
+  it('creates a pop_status notification for the POP owner', async () => {
+    updateDoc.mockResolvedValue();
+    addDoc.mockResolvedValue({ id: 'notif-1' });
+
+    await approvePOP('pop-1', 'uid-1', 'reviewer-uid');
+
+    expect(addDoc).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ type: 'pop_status', title: 'Payment Approved', read: false })
+    );
+  });
 });
 
 describe('rejectPOP', () => {
@@ -170,5 +211,21 @@ describe('rejectPOP', () => {
     await expect(rejectPOP('pop-1', 'uid-1', 'reviewer')).rejects.toMatchObject({
       message: 'Failed to reject payment.',
     });
+  });
+
+  it('creates a pop_status notification including the rejection reason', async () => {
+    updateDoc.mockResolvedValue();
+    addDoc.mockResolvedValue({ id: 'notif-1' });
+
+    await rejectPOP('pop-1', 'uid-1', 'reviewer-uid', 'Blurry image');
+
+    expect(addDoc).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        type: 'pop_status',
+        title: 'Payment Not Approved',
+        body: expect.stringContaining('Blurry image'),
+      })
+    );
   });
 });

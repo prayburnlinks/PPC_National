@@ -140,7 +140,7 @@ const RegisterScreen = ({ navigation }) => {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}
       contentContainerStyle={{ paddingTop: insets.top }}>
-      <View style={styles.content}>
+      <View style={[styles.content, { paddingBottom: spacing.xxxl + insets.bottom }]}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={handleBack} style={styles.backButton}>
@@ -381,6 +381,7 @@ const RegisterScreen = ({ navigation }) => {
               </View>
               <FlatList
                 data={CONGREGATIONS}
+                contentContainerStyle={{ paddingBottom: insets.bottom }}
                 keyExtractor={(item) => item.name}
                 renderItem={({ item }) => (
                   <TouchableOpacity

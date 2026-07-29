@@ -42,11 +42,29 @@ describe('DISTRICTS', () => {
     const ids = DISTRICTS.map((d) => d.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
+
+  it('is sorted alphabetically by name (regression)', () => {
+    const names = DISTRICTS.map((d) => d.name);
+    expect(names).toEqual([...names].sort());
+  });
+
+  it('includes Boland and does not include West Coast (regression)', () => {
+    const names = DISTRICTS.map((d) => d.name);
+    expect(names).toContain('Boland');
+    expect(names).not.toContain('West Coast');
+  });
+
+  it('each congregation group within CONGREGATIONS is sorted alphabetically (regression)', () => {
+    DISTRICTS.forEach((d) => {
+      const namesInDistrict = CONGREGATIONS.filter((c) => c.district === d.name).map((c) => c.name);
+      expect(namesInDistrict).toEqual([...namesInDistrict].sort());
+    });
+  });
 });
 
 describe('CONGREGATIONS', () => {
-  it('contains 36 congregations', () => {
-    expect(CONGREGATIONS).toHaveLength(36);
+  it('contains 81 congregations', () => {
+    expect(CONGREGATIONS).toHaveLength(81);
   });
 
   it('every congregation has a name and district', () => {
