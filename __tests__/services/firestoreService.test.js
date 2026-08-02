@@ -4,7 +4,7 @@ import {
   submitPrayerRequest,
   prayForRequest,
   getLiveStatus,
-  registerForEvent,
+  incrementEventAttendeeCount,
   getUpcomingEvents,
   getUserProfile,
   updateUserProfile,
@@ -37,7 +37,6 @@ import {
   getDocs,
   getDocsFromServer,
   addDoc,
-  setDoc,
   updateDoc,
   runTransaction,
 } from 'firebase/firestore';
@@ -226,27 +225,16 @@ describe('getLiveStatus', () => {
   });
 });
 
-describe('registerForEvent', () => {
-  it('sets registration doc and increments attendee count', async () => {
-    setDoc.mockResolvedValue();
+describe('incrementEventAttendeeCount', () => {
+  it('increments attendee count on the event', async () => {
     updateDoc.mockResolvedValue();
 
-    const result = await registerForEvent('uid-1', 'event-1');
+    await incrementEventAttendeeCount('event-1');
 
-    expect(setDoc).toHaveBeenCalled();
     expect(updateDoc).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ attendeeCount: expect.objectContaining({ __increment: 1 }) })
     );
-    expect(result.success).toBe(true);
-  });
-
-  it('throws on failure', async () => {
-    setDoc.mockRejectedValue(new Error('Quota exceeded'));
-
-    await expect(registerForEvent('uid-1', 'event-1')).rejects.toMatchObject({
-      message: 'Failed to register for event',
-    });
   });
 });
 

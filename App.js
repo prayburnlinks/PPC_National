@@ -158,7 +158,7 @@ export default function App() {
             {user && <Stack.Screen name="Events" component={EventsScreen} />}
             {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && <Stack.Screen name="Admin" component={AdminScreen} />}
             {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && <Stack.Screen name="Documents" component={DocumentsScreen} />}
-            {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && <Stack.Screen name="AdminMerchItems" component={AdminMerchItemsScreen} />}
+            {user?.role === ROLES.ADMIN && <Stack.Screen name="AdminMerchItems" component={AdminMerchItemsScreen} />}
             {user && <Stack.Screen name="NationalBoard" component={NationalBoardScreen} />}
             {user && (
               <Stack.Screen

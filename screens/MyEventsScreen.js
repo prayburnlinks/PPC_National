@@ -7,11 +7,16 @@ import {
   Text,
   ActivityIndicator,
   Image,
+  Alert,
 } from 'react-native';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../context/UserContext';
-import { getUserRegisteredEvents } from '../services/firestoreService';
+import {
+  getUserEventRegistrations,
+  submitEventRegistrationPayment,
+} from '../services/eventRegistrationService';
+import * as DocumentPicker from 'expo-document-picker';
 
 const CATEGORY_COLORS = {
   Women: colors.red,
@@ -22,16 +27,25 @@ const CATEGORY_COLORS = {
   'All Districts': colors.blue,
 };
 
+const STATUS_STYLES = {
+  awaiting_payment: { bg: '#FFFBEB', color: colors.gold, label: 'Awaiting Payment' },
+  payment_submitted: { bg: '#FFFBEB', color: colors.gold, label: 'Under Review' },
+  approved: { bg: '#F0FBF6', color: colors.green, label: 'Registered & Paid' },
+  confirmed: { bg: '#F0FBF6', color: colors.green, label: 'Registered' },
+  rejected: { bg: '#FFF0EE', color: colors.red, label: 'Payment Rejected' },
+};
+
 const MyEventsScreen = ({ navigation }) => {
   const { user } = useUser();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState([]);
+  const [uploadingId, setUploadingId] = useState(null);
 
   const load = useCallback(async () => {
     if (!user?.uid) return;
     setLoading(true);
-    const list = await getUserRegisteredEvents(user.uid);
+    const list = await getUserEventRegistrations(user.uid);
     setEvents(list);
     setLoading(false);
   }, [user?.uid]);
@@ -44,6 +58,25 @@ const MyEventsScreen = ({ navigation }) => {
   const formatDateShort = (date) => {
     const d = new Date(date);
     return { day: d.getDate(), month: d.toLocaleString('en-ZA', { month: 'short' }).toUpperCase() };
+  };
+
+  const handleUpload = async (event) => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/jpeg', 'image/png', 'application/pdf'],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+      const file = result.assets[0];
+      setUploadingId(event.registrationId);
+      await submitEventRegistrationPayment(event.registrationId, user, file);
+      await load();
+      Alert.alert('Submitted', 'Your proof of payment has been submitted and is awaiting review.');
+    } catch (error) {
+      Alert.alert('Upload Failed', error.message || 'Failed to upload proof of payment.');
+    } finally {
+      setUploadingId(null);
+    }
   };
 
   return (
@@ -75,6 +108,9 @@ const MyEventsScreen = ({ navigation }) => {
             const { day, month } = formatDateShort(event.eventDate);
             const catColor = CATEGORY_COLORS[event.category] || colors.blue;
             const isPast = new Date(event.eventDate) < new Date();
+            const statusStyle = STATUS_STYLES[event.registrationStatus];
+            const canUpload = event.registrationStatus === 'awaiting_payment' || event.registrationStatus === 'rejected';
+            const uploading = uploadingId === event.registrationId;
             return (
               <View key={event.id} style={[styles.eventCard, isPast && styles.eventCardPast]}>
                 <View style={[styles.dateBadge, { backgroundColor: catColor }]}>
@@ -88,6 +124,38 @@ const MyEventsScreen = ({ navigation }) => {
                   <Text style={styles.eventName}>{event.name}</Text>
                   <Text style={styles.eventVenue}>📍 {event.venue}</Text>
                   <Text style={styles.eventDate}>🗓 {formatDate(event.eventDate)}</Text>
+
+                  {statusStyle && (
+                    <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+                      <Text style={[styles.statusBadgeText, { color: statusStyle.color }]}>{statusStyle.label}</Text>
+                    </View>
+                  )}
+
+                  {event.registrationStatus === 'rejected' && event.rejectionReason ? (
+                    <Text style={styles.rejectionReason}>{event.rejectionReason}</Text>
+                  ) : null}
+
+                  {event.registrationStatus === 'awaiting_payment' && event.bankDetails ? (
+                    <Text style={styles.bankHintText}>
+                      R{event.registrationFee} · {event.bankDetails.bank} · {event.bankDetails.accountNumber} · Ref: {event.paymentReference || event.name}
+                    </Text>
+                  ) : null}
+
+                  {canUpload && (
+                    <TouchableOpacity
+                      style={[styles.uploadBtn, uploading && styles.buttonDisabled]}
+                      onPress={() => handleUpload(event)}
+                      disabled={uploading}
+                    >
+                      {uploading ? (
+                        <ActivityIndicator color={colors.white} size="small" />
+                      ) : (
+                        <Text style={styles.uploadBtnText}>
+                          {event.registrationStatus === 'rejected' ? 'Resubmit Proof of Payment' : 'Upload Proof of Payment'}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
                 </View>
                 <View style={styles.registeredBadge}>
                   <Text style={styles.registeredText}>✓</Text>
@@ -148,6 +216,19 @@ const styles = StyleSheet.create({
   eventName: { fontSize: typography.sizes.sm, fontWeight: '700', color: colors.textPrimary, marginBottom: 2 },
   eventVenue: { fontSize: typography.sizes.xs, color: colors.textSecondary, marginBottom: 2 },
   eventDate: { fontSize: typography.sizes.xs, color: colors.textSecondary },
+  statusBadge: {
+    borderRadius: borderRadius.full, paddingHorizontal: spacing.sm, paddingVertical: 2,
+    alignSelf: 'flex-start', marginTop: spacing.xs,
+  },
+  statusBadgeText: { fontSize: typography.sizes.xs, fontWeight: '700' },
+  rejectionReason: { fontSize: typography.sizes.xs, color: colors.red, marginTop: spacing.xs },
+  bankHintText: { fontSize: typography.sizes.xs, color: colors.textSecondary, marginTop: spacing.xs },
+  uploadBtn: {
+    backgroundColor: colors.blue, borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm, alignItems: 'center', marginTop: spacing.sm,
+  },
+  buttonDisabled: { opacity: 0.6 },
+  uploadBtnText: { color: colors.white, fontSize: typography.sizes.xs, fontWeight: '700' },
   registeredBadge: {
     width: 28, height: 28, borderRadius: 14,
     backgroundColor: colors.green, alignItems: 'center', justifyContent: 'center',

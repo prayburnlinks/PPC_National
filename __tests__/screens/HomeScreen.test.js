@@ -58,6 +58,13 @@ describe('HomeScreen rendering', () => {
       expect(getByText(expectedLabel)).toBeTruthy();
     });
   });
+
+  it('shows the current release presentation badge', async () => {
+    const { getByText } = renderHome();
+    await waitFor(() => {
+      expect(getByText(/Current release/i)).toBeTruthy();
+    });
+  });
 });
 
 describe('HomeScreen events', () => {

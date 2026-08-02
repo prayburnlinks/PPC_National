@@ -2,8 +2,8 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // Proof of payment uploads — only the uploader or leaders/admins can read
-    match /pop/{userId}/{fileName} {
+    // Event registration payment proof — same shape as merchOrders/
+    match /eventRegistrations/{userId}/{fileName} {
       allow read: if request.auth != null && (
         request.auth.uid == userId ||
         firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'leader']

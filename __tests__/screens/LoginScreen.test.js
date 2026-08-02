@@ -13,7 +13,16 @@ jest.mock('@react-navigation/native', () => ({
   useRoute: () => ({ params: {} }),
 }));
 
+jest.mock('firebase/auth', () => ({
+  signOut: jest.fn(() => Promise.resolve()),
+}));
+
+jest.mock('../../firebase-config', () => ({
+  auth: {},
+}));
+
 import { loginUser } from '../../services/authService';
+import { signOut } from 'firebase/auth';
 
 const mockOnLogin = jest.fn();
 
@@ -108,5 +117,29 @@ describe('LoginScreen login flow', () => {
     });
 
     expect(alertSpy).toHaveBeenCalledWith('Login Failed', 'Incorrect password');
+  });
+});
+
+describe('LoginScreen continue as visitor', () => {
+  it('signs out any lingering session before switching to visitor mode', async () => {
+    const { getByText } = renderLogin();
+
+    await act(async () => {
+      fireEvent.press(getByText('Continue as Visitor'));
+    });
+
+    expect(signOut).toHaveBeenCalled();
+    expect(mockOnLogin).toHaveBeenCalledWith({ role: 'visitor', name: 'Visitor' });
+  });
+
+  it('still switches to visitor mode even if signOut fails', async () => {
+    signOut.mockRejectedValueOnce(new Error('offline'));
+    const { getByText } = renderLogin();
+
+    await act(async () => {
+      fireEvent.press(getByText('Continue as Visitor'));
+    });
+
+    expect(mockOnLogin).toHaveBeenCalledWith({ role: 'visitor', name: 'Visitor' });
   });
 });

@@ -3,7 +3,7 @@
  * Tithe and offering donation interface
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   ScrollView,
@@ -33,6 +33,10 @@ const GivingScreen = ({ navigation }) => {
   const [showBankModal, setShowBankModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [givingReference, setGivingReference] = useState('');
+  // Mirrors `loading` but updates synchronously — state updates are batched
+  // by React, so two taps in the same tick could both read stale state
+  // before a re-render happens, double-submitting the transaction.
+  const submittingRef = useRef(false);
 
   const getDisplayAmount = () => {
     if (selectedAmount === 'other') return customAmount ? `R${customAmount}` : 'Enter amount';
@@ -57,6 +61,8 @@ const GivingScreen = ({ navigation }) => {
       return;
     }
 
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setLoading(true);
     try {
       const reference = getReferenceText();
@@ -69,11 +75,12 @@ const GivingScreen = ({ navigation }) => {
       });
 
       setGivingReference(reference);
-      setLoading(false);
       setShowBankModal(true);
     } catch (error) {
-      setLoading(false);
       Alert.alert('Error', error.message || 'Failed to process transaction');
+    } finally {
+      submittingRef.current = false;
+      setLoading(false);
     }
   };
 

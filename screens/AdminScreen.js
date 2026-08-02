@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { ROLES } from '../constants/config';
 import { getPendingRegistrations, approveUser, rejectUser } from '../services/authService';
-import { getPendingPOPs, approvePOP, rejectPOP } from '../services/popService';
+import { getPendingEventRegistrations, approveEventRegistration, rejectEventRegistration } from '../services/eventRegistrationService';
 import { getPendingMerchOrders, approveMerchOrder, rejectMerchOrder } from '../services/merchService';
 import { useUser } from '../context/UserContext';
 
@@ -28,28 +28,35 @@ const AdminScreen = ({ navigation }) => {
   const isAdminReviewer = reviewer?.role === ROLES.ADMIN;
   const TABS = isAdminReviewer ? ['Pending', 'Payments', 'Merch Orders', 'Actions'] : ['Payments', 'Merch Orders', 'Actions'];
   const [pendingUsers, setPendingUsers] = useState([]);
-  const [pendingPOPs, setPendingPOPs] = useState([]);
+  const [pendingEventPayments, setPendingEventPayments] = useState([]);
   const [pendingMerchOrders, setPendingMerchOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState(isAdminReviewer ? 'Pending' : 'Payments');
-  const [processingUid, setProcessingUid] = useState(null);
-  const [processingPopId, setProcessingPopId] = useState(null);
-  const [processingOrderId, setProcessingOrderId] = useState(null);
-  const [viewingPOP, setViewingPOP] = useState(null);
+  // Arrays, not a single id — otherwise acting on item B while item A is
+  // still processing reassigns the shared id to B, which makes A's buttons
+  // reappear and lets it be re-tapped (double-fire) while its own request
+  // is still in flight.
+  const [processingUids, setProcessingUids] = useState([]);
+  const [processingRegistrationIds, setProcessingRegistrationIds] = useState([]);
+  const [processingOrderIds, setProcessingOrderIds] = useState([]);
+  const [viewingRegistrationProof, setViewingRegistrationProof] = useState(null);
   const [viewingOrderProof, setViewingOrderProof] = useState(null);
+  const [loadError, setLoadError] = useState(false);
 
   const loadAll = useCallback(async () => {
     try {
-      const [users, pops, orders] = await Promise.all([
+      const [users, registrations, orders] = await Promise.all([
         isAdminReviewer ? getPendingRegistrations() : Promise.resolve([]),
-        getPendingPOPs(reviewer?.role, reviewer?.congregation),
+        getPendingEventRegistrations(reviewer?.role, reviewer?.congregation),
         getPendingMerchOrders(reviewer?.role, reviewer?.congregation),
       ]);
       setPendingUsers(users);
-      setPendingPOPs(pops);
+      setPendingEventPayments(registrations);
       setPendingMerchOrders(orders);
+      setLoadError(false);
     } catch {
+      setLoadError(true);
       Alert.alert('Error', 'Failed to load admin data. Please try again.');
     } finally {
       setLoading(false);
@@ -75,14 +82,14 @@ const AdminScreen = ({ navigation }) => {
         {
           text: 'Approve',
           onPress: async () => {
-            setProcessingUid(user.uid);
+            setProcessingUids(prev => [...prev, user.uid]);
             try {
               await approveUser(user.uid);
               setPendingUsers(prev => prev.filter(u => u.uid !== user.uid));
             } catch {
               Alert.alert('Error', 'Failed to approve user. Please try again.');
             } finally {
-              setProcessingUid(null);
+              setProcessingUids(prev => prev.filter(id => id !== user.uid));
             }
           },
         },
@@ -100,14 +107,14 @@ const AdminScreen = ({ navigation }) => {
           text: 'Reject',
           style: 'destructive',
           onPress: async () => {
-            setProcessingUid(user.uid);
+            setProcessingUids(prev => [...prev, user.uid]);
             try {
               await rejectUser(user.uid);
               setPendingUsers(prev => prev.filter(u => u.uid !== user.uid));
             } catch {
               Alert.alert('Error', 'Failed to reject user. Please try again.');
             } finally {
-              setProcessingUid(null);
+              setProcessingUids(prev => prev.filter(id => id !== user.uid));
             }
           },
         },
@@ -115,41 +122,41 @@ const AdminScreen = ({ navigation }) => {
     );
   };
 
-  const handleApprovePOP = (pop) => {
-    Alert.alert('Approve POP', `Approve proof of payment from ${pop.userName}?`, [
+  const handleApproveEventPayment = (registration) => {
+    Alert.alert('Approve Payment', `Approve proof of payment from ${registration.userName} for ${registration.eventName}?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Approve',
         onPress: async () => {
-          setProcessingPopId(pop.id);
+          setProcessingRegistrationIds(prev => [...prev, registration.id]);
           try {
-            await approvePOP(pop.id, pop.userId, reviewer?.uid);
-            setPendingPOPs(prev => prev.filter(p => p.id !== pop.id));
+            await approveEventRegistration(registration.id, registration.userId, reviewer?.uid);
+            setPendingEventPayments(prev => prev.filter(r => r.id !== registration.id));
           } catch {
             Alert.alert('Error', 'Failed to approve payment. Please try again.');
           } finally {
-            setProcessingPopId(null);
+            setProcessingRegistrationIds(prev => prev.filter(id => id !== registration.id));
           }
         },
       },
     ]);
   };
 
-  const handleRejectPOP = (pop) => {
-    Alert.alert('Reject POP', `Reject proof of payment from ${pop.userName}?`, [
+  const handleRejectEventPayment = (registration) => {
+    Alert.alert('Reject Payment', `Reject proof of payment from ${registration.userName} for ${registration.eventName}?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Reject',
         style: 'destructive',
         onPress: async () => {
-          setProcessingPopId(pop.id);
+          setProcessingRegistrationIds(prev => [...prev, registration.id]);
           try {
-            await rejectPOP(pop.id, pop.userId, reviewer?.uid);
-            setPendingPOPs(prev => prev.filter(p => p.id !== pop.id));
+            await rejectEventRegistration(registration.id, registration.userId, reviewer?.uid);
+            setPendingEventPayments(prev => prev.filter(r => r.id !== registration.id));
           } catch {
             Alert.alert('Error', 'Failed to reject payment. Please try again.');
           } finally {
-            setProcessingPopId(null);
+            setProcessingRegistrationIds(prev => prev.filter(id => id !== registration.id));
           }
         },
       },
@@ -162,14 +169,14 @@ const AdminScreen = ({ navigation }) => {
       {
         text: 'Approve',
         onPress: async () => {
-          setProcessingOrderId(order.id);
+          setProcessingOrderIds(prev => [...prev, order.id]);
           try {
             await approveMerchOrder(order.id, order.userId, reviewer?.uid);
             setPendingMerchOrders(prev => prev.filter(o => o.id !== order.id));
           } catch {
             Alert.alert('Error', 'Failed to approve order. Please try again.');
           } finally {
-            setProcessingOrderId(null);
+            setProcessingOrderIds(prev => prev.filter(id => id !== order.id));
           }
         },
       },
@@ -183,14 +190,14 @@ const AdminScreen = ({ navigation }) => {
         text: 'Reject',
         style: 'destructive',
         onPress: async () => {
-          setProcessingOrderId(order.id);
+          setProcessingOrderIds(prev => [...prev, order.id]);
           try {
             await rejectMerchOrder(order.id, order.userId, reviewer?.uid);
             setPendingMerchOrders(prev => prev.filter(o => o.id !== order.id));
           } catch {
             Alert.alert('Error', 'Failed to reject order. Please try again.');
           } finally {
-            setProcessingOrderId(null);
+            setProcessingOrderIds(prev => prev.filter(id => id !== order.id));
           }
         },
       },
@@ -224,9 +231,9 @@ const AdminScreen = ({ navigation }) => {
           <Text style={styles.headerSub}>User Management</Text>
         </View>
         <View style={styles.badgeWrap}>
-          {(pendingUsers.length + pendingPOPs.length + pendingMerchOrders.length) > 0 && (
+          {(pendingUsers.length + pendingEventPayments.length + pendingMerchOrders.length) > 0 && (
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>{pendingUsers.length + pendingPOPs.length + pendingMerchOrders.length}</Text>
+              <Text style={styles.badgeText}>{pendingUsers.length + pendingEventPayments.length + pendingMerchOrders.length}</Text>
             </View>
           )}
         </View>
@@ -243,7 +250,7 @@ const AdminScreen = ({ navigation }) => {
             <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
               {tab}
               {tab === 'Pending' && pendingUsers.length > 0 ? ` (${pendingUsers.length})` : ''}
-              {tab === 'Payments' && pendingPOPs.length > 0 ? ` (${pendingPOPs.length})` : ''}
+              {tab === 'Payments' && pendingEventPayments.length > 0 ? ` (${pendingEventPayments.length})` : ''}
               {tab === 'Merch Orders' && pendingMerchOrders.length > 0 ? ` (${pendingMerchOrders.length})` : ''}
             </Text>
           </TouchableOpacity>
@@ -263,9 +270,11 @@ const AdminScreen = ({ navigation }) => {
         >
           {pendingUsers.length === 0 ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>✅</Text>
-              <Text style={styles.emptyTitle}>All caught up!</Text>
-              <Text style={styles.emptyText}>No pending registrations at this time.</Text>
+              <Text style={styles.emptyIcon}>{loadError ? '⚠️' : '✅'}</Text>
+              <Text style={styles.emptyTitle}>{loadError ? 'Failed to load' : 'All caught up!'}</Text>
+              <Text style={styles.emptyText}>
+                {loadError ? 'Pull down to retry.' : 'No pending registrations at this time.'}
+              </Text>
             </View>
           ) : (
             pendingUsers.map(user => (
@@ -306,7 +315,7 @@ const AdminScreen = ({ navigation }) => {
                   )}
                 </View>
 
-                {processingUid === user.uid ? (
+                {processingUids.includes(user.uid) ? (
                   <ActivityIndicator style={styles.spinner} color={colors.blue} />
                 ) : (
                   <View style={styles.actions}>
@@ -334,70 +343,76 @@ const AdminScreen = ({ navigation }) => {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.blue]} />}
           showsVerticalScrollIndicator={false}
         >
-          {pendingPOPs.length === 0 ? (
+          {pendingEventPayments.length === 0 ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>✅</Text>
-              <Text style={styles.emptyTitle}>All caught up!</Text>
-              <Text style={styles.emptyText}>No pending proof of payments.</Text>
+              <Text style={styles.emptyIcon}>{loadError ? '⚠️' : '✅'}</Text>
+              <Text style={styles.emptyTitle}>{loadError ? 'Failed to load' : 'All caught up!'}</Text>
+              <Text style={styles.emptyText}>
+                {loadError ? 'Pull down to retry.' : 'No pending proof of payments.'}
+              </Text>
             </View>
           ) : (
-            pendingPOPs.map(pop => (
-              <View key={pop.id} style={styles.card}>
+            pendingEventPayments.map(registration => (
+              <View key={registration.id} style={styles.card}>
                 <View style={styles.cardTop}>
                   <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>{pop.userName?.[0]?.toUpperCase() || '?'}</Text>
+                    <Text style={styles.avatarText}>{registration.userName?.[0]?.toUpperCase() || '?'}</Text>
                   </View>
                   <View style={styles.cardInfo}>
-                    <Text style={styles.userName}>{pop.userName}</Text>
-                    <Text style={styles.userEmail}>{pop.congregation || 'No congregation'}</Text>
+                    <Text style={styles.userName}>{registration.userName}</Text>
+                    <Text style={styles.userEmail}>{registration.eventName}</Text>
                     <View style={[styles.rolePill, { borderColor: colors.blue }]}>
                       <Text style={[styles.rolePillText, { color: colors.blue }]}>
-                        {pop.mimeType?.includes('pdf') ? '📄 PDF' : '🖼 Image'}
+                        {registration.mimeType?.includes('pdf') ? '📄 PDF' : '🖼 Image'}
                       </Text>
                     </View>
                   </View>
                 </View>
                 <View style={styles.meta}>
                   <View style={styles.metaRow}>
-                    <Text style={styles.metaLabel}>District</Text>
-                    <Text style={styles.metaValue}>{pop.district || 'N/A'}</Text>
+                    <Text style={styles.metaLabel}>Amount</Text>
+                    <Text style={styles.metaValue}>{registration.currency}{registration.registrationFee}</Text>
+                  </View>
+                  <View style={styles.metaRow}>
+                    <Text style={styles.metaLabel}>Congregation</Text>
+                    <Text style={styles.metaValue}>{registration.congregation || 'N/A'}</Text>
                   </View>
                   <View style={styles.metaRow}>
                     <Text style={styles.metaLabel}>File</Text>
-                    <Text style={styles.metaValue} numberOfLines={1}>{pop.fileName}</Text>
+                    <Text style={styles.metaValue} numberOfLines={1}>{registration.fileName}</Text>
                   </View>
                   <View style={styles.metaRow}>
                     <Text style={styles.metaLabel}>Submitted</Text>
-                    <Text style={styles.metaValue}>{formatDate(pop.submittedAt?.toDate?.() || pop.submittedAt)}</Text>
+                    <Text style={styles.metaValue}>{formatDate(registration.paymentSubmittedAt?.toDate?.() || registration.paymentSubmittedAt)}</Text>
                   </View>
                 </View>
                 {/* View button */}
                 <TouchableOpacity
                   style={styles.viewBtn}
                   onPress={() => {
-                    if (pop.mimeType?.includes('pdf')) {
-                      Linking.openURL(pop.fileUrl).catch(() => Alert.alert('Error', 'Could not open file.'));
+                    if (registration.mimeType?.includes('pdf')) {
+                      Linking.openURL(registration.fileUrl).catch(() => Alert.alert('Error', 'Could not open file.'));
                     } else {
-                      setViewingPOP(pop);
+                      setViewingRegistrationProof(registration);
                     }
                   }}
                 >
                   <Text style={styles.viewBtnText}>👁  View Proof of Payment</Text>
                 </TouchableOpacity>
 
-                {processingPopId === pop.id ? (
+                {processingRegistrationIds.includes(registration.id) ? (
                   <ActivityIndicator style={styles.spinner} color={colors.blue} />
                 ) : (
                   <View style={styles.actions}>
                     <TouchableOpacity
                       style={styles.rejectBtn}
-                      onPress={() => handleRejectPOP(pop)}
+                      onPress={() => handleRejectEventPayment(registration)}
                     >
                       <Text style={styles.rejectBtnText}>Reject</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.approveBtn}
-                      onPress={() => handleApprovePOP(pop)}
+                      onPress={() => handleApproveEventPayment(registration)}
                     >
                       <Text style={styles.approveBtnText}>Approve</Text>
                     </TouchableOpacity>
@@ -415,9 +430,11 @@ const AdminScreen = ({ navigation }) => {
         >
           {pendingMerchOrders.length === 0 ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>✅</Text>
-              <Text style={styles.emptyTitle}>All caught up!</Text>
-              <Text style={styles.emptyText}>No merch orders awaiting review.</Text>
+              <Text style={styles.emptyIcon}>{loadError ? '⚠️' : '✅'}</Text>
+              <Text style={styles.emptyTitle}>{loadError ? 'Failed to load' : 'All caught up!'}</Text>
+              <Text style={styles.emptyText}>
+                {loadError ? 'Pull down to retry.' : 'No merch orders awaiting review.'}
+              </Text>
             </View>
           ) : (
             pendingMerchOrders.map(order => (
@@ -463,7 +480,7 @@ const AdminScreen = ({ navigation }) => {
                   <Text style={styles.viewBtnText}>👁  View Proof of Payment</Text>
                 </TouchableOpacity>
 
-                {processingOrderId === order.id ? (
+                {processingOrderIds.includes(order.id) ? (
                   <ActivityIndicator style={styles.spinner} color={colors.blue} />
                 ) : (
                   <View style={styles.actions}>
@@ -503,7 +520,7 @@ const AdminScreen = ({ navigation }) => {
               <Text style={styles.actionIcon}>💳</Text>
               <View style={styles.actionText}>
                 <Text style={styles.actionLabel}>Proof of Payments</Text>
-                <Text style={styles.actionSub}>{pendingPOPs.length} payments awaiting review</Text>
+                <Text style={styles.actionSub}>{pendingEventPayments.length} payments awaiting review</Text>
               </View>
               <Text style={styles.actionArrow}>›</Text>
             </TouchableOpacity>
@@ -515,36 +532,38 @@ const AdminScreen = ({ navigation }) => {
               </View>
               <Text style={styles.actionArrow}>›</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionRow} onPress={() => navigation.navigate('AdminMerchItems')}>
-              <Text style={styles.actionIcon}>🏷️</Text>
-              <View style={styles.actionText}>
-                <Text style={styles.actionLabel}>Manage Merchandise</Text>
-                <Text style={styles.actionSub}>Add or edit store items</Text>
-              </View>
-              <Text style={styles.actionArrow}>›</Text>
-            </TouchableOpacity>
+            {isAdminReviewer && (
+              <TouchableOpacity style={styles.actionRow} onPress={() => navigation.navigate('AdminMerchItems')}>
+                <Text style={styles.actionIcon}>🏷️</Text>
+                <View style={styles.actionText}>
+                  <Text style={styles.actionLabel}>Manage Merchandise</Text>
+                  <Text style={styles.actionSub}>Add or edit store items</Text>
+                </View>
+                <Text style={styles.actionArrow}>›</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </ScrollView>
       )}
 
-      {/* POP Image Viewer Modal */}
+      {/* Event Registration Payment Proof Viewer Modal */}
       <Modal
-        visible={!!viewingPOP}
+        visible={!!viewingRegistrationProof}
         transparent
         animationType="fade"
-        onRequestClose={() => setViewingPOP(null)}
+        onRequestClose={() => setViewingRegistrationProof(null)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{viewingPOP?.userName} — Proof of Payment</Text>
-              <TouchableOpacity onPress={() => setViewingPOP(null)} style={styles.modalClose}>
+              <Text style={styles.modalTitle}>{viewingRegistrationProof?.userName} — Proof of Payment</Text>
+              <TouchableOpacity onPress={() => setViewingRegistrationProof(null)} style={styles.modalClose}>
                 <Text style={styles.modalCloseText}>✕</Text>
               </TouchableOpacity>
             </View>
-            {viewingPOP?.fileUrl && (
+            {viewingRegistrationProof?.fileUrl && (
               <Image
-                source={{ uri: viewingPOP.fileUrl }}
+                source={{ uri: viewingRegistrationProof.fileUrl }}
                 style={styles.modalImage}
                 resizeMode="contain"
               />

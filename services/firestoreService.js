@@ -6,7 +6,6 @@
 import {
   collection,
   doc,
-  setDoc,
   getDoc,
   getDocs,
   getDocsFromServer,
@@ -123,74 +122,20 @@ export const getEventsByCategory = async (category) => {
  */
 
 /**
- * Register user for an event
+ * Bump an event's attendee count by 1 and keep the in-memory events cache
+ * in sync — otherwise HomeScreen/EventsScreen can show a stale attendee
+ * count for up to CACHE_TTL after a registration that just succeeded.
+ * Used by eventRegistrationService.registerForEvent.
  */
-export const registerForEvent = async (userId, eventId) => {
-  try {
-    const registrationRef = doc(
-      db,
-      'users',
-      userId,
-      'registeredEvents',
-      eventId
-    );
+export const incrementEventAttendeeCount = async (eventId) => {
+  const eventRef = doc(db, 'events', eventId);
+  await updateDoc(eventRef, {
+    attendeeCount: increment(1),
+  });
 
-    await setDoc(registrationRef, {
-      eventId,
-      registeredAt: new Date(),
-      attended: false,
-      feePaid: false,
-    });
-
-    // Atomically increment attendee count
-    const eventRef = doc(db, 'events', eventId);
-    await updateDoc(eventRef, {
-      attendeeCount: increment(1),
-    });
-
-    return { success: true, message: 'Registered for event' };
-  } catch (error) {
-    console.error('Error registering for event:', error);
-    throw { message: 'Failed to register for event' };
-  }
-};
-
-/**
- * Get user's registered events
- */
-export const getUserRegisteredEvents = async (userId) => {
-  try {
-    const registeredRef = collection(db, 'users', userId, 'registeredEvents');
-    const snapshot = await getDocs(registeredRef);
-
-    const eventIds = snapshot.docs.map(doc => doc.id);
-    const results = await Promise.all(eventIds.map(getEventById));
-    const events = results.filter(Boolean);
-
-    return events.sort((a, b) => a.eventDate - b.eventDate);
-  } catch (error) {
-    console.error('Error fetching user registered events:', error);
-    return [];
-  }
-};
-
-/**
- * Check if user is registered for an event
- */
-export const isUserRegisteredForEvent = async (userId, eventId) => {
-  try {
-    const registrationRef = doc(
-      db,
-      'users',
-      userId,
-      'registeredEvents',
-      eventId
-    );
-    const registrationDoc = await getDoc(registrationRef);
-    return registrationDoc.exists();
-  } catch (error) {
-    console.error('Error checking registration:', error);
-    return false;
+  const cachedEvent = eventsCache?.find(e => e.id === eventId);
+  if (cachedEvent) {
+    cachedEvent.attendeeCount = (cachedEvent.attendeeCount || 0) + 1;
   }
 };
 
@@ -476,10 +421,8 @@ export default {
   getEventsByCategory,
   
   // Event Registration
-  registerForEvent,
-  getUserRegisteredEvents,
-  isUserRegisteredForEvent,
-  
+  incrementEventAttendeeCount,
+
   // Giving
   logGivingTransaction,
   getUserGivingHistory,

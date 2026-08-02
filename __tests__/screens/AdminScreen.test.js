@@ -9,10 +9,10 @@ jest.mock('../../services/authService', () => ({
   rejectUser: jest.fn(),
 }));
 
-jest.mock('../../services/popService', () => ({
-  getPendingPOPs: jest.fn(),
-  approvePOP: jest.fn(),
-  rejectPOP: jest.fn(),
+jest.mock('../../services/eventRegistrationService', () => ({
+  getPendingEventRegistrations: jest.fn(),
+  approveEventRegistration: jest.fn(),
+  rejectEventRegistration: jest.fn(),
 }));
 
 jest.mock('../../services/merchService', () => ({
@@ -27,7 +27,7 @@ import {
   rejectUser,
 } from '../../services/authService';
 
-import { getPendingPOPs } from '../../services/popService';
+import { getPendingEventRegistrations } from '../../services/eventRegistrationService';
 import { getPendingMerchOrders } from '../../services/merchService';
 
 const mockAdmin = {
@@ -70,7 +70,7 @@ const renderAdmin = (user = mockAdmin) => {
 beforeEach(() => {
   jest.clearAllMocks();
   getPendingRegistrations.mockResolvedValue(mockPendingUsers);
-  getPendingPOPs.mockResolvedValue([]);
+  getPendingEventRegistrations.mockResolvedValue([]);
   getPendingMerchOrders.mockResolvedValue([]);
 });
 
@@ -224,7 +224,7 @@ describe('AdminScreen leader role (cannot approve/reject user registrations)', (
 
   it('never calls getPendingRegistrations for a leader reviewer', async () => {
     renderAdmin(mockLeader);
-    await waitFor(() => expect(getPendingPOPs).toHaveBeenCalled());
+    await waitFor(() => expect(getPendingEventRegistrations).toHaveBeenCalled());
 
     expect(getPendingRegistrations).not.toHaveBeenCalled();
   });

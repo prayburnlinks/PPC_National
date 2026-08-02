@@ -36,14 +36,6 @@ service cloud.firestore {
         && request.resource.data.paymentMethod == 'eft';
     }
 
-    // A user submitting their own proof of payment resets their own
-    // popStatus to 'pending' — that's the one self-service value allowed;
-    // 'approved'/'rejected' must come from a leader/admin review below.
-    function isSelfSubmittingPop() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['popStatus', 'updatedAt'])
-        && request.resource.data.popStatus == 'pending';
-    }
-
     match /users/{userId} {
       allow read: if isAuthenticated() && (isOwner(userId) || isLeaderOrAdmin());
 
@@ -53,24 +45,13 @@ service cloud.firestore {
         (request.resource.data.role in ['leader', 'admin'] && request.resource.data.status == 'pending')
       );
 
-      // Users can update their own profile but cannot touch protected fields,
-      // and can't set their own popStatus to anything but 'pending' (no self-approval).
-      allow update: if isAuthenticated() && isOwner(userId) && !isChangingProtectedField()
-        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['popStatus']) || isSelfSubmittingPop());
+      // Users can update their own profile but cannot touch protected fields
+      allow update: if isAuthenticated() && isOwner(userId) && !isChangingProtectedField();
 
       // Admins can update anything (approval, role changes)
       allow update: if isAdmin();
 
-      // Leaders can review proof-of-payment status — nothing else on the profile
-      allow update: if isAuthenticated() && isLeaderOrAdmin()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['popStatus', 'updatedAt'])
-        && request.resource.data.popStatus in ['approved', 'rejected'];
-
       allow delete: if false;
-
-      match /registeredEvents/{eventId} {
-        allow read, write: if isAuthenticated() && isOwner(userId);
-      }
 
       match /givingHistory/{transactionId} {
         allow read:   if isAuthenticated() && isOwner(userId);
@@ -81,7 +62,12 @@ service cloud.firestore {
         allow read: if isAuthenticated() && isOwner(userId);
         // System/reviewer-triggered only (registration approval, POP review,
         // etc.) — never self-service, and shape-restricted.
-        allow create: if isLeaderOrAdmin()
+        allow create: if (
+            isAdmin() ||
+            (isLeaderOrAdmin() &&
+              get(/databases/$(database)/documents/users/$(userId)).data.congregation ==
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.congregation)
+          )
           && request.resource.data.read == false
           && request.resource.data.type is string
           && request.resource.data.title is string
@@ -149,19 +135,45 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && isOwner(resource.data.createdBy);
     }
 
-    match /proofOfPayments/{popId} {
-      // Admins see every POP; leaders only their own congregation's.
-      allow read: if isAdmin() || (
+    match /eventRegistrations/{registrationId} {
+      // Admins see every registration; leaders only their own congregation's;
+      // the registering member can always see their own.
+      allow read: if isAdmin() || isOwner(resource.data.userId) || (
         isLeaderOrAdmin() &&
         resource.data.congregation == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.congregation
       );
+
+      // Registering — doc id is `${uid}_${eventId}` so a member can't
+      // create a registration under another event/user's id, and status
+      // must match whether the event actually requires payment.
       allow create: if isAuthenticated()
         && request.resource.data.userId == request.auth.uid
-        && request.resource.data.status == 'pending';
-      allow update: if isLeaderOrAdmin()
+        && registrationId == request.auth.uid + '_' + request.resource.data.eventId
+        && (
+          (request.resource.data.requiresPayment == true  && request.resource.data.status == 'awaiting_payment') ||
+          (request.resource.data.requiresPayment == false && request.resource.data.status == 'confirmed')
+        );
+
+      // Owner submits or resubmits payment proof (resubmission is allowed
+      // after a rejection since the doc id is fixed per user+event — there's
+      // no "just create a new one" escape hatch like merchOrders has).
+      allow update: if isAuthenticated() && isOwner(resource.data.userId)
+        && resource.data.status in ['awaiting_payment', 'rejected']
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['fileUrl', 'fileName', 'mimeType', 'status', 'paymentSubmittedAt', 'rejectionReason'])
+        && request.resource.data.status == 'payment_submitted';
+
+      // Admin/leader reviews
+      allow update: if (
+          isAdmin() ||
+          (isLeaderOrAdmin() &&
+            resource.data.congregation == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.congregation)
+        )
+        && resource.data.status == 'payment_submitted'
         && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['status', 'reviewedBy', 'reviewedAt', 'rejectionReason'])
         && request.resource.data.status in ['approved', 'rejected'];
+
       allow delete: if false;
     }
 
@@ -185,7 +197,12 @@ service cloud.firestore {
             .hasOnly(['fileUrl', 'fileName', 'mimeType', 'status', 'paymentSubmittedAt'])
         && request.resource.data.status == 'payment_submitted';
       // Admin/leader reviews
-      allow update: if isLeaderOrAdmin()
+      allow update: if (
+          isAdmin() ||
+          (isLeaderOrAdmin() &&
+            resource.data.congregation == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.congregation)
+        )
+        && resource.data.status == 'payment_submitted'
         && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['status', 'reviewedBy', 'reviewedAt', 'rejectionReason'])
         && request.resource.data.status in ['approved', 'rejected'];
