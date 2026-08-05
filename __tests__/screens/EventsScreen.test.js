@@ -14,6 +14,12 @@ jest.mock('../../services/eventRegistrationService', () => ({
   getUserEventRegistrationsMap: jest.fn(),
 }));
 
+jest.mock('expo-clipboard', () => ({
+  setStringAsync: jest.fn(),
+}));
+
+import * as Clipboard from 'expo-clipboard';
+
 import { getAllEvents, logGivingTransaction } from '../../services/firestoreService';
 import {
   registerForEvent,
@@ -125,11 +131,23 @@ describe('EventsScreen', () => {
     registerForEvent.mockResolvedValue(undefined);
     logGivingTransaction.mockResolvedValue(undefined);
 
-    const { getByText } = renderScreen();
+    const { getByText, queryByText } = renderScreen();
     await waitFor(() => getByText('Leaders Retreat'));
     fireEvent.press(getByText('Leaders Retreat'));
 
     await waitFor(() => getByText('Register — R350'));
+    // Payment details come from the central BANK_DETAILS config, not the
+    // event's own (possibly stale) bankDetails field
+    expect(getByText('Absa')).toBeTruthy();
+    expect(getByText('4056725472')).toBeTruthy();
+    expect(queryByText('FNB')).toBeNull();
+
+    Clipboard.setStringAsync.mockResolvedValue();
+    fireEvent.press(getByText('Copy'));
+    await waitFor(() => {
+      expect(Clipboard.setStringAsync).toHaveBeenCalledWith('4056725472');
+    });
+
     fireEvent.press(getByText('Register — R350'));
 
     await waitFor(() => {

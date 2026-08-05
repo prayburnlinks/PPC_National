@@ -8,6 +8,10 @@ jest.mock('../../services/eventRegistrationService', () => ({
   submitEventRegistrationPayment: jest.fn(),
 }));
 
+jest.mock('expo-clipboard', () => ({
+  setStringAsync: jest.fn(),
+}));
+
 import { getUserEventRegistrations } from '../../services/eventRegistrationService';
 
 const mockUser = { uid: 'uid-1', name: 'Alice' };
@@ -76,6 +80,8 @@ describe('MyEventsScreen', () => {
     await waitFor(() => {
       expect(getByText('Awaiting Payment')).toBeTruthy();
       expect(getByText('Upload Proof of Payment')).toBeTruthy();
+      expect(getByText(/Absa · 4056725472/)).toBeTruthy();
+      expect(getByText('Copy')).toBeTruthy();
     });
   });
 

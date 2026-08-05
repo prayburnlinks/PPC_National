@@ -7,11 +7,15 @@ import {
   Text,
   ActivityIndicator,
   Image,
+  Alert,
 } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import * as Clipboard from 'expo-clipboard';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
+import { BANK_DETAILS } from '../constants/config';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../context/UserContext';
-import { getUserMerchOrders } from '../services/merchService';
+import { getUserMerchOrders, submitOrderPayment } from '../services/merchService';
 
 const STATUS_STYLES = {
   awaiting_payment: { bg: '#FFFBEB', color: colors.gold, label: 'Awaiting Payment' },
@@ -25,6 +29,7 @@ const MyOrdersScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState([]);
+  const [uploadingId, setUploadingId] = useState(null);
 
   const load = useCallback(async () => {
     if (!user?.uid) return;
@@ -37,6 +42,26 @@ const MyOrdersScreen = ({ navigation }) => {
 
   const formatDate = (date) =>
     new Date(date?.toDate ? date.toDate() : date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
+
+  // Uploads proof of payment for one specific order — the file lands on
+  // that order's document only, so multiple open orders never share a POP.
+  const handleUpload = async (order) => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/jpeg', 'image/png', 'application/pdf'],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+      setUploadingId(order.id);
+      await submitOrderPayment(order, user, result.assets[0]);
+      await load();
+      Alert.alert('Submitted', 'Your proof of payment has been submitted and is awaiting review.');
+    } catch (error) {
+      Alert.alert('Upload Failed', error.message || 'Failed to upload proof of payment.');
+    } finally {
+      setUploadingId(null);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -63,20 +88,60 @@ const MyOrdersScreen = ({ navigation }) => {
           ) : (
             orders.map((order) => {
               const status = STATUS_STYLES[order.status] || STATUS_STYLES.awaiting_payment;
+              const canUpload = order.status === 'awaiting_payment' || order.status === 'rejected';
               return (
                 <View key={order.id} style={styles.orderCard}>
-                  <Image source={{ uri: order.itemImageUrl }} style={styles.orderImage} />
-                  <View style={styles.orderInfo}>
-                    <Text style={styles.orderName}>{order.itemName}</Text>
-                    <Text style={styles.orderMeta}>{order.size ? `Size ${order.size} · ` : ''}Qty {order.quantity}</Text>
-                    <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
-                  </View>
-                  <View style={styles.orderRight}>
-                    <Text style={styles.orderAmount}>R{order.totalAmount}</Text>
-                    <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
-                      <Text style={[styles.statusBadgeText, { color: status.color }]}>{status.label}</Text>
+                  <View style={styles.orderRow}>
+                    <Image source={{ uri: order.itemImageUrl }} style={styles.orderImage} />
+                    <View style={styles.orderInfo}>
+                      <Text style={styles.orderName}>{order.itemName}</Text>
+                      <Text style={styles.orderMeta}>{order.size ? `Size ${order.size} · ` : ''}Qty {order.quantity}</Text>
+                      <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
+                    </View>
+                    <View style={styles.orderRight}>
+                      <Text style={styles.orderAmount}>R{order.totalAmount}</Text>
+                      <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
+                        <Text style={[styles.statusBadgeText, { color: status.color }]}>{status.label}</Text>
+                      </View>
                     </View>
                   </View>
+
+                  {order.status === 'rejected' && order.rejectionReason ? (
+                    <Text style={styles.rejectionReason}>{order.rejectionReason}</Text>
+                  ) : null}
+
+                  {order.status === 'awaiting_payment' && (
+                    <View style={styles.bankHintRow}>
+                      <Text style={styles.bankHintText}>
+                        R{order.totalAmount} · {BANK_DETAILS.bank} · {BANK_DETAILS.accountNumber} · Ref: {order.reference || order.itemName}
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.copyButton}
+                        onPress={async () => {
+                          await Clipboard.setStringAsync(BANK_DETAILS.accountNumber);
+                          Alert.alert('Copied', `"${BANK_DETAILS.accountNumber}" copied to clipboard!`);
+                        }}
+                      >
+                        <Text style={styles.copyButtonText}>Copy</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {canUpload && (
+                    <TouchableOpacity
+                      style={[styles.uploadBtn, uploadingId === order.id && styles.buttonDisabled]}
+                      onPress={() => handleUpload(order)}
+                      disabled={!!uploadingId}
+                    >
+                      {uploadingId === order.id ? (
+                        <ActivityIndicator color={colors.white} size="small" />
+                      ) : (
+                        <Text style={styles.uploadBtnText}>
+                          {order.status === 'rejected' ? 'Resubmit Proof of Payment' : 'Upload Proof of Payment'}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
                 </View>
               );
             })
@@ -116,12 +181,28 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     marginBottom: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
   },
+  orderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  bankHintRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
+  rejectionReason: { fontSize: typography.sizes.xs, color: colors.red, marginTop: spacing.sm },
+  bankHintText: { flex: 1, fontSize: typography.sizes.xs, color: colors.textSecondary },
+  copyButton: {
+    backgroundColor: colors.surfaceLight, borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.sm, paddingVertical: 2,
+  },
+  copyButtonText: { fontSize: typography.sizes.xs, fontWeight: '700', color: colors.blue },
+  uploadBtn: {
+    backgroundColor: colors.blue, borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm, alignItems: 'center', marginTop: spacing.sm,
+  },
+  buttonDisabled: { opacity: 0.6 },
+  uploadBtnText: { color: colors.white, fontSize: typography.sizes.xs, fontWeight: '700' },
   orderImage: {
     width: 56, height: 56, borderRadius: borderRadius.md,
     backgroundColor: colors.surfaceLight,

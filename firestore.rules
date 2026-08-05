@@ -154,9 +154,8 @@ service cloud.firestore {
           (request.resource.data.requiresPayment == false && request.resource.data.status == 'confirmed')
         );
 
-      // Owner submits or resubmits payment proof (resubmission is allowed
-      // after a rejection since the doc id is fixed per user+event — there's
-      // no "just create a new one" escape hatch like merchOrders has).
+      // Owner submits or resubmits payment proof after a rejection
+      // (mirrored by merchOrders below).
       allow update: if isAuthenticated() && isOwner(resource.data.userId)
         && resource.data.status in ['awaiting_payment', 'rejected']
         && request.resource.data.diff(resource.data).affectedKeys()
@@ -190,11 +189,12 @@ service cloud.firestore {
       allow create: if isAuthenticated()
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.status == 'awaiting_payment';
-      // Owner attaches payment proof
+      // Owner attaches payment proof, or resubmits after a rejection —
+      // same flow as eventRegistrations.
       allow update: if isAuthenticated() && isOwner(resource.data.userId)
-        && resource.data.status == 'awaiting_payment'
+        && resource.data.status in ['awaiting_payment', 'rejected']
         && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['fileUrl', 'fileName', 'mimeType', 'status', 'paymentSubmittedAt'])
+            .hasOnly(['fileUrl', 'fileName', 'mimeType', 'status', 'paymentSubmittedAt', 'rejectionReason'])
         && request.resource.data.status == 'payment_submitted';
       // Admin/leader reviews
       allow update: if (

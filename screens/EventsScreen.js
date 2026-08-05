@@ -10,7 +10,9 @@ import {
   Alert,
   Image,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
+import { BANK_DETAILS } from '../constants/config';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../context/UserContext';
 import {
@@ -98,7 +100,7 @@ const EventsScreen = ({ navigation }) => {
       Alert.alert(
         'Registration Successful! 🎉',
         selectedEvent.requiresPayment
-          ? `You are registered for ${selectedEvent.name}.\n\nPlease complete your R${selectedEvent.registrationFee} EFT payment using:\n\nRef: ${user.name} · ${selectedEvent.paymentReference || selectedEvent.name}\nAccount: ${selectedEvent.bankDetails?.accountNumber}`
+          ? `You are registered for ${selectedEvent.name}.\n\nPlease complete your R${selectedEvent.registrationFee} EFT payment using:\n\nRef: ${user.name} · ${selectedEvent.paymentReference || selectedEvent.name}\nBank: ${BANK_DETAILS.bank}\nAccount: ${BANK_DETAILS.accountNumber}`
           : `You are registered for ${selectedEvent.name}.`,
         [{ text: 'OK' }]
       );
@@ -269,19 +271,30 @@ const EventsScreen = ({ navigation }) => {
                     </Text>
                     <View style={styles.bankRow}>
                       <Text style={styles.bankLabel}>Bank</Text>
-                      <Text style={styles.bankValue}>{selectedEvent.bankDetails?.bank}</Text>
+                      <Text style={styles.bankValue}>{BANK_DETAILS.bank}</Text>
                     </View>
                     <View style={styles.bankRow}>
                       <Text style={styles.bankLabel}>Account</Text>
-                      <Text style={styles.bankValue}>{selectedEvent.bankDetails?.accountName}</Text>
+                      <Text style={styles.bankValue}>{BANK_DETAILS.accountName}</Text>
                     </View>
                     <View style={styles.bankRow}>
                       <Text style={styles.bankLabel}>Number</Text>
-                      <Text style={styles.bankValue}>{selectedEvent.bankDetails?.accountNumber}</Text>
+                      <View style={styles.bankValueRow}>
+                        <Text style={styles.bankValue}>{BANK_DETAILS.accountNumber}</Text>
+                        <TouchableOpacity
+                          style={styles.copyButton}
+                          onPress={async () => {
+                            await Clipboard.setStringAsync(BANK_DETAILS.accountNumber);
+                            Alert.alert('Copied', `"${BANK_DETAILS.accountNumber}" copied to clipboard!`);
+                          }}
+                        >
+                          <Text style={styles.copyButtonText}>Copy</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                     <View style={styles.bankRow}>
                       <Text style={styles.bankLabel}>Branch</Text>
-                      <Text style={styles.bankValue}>{selectedEvent.bankDetails?.branchCode}</Text>
+                      <Text style={styles.bankValue}>{BANK_DETAILS.branchCode}</Text>
                     </View>
                     <View style={[styles.bankRow, styles.referenceRow]}>
                       <Text style={styles.bankLabel}>Reference</Text>
@@ -436,6 +449,12 @@ const styles = StyleSheet.create({
   },
   bankLabel: { fontSize: typography.sizes.xs, color: colors.textSecondary },
   bankValue: { fontSize: typography.sizes.xs, fontWeight: '700', color: colors.textPrimary },
+  bankValueRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  copyButton: {
+    backgroundColor: colors.surfaceLight, borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.sm, paddingVertical: 2,
+  },
+  copyButtonText: { fontSize: typography.sizes.xs, fontWeight: '700', color: colors.blue },
   referenceRow: { borderBottomWidth: 0 },
   referenceValue: { color: colors.blue },
   registeredConfirm: {

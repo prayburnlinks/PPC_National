@@ -50,19 +50,20 @@ describe('ProfileScreen', () => {
 
   // PROF-02
   it('navigates to each Account row target', () => {
-    const { getByText, navigation } = renderScreen();
+    const { getByText, queryByText, navigation } = renderScreen();
 
     fireEvent.press(getByText('Notifications'));
-    fireEvent.press(getByText('Giving History'));
     fireEvent.press(getByText('Prayer Requests'));
     fireEvent.press(getByText('My Events'));
     fireEvent.press(getByText('My Orders'));
 
     expect(navigation.navigate).toHaveBeenCalledWith('Notifications');
-    expect(navigation.navigate).toHaveBeenCalledWith('GivingHistory');
     expect(navigation.navigate).toHaveBeenCalledWith('MyPrayerRequests');
     expect(navigation.navigate).toHaveBeenCalledWith('MyEvents');
     expect(navigation.navigate).toHaveBeenCalledWith('MyOrders');
+
+    // Giving is display-only now — no history row on the profile
+    expect(queryByText('Giving History')).toBeNull();
   });
 
   // PROF-03

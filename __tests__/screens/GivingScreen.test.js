@@ -86,55 +86,38 @@ describe('GivingScreen amount validation', () => {
 });
 
 describe('GivingScreen member giving', () => {
-  it('logs the transaction with the member reference and opens the bank details modal', async () => {
-    logGivingTransaction.mockResolvedValue({ success: true, transactionId: 'tx-1' });
-
+  it('shows the bank details with the member reference without logging a transaction', async () => {
     const { getByText } = renderGiving(mockMember);
 
     await act(async () => {
       fireEvent.press(getByText(/Proceed to Give/));
     });
 
-    expect(logGivingTransaction).toHaveBeenCalledWith(
-      'uid-1',
-      expect.objectContaining({
-        fund: 'tithes',
-        amount: 100,
-        paymentMethod: 'eft',
-        reference: 'Alice · Ebenezer',
-      })
-    );
-
     await waitFor(() => {
       expect(getByText('EFT Banking Details')).toBeTruthy();
       expect(getByText('Alice · Ebenezer')).toBeTruthy();
     });
+    // Display-only: no record is written since we can't confirm the
+    // payment was actually completed
+    expect(logGivingTransaction).not.toHaveBeenCalled();
   });
 });
 
 describe('GivingScreen visitor (anonymous) giving', () => {
-  it('logs an anonymous transaction with a default reference when no name is entered', async () => {
-    logGivingTransaction.mockResolvedValue({ success: true, transactionId: 'tx-2' });
-
+  it('shows a default visitor reference when no name is entered', async () => {
     const { getByText } = renderGiving(mockVisitor);
 
     await act(async () => {
       fireEvent.press(getByText(/Proceed to Give/));
     });
 
-    expect(logGivingTransaction).toHaveBeenCalledWith(
-      undefined,
-      expect.objectContaining({ reference: 'Anonymous Visitor (Visitor)' })
-    );
-
     await waitFor(() => {
       expect(getByText('Anonymous Visitor (Visitor)')).toBeTruthy();
     });
+    expect(logGivingTransaction).not.toHaveBeenCalled();
   });
 
   it('uses the entered name in the reference when provided', async () => {
-    logGivingTransaction.mockResolvedValue({ success: true, transactionId: 'tx-3' });
-
     const { getByText, getByPlaceholderText } = renderGiving(mockVisitor);
 
     fireEvent.changeText(getByPlaceholderText('For your giving reference'), 'John Visitor');
@@ -143,16 +126,15 @@ describe('GivingScreen visitor (anonymous) giving', () => {
       fireEvent.press(getByText(/Proceed to Give/));
     });
 
-    expect(logGivingTransaction).toHaveBeenCalledWith(
-      undefined,
-      expect.objectContaining({ reference: 'John Visitor (Visitor)' })
-    );
+    await waitFor(() => {
+      expect(getByText('John Visitor (Visitor)')).toBeTruthy();
+    });
+    expect(logGivingTransaction).not.toHaveBeenCalled();
   });
 });
 
 describe('GivingScreen bank details modal', () => {
   it('copies the account number to the clipboard', async () => {
-    logGivingTransaction.mockResolvedValue({ success: true, transactionId: 'tx-4' });
     Clipboard.setStringAsync.mockResolvedValue();
     const alertSpy = jest.spyOn(require('react-native').Alert, 'alert');
 

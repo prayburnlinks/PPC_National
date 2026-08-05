@@ -305,10 +305,10 @@ export const NATIONAL_YOUTH_BOARD = [
   },
   {
     id: 4,
-    name: 'Albie Botha',
+    name: 'Abie Botha',
     portfolio: 'Treasurer',
-    photo: require('../assets/youthboard/albie-botha.jpg'),
-    photoFull: require('../assets/youthboard/albie-botha-full.jpg'),
+    photo: require('../assets/youthboard/abie-botha.jpg'),
+    photoFull: require('../assets/youthboard/abie-botha-full.jpg'),
   },
 ];
 

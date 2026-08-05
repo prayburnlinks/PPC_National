@@ -9,7 +9,9 @@ import {
   Image,
   Alert,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
+import { BANK_DETAILS } from '../constants/config';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../context/UserContext';
 import {
@@ -135,10 +137,21 @@ const MyEventsScreen = ({ navigation }) => {
                     <Text style={styles.rejectionReason}>{event.rejectionReason}</Text>
                   ) : null}
 
-                  {event.registrationStatus === 'awaiting_payment' && event.bankDetails ? (
-                    <Text style={styles.bankHintText}>
-                      R{event.registrationFee} · {event.bankDetails.bank} · {event.bankDetails.accountNumber} · Ref: {event.paymentReference || event.name}
-                    </Text>
+                  {event.registrationStatus === 'awaiting_payment' ? (
+                    <View style={styles.bankHintRow}>
+                      <Text style={styles.bankHintText}>
+                        R{event.registrationFee} · {BANK_DETAILS.bank} · {BANK_DETAILS.accountNumber} · Ref: {event.paymentReference || event.name}
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.copyButton}
+                        onPress={async () => {
+                          await Clipboard.setStringAsync(BANK_DETAILS.accountNumber);
+                          Alert.alert('Copied', `"${BANK_DETAILS.accountNumber}" copied to clipboard!`);
+                        }}
+                      >
+                        <Text style={styles.copyButtonText}>Copy</Text>
+                      </TouchableOpacity>
+                    </View>
                   ) : null}
 
                   {canUpload && (
@@ -222,7 +235,13 @@ const styles = StyleSheet.create({
   },
   statusBadgeText: { fontSize: typography.sizes.xs, fontWeight: '700' },
   rejectionReason: { fontSize: typography.sizes.xs, color: colors.red, marginTop: spacing.xs },
-  bankHintText: { fontSize: typography.sizes.xs, color: colors.textSecondary, marginTop: spacing.xs },
+  bankHintText: { flex: 1, fontSize: typography.sizes.xs, color: colors.textSecondary },
+  bankHintRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
+  copyButton: {
+    backgroundColor: colors.surfaceLight, borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.sm, paddingVertical: 2,
+  },
+  copyButtonText: { fontSize: typography.sizes.xs, fontWeight: '700', color: colors.blue },
   uploadBtn: {
     backgroundColor: colors.blue, borderRadius: borderRadius.md,
     paddingVertical: spacing.sm, alignItems: 'center', marginTop: spacing.sm,
