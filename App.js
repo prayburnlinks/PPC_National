@@ -8,7 +8,7 @@ import { auth } from './firebase-config';
 import { onAuthStateChanged } from 'firebase/auth';
 import { getCurrentUser } from './services/authService';
 import { colors } from './constants/theme';
-import { ROLES, USER_STATUS, NATIONAL_WOMENS_BOARD } from './constants/config';
+import { ROLES, USER_STATUS, NATIONAL_WOMENS_BOARD, NATIONAL_YOUTH_BOARD, NATIONAL_SUNDAY_SCHOOL_BOARD } from './constants/config';
 import { UserContext } from './context/UserContext';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
@@ -165,6 +165,20 @@ export default function App() {
                 name="NationalWomensBoard"
                 component={NationalBoardScreen}
                 initialParams={{ title: "National Women's Board", board: NATIONAL_WOMENS_BOARD }}
+              />
+            )}
+            {user && (
+              <Stack.Screen
+                name="NationalYouthBoard"
+                component={NationalBoardScreen}
+                initialParams={{ title: 'National Youth Board', board: NATIONAL_YOUTH_BOARD }}
+              />
+            )}
+            {user && (
+              <Stack.Screen
+                name="NationalSundaySchoolBoard"
+                component={NationalBoardScreen}
+                initialParams={{ title: 'National Sunday School Board', board: NATIONAL_SUNDAY_SCHOOL_BOARD }}
               />
             )}
             {user && user.role !== ROLES.VISITOR && <Stack.Screen name="GivingHistory" component={GivingHistoryScreen} />}

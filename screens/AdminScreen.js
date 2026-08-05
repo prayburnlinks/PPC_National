@@ -11,12 +11,13 @@ import {
   Modal,
   Image,
   Linking,
+  Share,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { ROLES } from '../constants/config';
 import { getPendingRegistrations, approveUser, rejectUser } from '../services/authService';
-import { getPendingEventRegistrations, approveEventRegistration, rejectEventRegistration } from '../services/eventRegistrationService';
+import { getPendingEventRegistrations, approveEventRegistration, rejectEventRegistration, getEventRegistrationsByEvent } from '../services/eventRegistrationService';
 import { getPendingMerchOrders, approveMerchOrder, rejectMerchOrder } from '../services/merchService';
 import { useUser } from '../context/UserContext';
 
@@ -26,10 +27,14 @@ const AdminScreen = ({ navigation }) => {
   // Only Admins can approve/reject user registrations (firestore.rules
   // grants that to isAdmin() only) — Leaders get Payments review instead.
   const isAdminReviewer = reviewer?.role === ROLES.ADMIN;
-  const TABS = isAdminReviewer ? ['Pending', 'Payments', 'Merch Orders', 'Actions'] : ['Payments', 'Merch Orders', 'Actions'];
+  const TABS = isAdminReviewer
+    ? ['Pending', 'Payments', 'Merch Orders', 'Events', 'Actions']
+    : ['Payments', 'Merch Orders', 'Events', 'Actions'];
   const [pendingUsers, setPendingUsers] = useState([]);
   const [pendingEventPayments, setPendingEventPayments] = useState([]);
   const [pendingMerchOrders, setPendingMerchOrders] = useState([]);
+  const [eventGroups, setEventGroups] = useState([]);
+  const [expandedEventIds, setExpandedEventIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState(isAdminReviewer ? 'Pending' : 'Payments');
@@ -46,14 +51,16 @@ const AdminScreen = ({ navigation }) => {
 
   const loadAll = useCallback(async () => {
     try {
-      const [users, registrations, orders] = await Promise.all([
+      const [users, registrations, orders, groups] = await Promise.all([
         isAdminReviewer ? getPendingRegistrations() : Promise.resolve([]),
         getPendingEventRegistrations(reviewer?.role, reviewer?.congregation),
         getPendingMerchOrders(reviewer?.role, reviewer?.congregation),
+        getEventRegistrationsByEvent(reviewer?.role, reviewer?.congregation),
       ]);
       setPendingUsers(users);
       setPendingEventPayments(registrations);
       setPendingMerchOrders(orders);
+      setEventGroups(groups);
       setLoadError(false);
     } catch {
       setLoadError(true);
@@ -211,6 +218,44 @@ const AdminScreen = ({ navigation }) => {
       month: 'short',
       year: 'numeric',
     });
+  };
+
+  const REG_STATUS = {
+    confirmed: { label: 'Registered', color: colors.green },
+    approved: { label: 'Paid ✓', color: colors.green },
+    awaiting_payment: { label: 'Awaiting Payment', color: '#E67E22' },
+    payment_submitted: { label: 'Under Review', color: colors.blue },
+    rejected: { label: 'Rejected', color: colors.red },
+  };
+
+  const toggleEventExpanded = (eventId) => {
+    setExpandedEventIds(prev =>
+      prev.includes(eventId) ? prev.filter(id => id !== eventId) : [...prev, eventId]
+    );
+  };
+
+  const shareAttendeeCsv = async (group) => {
+    const esc = (v) => {
+      const s = String(v ?? '');
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = group.attendees.map(a =>
+      [
+        a.userName,
+        a.congregation,
+        a.district,
+        REG_STATUS[a.status]?.label || a.status,
+        formatDate(a.registeredAt?.toDate?.() || a.registeredAt),
+      ].map(esc).join(',')
+    );
+    try {
+      await Share.share({
+        title: `${group.eventName} — Attendees`,
+        message: ['name,congregation,district,status,registered', ...rows].join('\n'),
+      });
+    } catch {
+      // User dismissed the share sheet — nothing to do
+    }
   };
 
   const roleColor = (role) => {
@@ -502,6 +547,68 @@ const AdminScreen = ({ navigation }) => {
             ))
           )}
         </ScrollView>
+      ) : activeTab === 'Events' ? (
+        <ScrollView
+          contentContainerStyle={[styles.list, { paddingBottom: spacing.xxxl + insets.bottom }]}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.blue]} />}
+          showsVerticalScrollIndicator={false}
+        >
+          {eventGroups.length === 0 ? (
+            <View style={styles.empty}>
+              <Text style={styles.emptyIcon}>{loadError ? '⚠️' : '📅'}</Text>
+              <Text style={styles.emptyTitle}>{loadError ? 'Failed to load' : 'No Registrations Yet'}</Text>
+              <Text style={styles.emptyText}>
+                {loadError ? 'Pull down to retry.' : 'Event registrations will appear here.'}
+              </Text>
+            </View>
+          ) : (
+            eventGroups.map(group => {
+              const isOpen = expandedEventIds.includes(group.eventId);
+              const paidCount = group.attendees.filter(a => a.status === 'approved').length;
+              const hasPaidEvent = group.attendees.some(a => a.requiresPayment);
+              return (
+                <View key={group.eventId} style={styles.card}>
+                  <TouchableOpacity onPress={() => toggleEventExpanded(group.eventId)}>
+                    <View style={styles.eventHeaderRow}>
+                      <View style={styles.eventHeaderInfo}>
+                        <Text style={styles.userName}>{group.eventName}</Text>
+                        <Text style={styles.userEmail}>
+                          {formatDate(group.eventDate?.toDate?.() || group.eventDate)}
+                        </Text>
+                        <Text style={styles.eventCount}>
+                          {group.attendees.length} registered
+                          {hasPaidEvent ? ` · ${paidCount} paid` : ' · free event'}
+                        </Text>
+                      </View>
+                      <Text style={styles.eventChevron}>{isOpen ? '˅' : '›'}</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  {isOpen && (
+                    <View style={styles.attendeeList}>
+                      {group.attendees.map(a => (
+                        <View key={a.id} style={styles.attendeeRow}>
+                          <View style={styles.attendeeInfo}>
+                            <Text style={styles.attendeeName}>{a.userName || 'Unknown'}</Text>
+                            <Text style={styles.attendeeCong}>{a.congregation || 'N/A'}</Text>
+                          </View>
+                          <View style={[styles.statusPill, { borderColor: (REG_STATUS[a.status]?.color || colors.textSecondary) }]}>
+                            <Text style={[styles.statusPillText, { color: (REG_STATUS[a.status]?.color || colors.textSecondary) }]}>
+                              {REG_STATUS[a.status]?.label || a.status}
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                      <TouchableOpacity style={styles.viewBtn} onPress={() => shareAttendeeCsv(group)}>
+                        <Text style={styles.viewBtnText}>⬆  Share Attendee List (CSV)</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              );
+            })
+          )}
+        </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={[styles.list, { paddingBottom: spacing.xxxl + insets.bottom }]} showsVerticalScrollIndicator={false}>
           <View style={styles.card}>
@@ -529,6 +636,16 @@ const AdminScreen = ({ navigation }) => {
               <View style={styles.actionText}>
                 <Text style={styles.actionLabel}>Merch Orders</Text>
                 <Text style={styles.actionSub}>{pendingMerchOrders.length} orders awaiting review</Text>
+              </View>
+              <Text style={styles.actionArrow}>›</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionRow} onPress={() => setActiveTab('Events')}>
+              <Text style={styles.actionIcon}>📅</Text>
+              <View style={styles.actionText}>
+                <Text style={styles.actionLabel}>Event Registrations</Text>
+                <Text style={styles.actionSub}>
+                  {eventGroups.reduce((n, g) => n + g.attendees.length, 0)} registrations across {eventGroups.length} events
+                </Text>
               </View>
               <Text style={styles.actionArrow}>›</Text>
             </TouchableOpacity>
@@ -671,9 +788,10 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.blue,
   },
   tabText: {
-    fontSize: typography.sizes.sm,
+    fontSize: typography.sizes.xs,
     fontWeight: '600',
     color: colors.textSecondary,
+    textAlign: 'center',
   },
   tabTextActive: {
     color: colors.blue,
@@ -682,6 +800,61 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  eventHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  eventHeaderInfo: {
+    flex: 1,
+  },
+  eventCount: {
+    fontSize: typography.sizes.xs,
+    fontWeight: '700',
+    color: colors.blue,
+    marginTop: 2,
+  },
+  eventChevron: {
+    fontSize: 22,
+    color: colors.textSecondary,
+    paddingLeft: spacing.md,
+  },
+  attendeeList: {
+    marginTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  attendeeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  attendeeInfo: {
+    flex: 1,
+    paddingRight: spacing.sm,
+  },
+  attendeeName: {
+    fontSize: typography.sizes.sm,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  attendeeCong: {
+    fontSize: typography.sizes.xs,
+    color: colors.textSecondary,
+    marginTop: 1,
+  },
+  statusPill: {
+    borderWidth: 1,
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+  },
+  statusPillText: {
+    fontSize: typography.sizes.xs,
+    fontWeight: '700',
   },
   list: {
     padding: spacing.lg,

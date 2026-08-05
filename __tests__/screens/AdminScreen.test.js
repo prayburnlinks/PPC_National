@@ -13,6 +13,7 @@ jest.mock('../../services/eventRegistrationService', () => ({
   getPendingEventRegistrations: jest.fn(),
   approveEventRegistration: jest.fn(),
   rejectEventRegistration: jest.fn(),
+  getEventRegistrationsByEvent: jest.fn(),
 }));
 
 jest.mock('../../services/merchService', () => ({
@@ -27,7 +28,7 @@ import {
   rejectUser,
 } from '../../services/authService';
 
-import { getPendingEventRegistrations } from '../../services/eventRegistrationService';
+import { getPendingEventRegistrations, getEventRegistrationsByEvent } from '../../services/eventRegistrationService';
 import { getPendingMerchOrders } from '../../services/merchService';
 
 const mockAdmin = {
@@ -72,6 +73,7 @@ beforeEach(() => {
   getPendingRegistrations.mockResolvedValue(mockPendingUsers);
   getPendingEventRegistrations.mockResolvedValue([]);
   getPendingMerchOrders.mockResolvedValue([]);
+  getEventRegistrationsByEvent.mockResolvedValue([]);
 });
 
 describe('AdminScreen rendering', () => {
@@ -239,5 +241,93 @@ describe('AdminScreen leader role (cannot approve/reject user registrations)', (
 
     expect(queryByText('Pending Approvals')).toBeFalsy();
     expect(getByText('Proof of Payments')).toBeTruthy();
+  });
+});
+
+describe('AdminScreen Events tab', () => {
+  const mockGroups = [
+    {
+      eventId: 'e1',
+      eventName: 'National Sisters Conference',
+      eventDate: new Date('2026-07-12'),
+      attendees: [
+        { id: 'u1_e1', userName: 'Alice Adams', congregation: 'Ceres', district: 'Boland', status: 'approved', requiresPayment: true, registeredAt: new Date('2026-08-01') },
+        { id: 'u2_e1', userName: 'Ben Botha', congregation: 'Paarl', district: 'Boland', status: 'awaiting_payment', requiresPayment: true, registeredAt: new Date('2026-08-02') },
+      ],
+    },
+    {
+      eventId: 'e2',
+      eventName: 'Youth Rally',
+      eventDate: new Date('2026-09-01'),
+      attendees: [
+        { id: 'u3_e2', userName: 'Cara Nel', congregation: 'George', district: 'Garden Route', status: 'confirmed', requiresPayment: false, registeredAt: new Date('2026-08-03') },
+      ],
+    },
+  ];
+
+  it('lists each event with registration and paid counts', async () => {
+    getEventRegistrationsByEvent.mockResolvedValue(mockGroups);
+
+    const { getByText } = renderAdmin();
+    await waitFor(() => getByText('Events'));
+    fireEvent.press(getByText('Events'));
+
+    await waitFor(() => {
+      expect(getByText('National Sisters Conference')).toBeTruthy();
+      expect(getByText('2 registered · 1 paid')).toBeTruthy();
+      expect(getByText('Youth Rally')).toBeTruthy();
+      expect(getByText('1 registered · free event')).toBeTruthy();
+    });
+  });
+
+  it('expands an event to show attendees with status badges', async () => {
+    getEventRegistrationsByEvent.mockResolvedValue(mockGroups);
+
+    const { getByText, queryByText } = renderAdmin();
+    await waitFor(() => getByText('Events'));
+    fireEvent.press(getByText('Events'));
+
+    await waitFor(() => getByText('National Sisters Conference'));
+    expect(queryByText('Alice Adams')).toBeNull();
+
+    fireEvent.press(getByText('National Sisters Conference'));
+
+    expect(getByText('Alice Adams')).toBeTruthy();
+    expect(getByText('Paid ✓')).toBeTruthy();
+    expect(getByText('Ben Botha')).toBeTruthy();
+    expect(getByText('Awaiting Payment')).toBeTruthy();
+  });
+
+  it('shares an attendee list as CSV', async () => {
+    const { Share } = require('react-native');
+    jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' });
+    getEventRegistrationsByEvent.mockResolvedValue(mockGroups);
+
+    const { getByText } = renderAdmin();
+    await waitFor(() => getByText('Events'));
+    fireEvent.press(getByText('Events'));
+
+    await waitFor(() => getByText('National Sisters Conference'));
+    fireEvent.press(getByText('National Sisters Conference'));
+    fireEvent.press(getByText('⬆  Share Attendee List (CSV)'));
+
+    await waitFor(() => {
+      expect(Share.share).toHaveBeenCalledWith({
+        title: 'National Sisters Conference — Attendees',
+        message: expect.stringContaining('name,congregation,district,status,registered'),
+      });
+    });
+    const csv = Share.share.mock.calls[0][0].message;
+    expect(csv).toContain('Alice Adams,Ceres,Boland,Paid ✓');
+    expect(csv).toContain('Ben Botha,Paarl,Boland,Awaiting Payment');
+  });
+
+  it('shows the Events tab to leaders with congregation scoping', async () => {
+    getEventRegistrationsByEvent.mockResolvedValue([]);
+
+    const { getByText } = renderAdmin(mockLeader);
+    await waitFor(() => getByText('Events'));
+
+    expect(getEventRegistrationsByEvent).toHaveBeenCalledWith('leader', 'Ebenezer');
   });
 });

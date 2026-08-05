@@ -124,7 +124,10 @@ const AdminMerchItemsScreen = ({ navigation }) => {
       </View>
 
       {showForm ? (
-        <ScrollView contentContainerStyle={styles.formContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={[styles.formContent, { paddingBottom: spacing.xxxl + insets.bottom }]}
+          showsVerticalScrollIndicator={false}
+        >
           <TouchableOpacity style={styles.imagePicker} onPress={handlePickImage}>
             {form.imageFile ? (
               <Image source={{ uri: form.imageFile.uri }} style={styles.imagePreview} />

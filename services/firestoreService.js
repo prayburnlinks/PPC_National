@@ -39,10 +39,21 @@ const fetchEvents = async () => {
   if (eventsCache && now - eventsCachedAt < CACHE_TTL) return eventsCache;
   const snapshot = await getDocsFromServer(collection(db, 'events'));
   eventsCache = snapshot.docs.map(doc => ({
-    ...doc.data(), id: doc.id, eventDate: parseDate(doc.data().eventDate),
+    ...doc.data(),
+    id: doc.id,
+    eventDate: parseDate(doc.data().eventDate),
+    endDate: doc.data().endDate ? parseDate(doc.data().endDate) : null,
   }));
   eventsCachedAt = now;
   return eventsCache;
+};
+
+// An event stays listed through the whole of its final calendar day —
+// `endDate` for multi-day events, otherwise `eventDate`.
+const hasEventEnded = (event, now = new Date()) => {
+  const lastDay = new Date(event.endDate || event.eventDate);
+  lastDay.setHours(23, 59, 59, 999);
+  return lastDay < now;
 };
 
 /**
@@ -59,7 +70,7 @@ export const getUpcomingEvents = async (maxResults = 4) => {
     const now = new Date();
     const docs = await fetchEvents();
     return docs
-      .filter(e => e.eventDate >= now)
+      .filter(e => !hasEventEnded(e, now))
       .sort((a, b) => a.eventDate - b.eventDate)
       .slice(0, maxResults);
   } catch (error) {
@@ -73,8 +84,11 @@ export const getUpcomingEvents = async (maxResults = 4) => {
  */
 export const getAllEvents = async (pageSize = 20) => {
   try {
+    const now = new Date();
     const docs = await fetchEvents();
-    const all = [...docs].sort((a, b) => a.eventDate - b.eventDate);
+    const all = docs
+      .filter(e => !hasEventEnded(e, now))
+      .sort((a, b) => a.eventDate - b.eventDate);
     return {
       events: all.slice(0, pageSize),
       hasMore: all.length > pageSize,
@@ -94,7 +108,12 @@ export const getEventById = async (eventId) => {
     if (!eventDoc.exists()) return null;
 
     const data = eventDoc.data();
-    return { ...data, id: eventDoc.id, eventDate: parseDate(data.eventDate) };
+    return {
+      ...data,
+      id: eventDoc.id,
+      eventDate: parseDate(data.eventDate),
+      endDate: data.endDate ? parseDate(data.endDate) : null,
+    };
   } catch (error) {
     console.error('Error fetching event:', error);
     return null;
@@ -106,9 +125,8 @@ export const getEventById = async (eventId) => {
  */
 export const getEventsByCategory = async (category) => {
   try {
-    const now = new Date();
     const { events } = await getAllEvents(100);
-    return events.filter(e => e.category === category && e.eventDate >= now);
+    return events.filter(e => e.category === category);
   } catch (error) {
     console.error('Error fetching events by category:', error);
     return [];

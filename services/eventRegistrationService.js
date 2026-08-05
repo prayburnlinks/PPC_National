@@ -167,6 +167,47 @@ export const getPendingEventRegistrations = async (reviewerRole, reviewerCongreg
   }
 };
 
+// Every registration grouped by event, for the Admin panel's Events tab.
+// Admins see all congregations; leaders only their own (mirrors the
+// firestore.rules read scoping, so a leader's query doesn't get denied).
+export const getEventRegistrationsByEvent = async (reviewerRole, reviewerCongregation) => {
+  try {
+    const q = reviewerRole === 'leader'
+      ? query(collection(db, 'eventRegistrations'), where('congregation', '==', reviewerCongregation))
+      : collection(db, 'eventRegistrations');
+    const snap = await getDocs(q);
+
+    const groups = new Map();
+    snap.docs.forEach(d => {
+      const reg = { id: d.id, ...d.data() };
+      if (!groups.has(reg.eventId)) {
+        groups.set(reg.eventId, {
+          eventId: reg.eventId,
+          eventName: reg.eventName,
+          eventDate: reg.eventDate,
+          attendees: [],
+        });
+      }
+      groups.get(reg.eventId).attendees.push(reg);
+    });
+
+    const toMs = (raw) => {
+      if (raw?.toDate) return raw.toDate().getTime();
+      if (raw?.seconds) return raw.seconds * 1000;
+      return raw ? new Date(raw).getTime() : 0;
+    };
+    return [...groups.values()]
+      .map(g => ({
+        ...g,
+        attendees: g.attendees.sort((a, b) => (a.userName || '').localeCompare(b.userName || '')),
+      }))
+      .sort((a, b) => toMs(b.eventDate) - toMs(a.eventDate));
+  } catch (error) {
+    console.error('Get event registrations by event error:', error);
+    return [];
+  }
+};
+
 export const approveEventRegistration = async (registrationId, userId, reviewerUid) => {
   try {
     await updateDoc(doc(db, 'eventRegistrations', registrationId), {

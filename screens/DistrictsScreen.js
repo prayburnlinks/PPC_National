@@ -74,6 +74,38 @@ const DistrictsScreen = ({ navigation }) => {
           <Text style={styles.boardArrow}>›</Text>
         </TouchableOpacity>
 
+        {/* National Youth Board Entry */}
+        <TouchableOpacity
+          style={styles.boardCard}
+          onPress={() => navigation.navigate('NationalYouthBoard')}
+          activeOpacity={0.8}
+        >
+          <View style={styles.boardLeft}>
+            <Text style={styles.boardIcon}>🙌</Text>
+            <View>
+              <Text style={styles.boardTitle}>National Youth Board</Text>
+              <Text style={styles.boardSub}>Meet our leadership team</Text>
+            </View>
+          </View>
+          <Text style={styles.boardArrow}>›</Text>
+        </TouchableOpacity>
+
+        {/* National Sunday School Board Entry */}
+        <TouchableOpacity
+          style={styles.boardCard}
+          onPress={() => navigation.navigate('NationalSundaySchoolBoard')}
+          activeOpacity={0.8}
+        >
+          <View style={styles.boardLeft}>
+            <Text style={styles.boardIcon}>📖</Text>
+            <View>
+              <Text style={styles.boardTitle}>National Sunday School Board</Text>
+              <Text style={styles.boardSub}>Meet our leadership team</Text>
+            </View>
+          </View>
+          <Text style={styles.boardArrow}>›</Text>
+        </TouchableOpacity>
+
         {DISTRICTS.map((district, idx) => {
           const isOpen = expanded.includes(district.name);
           const congregations = CONGREGATIONS.filter(c => c.district === district.name);

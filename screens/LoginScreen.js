@@ -198,6 +198,7 @@ const LoginScreen = ({ navigation }) => {
             "The fire must be kept burning on the altar continuously; it must not go out."
           </Text>
           <Text style={styles.footerRef}>— Leviticus 6:13</Text>
+          <Text style={styles.footerCredit}>Developed by Prayburn Links</Text>
         </View>
       </ScrollView>
       {/* Forgot Password Modal */}
@@ -445,6 +446,11 @@ const styles = StyleSheet.create({
     color: colors.red,
     fontWeight: '700',
     marginTop: spacing.xs,
+  },
+  footerCredit: {
+    fontSize: typography.sizes.xs,
+    color: colors.textSecondary,
+    marginTop: spacing.lg,
   },
   modalOverlay: {
     flex: 1,

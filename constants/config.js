@@ -87,10 +87,10 @@ export const DISTRICTS = [
 
 // Bank Details for EFT
 export const BANK_DETAILS = {
-  bank: 'First National Bank',
-  accountName: 'PPC I Love My Church',
-  accountNumber: '62 8473 8291',
-  branchCode: '250 655',
+  bank: 'Absa',
+  accountName: 'PPK ABC Fonds',
+  accountNumber: '4056725472',
+  branchCode: '632005',
   accountType: 'Cheque / Current',
   referenceFormat: 'Name + Congregation',
 };
@@ -278,6 +278,68 @@ export const NATIONAL_WOMENS_BOARD = [
     portfolio: 'Treasurer',
     photo: require('../assets/womensboard/cornelia-links.jpg'),
     photoFull: require('../assets/womensboard/cornelia-links-full.jpg'),
+  },
+];
+
+export const NATIONAL_YOUTH_BOARD = [
+  {
+    id: 1,
+    name: 'Christopher Spies',
+    portfolio: 'Chairperson',
+    photo: require('../assets/youthboard/christopher-spies.jpg'),
+    photoFull: require('../assets/youthboard/christopher-spies-full.jpg'),
+  },
+  {
+    id: 2,
+    name: 'Clinton Anthony',
+    portfolio: 'Vice Chairperson',
+    photo: require('../assets/youthboard/clinton-anthony.jpg'),
+    photoFull: require('../assets/youthboard/clinton-anthony-full.jpg'),
+  },
+  {
+    id: 3,
+    name: 'Danny Wildskud',
+    portfolio: 'Secretary',
+    photo: require('../assets/youthboard/danny-wildskud.jpg'),
+    photoFull: require('../assets/youthboard/danny-wildskud-full.jpg'),
+  },
+  {
+    id: 4,
+    name: 'Albie Botha',
+    portfolio: 'Treasurer',
+    photo: require('../assets/youthboard/albie-botha.jpg'),
+    photoFull: require('../assets/youthboard/albie-botha-full.jpg'),
+  },
+];
+
+export const NATIONAL_SUNDAY_SCHOOL_BOARD = [
+  {
+    id: 1,
+    name: 'Noel Bredenkamp',
+    portfolio: 'Chairperson',
+    photo: require('../assets/sundayschoolboard/noel-bredenkamp.jpg'),
+    photoFull: require('../assets/sundayschoolboard/noel-bredenkamp-full.jpg'),
+  },
+  {
+    id: 2,
+    name: 'Danie Van Wyk',
+    portfolio: 'Vice Chairperson',
+    photo: require('../assets/sundayschoolboard/danie-van-wyk.jpg'),
+    photoFull: require('../assets/sundayschoolboard/danie-van-wyk-full.jpg'),
+  },
+  {
+    id: 3,
+    name: 'Chantel Lewis',
+    portfolio: 'Secretary',
+    photo: require('../assets/sundayschoolboard/chantel-lewis.jpg'),
+    photoFull: require('../assets/sundayschoolboard/chantel-lewis-full.jpg'),
+  },
+  {
+    id: 4,
+    name: 'Dawid Bothman',
+    portfolio: 'Treasurer',
+    photo: require('../assets/sundayschoolboard/dawid-bothman.jpg'),
+    photoFull: require('../assets/sundayschoolboard/dawid-bothman-full.jpg'),
   },
 ];
 

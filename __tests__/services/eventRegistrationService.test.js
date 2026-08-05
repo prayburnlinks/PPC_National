@@ -6,6 +6,7 @@ import {
   getPendingEventRegistrations,
   approveEventRegistration,
   rejectEventRegistration,
+  getEventRegistrationsByEvent,
 } from '../../services/eventRegistrationService';
 
 jest.mock('firebase/firestore', () => ({
@@ -204,6 +205,42 @@ describe('getPendingEventRegistrations', () => {
     getDocs.mockResolvedValue({ docs: [] });
 
     const result = await getPendingEventRegistrations('leader', 'Ebenezer');
+
+    expect(result).toEqual([]);
+  });
+});
+
+describe('getEventRegistrationsByEvent', () => {
+  it('groups registrations by event with attendees sorted by name, newest event first', async () => {
+    getDocs.mockResolvedValue({
+      docs: [
+        { id: 'u1_e1', data: () => ({ eventId: 'e1', eventName: 'Youth Camp', eventDate: new Date('2026-09-01'), userId: 'u1', userName: 'Zanele', status: 'approved' }) },
+        { id: 'u2_e2', data: () => ({ eventId: 'e2', eventName: 'Sisters Conference', eventDate: new Date('2026-10-01'), userId: 'u2', userName: 'Ben', status: 'awaiting_payment' }) },
+        { id: 'u3_e1', data: () => ({ eventId: 'e1', eventName: 'Youth Camp', eventDate: new Date('2026-09-01'), userId: 'u3', userName: 'Alice', status: 'confirmed' }) },
+      ],
+    });
+
+    const result = await getEventRegistrationsByEvent('admin', null);
+
+    expect(result).toHaveLength(2);
+    expect(result[0].eventName).toBe('Sisters Conference'); // newest first
+    expect(result[1].eventName).toBe('Youth Camp');
+    expect(result[1].attendees.map(a => a.userName)).toEqual(['Alice', 'Zanele']);
+  });
+
+  it('scopes the query to the congregation for leaders', async () => {
+    getDocs.mockResolvedValue({ docs: [] });
+    const { where } = require('firebase/firestore');
+
+    await getEventRegistrationsByEvent('leader', 'Ebenezer');
+
+    expect(where).toHaveBeenCalledWith('congregation', '==', 'Ebenezer');
+  });
+
+  it('returns an empty array on error', async () => {
+    getDocs.mockRejectedValue(new Error('offline'));
+
+    const result = await getEventRegistrationsByEvent('admin', null);
 
     expect(result).toEqual([]);
   });
