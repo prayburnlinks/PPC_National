@@ -15,10 +15,7 @@ import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { BANK_DETAILS } from '../constants/config';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../context/UserContext';
-import {
-  getAllEvents,
-  logGivingTransaction,
-} from '../services/firestoreService';
+import { getAllEvents } from '../services/firestoreService';
 import {
   registerForEvent,
   getUserEventRegistrationsMap,
@@ -82,17 +79,6 @@ const EventsScreen = ({ navigation }) => {
     setRegistering(true);
     try {
       await registerForEvent(user, selectedEvent);
-
-      if (selectedEvent.requiresPayment && selectedEvent.registrationFee > 0) {
-        await logGivingTransaction(user.uid, {
-          fund: 'event_registration',
-          amount: selectedEvent.registrationFee,
-          eventId: selectedEvent.id,
-          eventName: selectedEvent.name,
-          paymentMethod: 'eft',
-          reference: `${user.name} · ${selectedEvent.paymentReference || selectedEvent.name}`,
-        });
-      }
 
       setRegisteredIds(prev => new Set([...prev, selectedEvent.id]));
       setSelectedEvent(null);

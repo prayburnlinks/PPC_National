@@ -85,3 +85,15 @@ describe('event listing expiry', () => {
     expect(result.map(e => e.name)).toEqual(['Leaders Retreat']);
   });
 });
+
+describe('malformed event docs', () => {
+  it('excludes an event with no date from all listings', async () => {
+    const svc = freshService([
+      ['dateless', { name: 'Broken Event' }],
+      ['ok', { name: 'Real Event', eventDate: new Date(Date.now() + DAY) }],
+    ]);
+
+    const { events } = await svc.getAllEvents(20);
+    expect(events.map(e => e.name)).toEqual(['Real Event']);
+  });
+});

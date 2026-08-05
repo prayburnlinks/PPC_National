@@ -23,7 +23,6 @@ import PrayerWallScreen from './screens/PrayerWallScreen';
 import AdminScreen from './screens/AdminScreen';
 import NationalBoardScreen from './screens/NationalBoardScreen';
 import DocumentsScreen from './screens/DocumentsScreen';
-import GivingHistoryScreen from './screens/GivingHistoryScreen';
 import MyEventsScreen from './screens/MyEventsScreen';
 import MyPrayerRequestsScreen from './screens/MyPrayerRequestsScreen';
 import NotificationsScreen from './screens/NotificationsScreen';
@@ -181,7 +180,6 @@ export default function App() {
                 initialParams={{ title: 'National Sunday School Board', board: NATIONAL_SUNDAY_SCHOOL_BOARD }}
               />
             )}
-            {user && user.role !== ROLES.VISITOR && <Stack.Screen name="GivingHistory" component={GivingHistoryScreen} />}
             {user && user.role !== ROLES.VISITOR && <Stack.Screen name="MyEvents" component={MyEventsScreen} />}
             {user && user.role !== ROLES.VISITOR && <Stack.Screen name="MyPrayerRequests" component={MyPrayerRequestsScreen} />}
             {user && user.role !== ROLES.VISITOR && <Stack.Screen name="Notifications" component={NotificationsScreen} />}

@@ -8,7 +8,6 @@ import {
   getUpcomingEvents,
   getUserProfile,
   updateUserProfile,
-  logGivingTransaction,
   createUserNotification,
 } from '../../services/firestoreService';
 
@@ -302,50 +301,6 @@ describe('updateUserProfile', () => {
     expect(updates).toHaveProperty('name', 'Bob');
     expect(updates).not.toHaveProperty('role');
     expect(updates).not.toHaveProperty('status');
-  });
-});
-
-describe('logGivingTransaction', () => {
-  const txData = { fund: 'tithes', amount: 100, paymentMethod: 'eft', reference: 'Alice · Ebenezer' };
-
-  it('writes to both givingHistory and givingTransactions for a signed-in user', async () => {
-    addDoc
-      .mockResolvedValueOnce({ id: 'history-doc-1' })
-      .mockResolvedValueOnce({ id: 'global-doc-1' });
-
-    const result = await logGivingTransaction('uid-1', txData);
-
-    expect(addDoc).toHaveBeenCalledTimes(2);
-    const [, globalPayload] = addDoc.mock.calls[1];
-    expect(globalPayload).toMatchObject({
-      userId: 'uid-1',
-      isAnonymous: false,
-      transactionId: 'history-doc-1',
-    });
-    expect(result).toMatchObject({ success: true, transactionId: 'history-doc-1' });
-  });
-
-  it('writes only to givingTransactions for an anonymous visitor (no userId)', async () => {
-    addDoc.mockResolvedValueOnce({ id: 'global-doc-2' });
-
-    const result = await logGivingTransaction(null, txData);
-
-    expect(addDoc).toHaveBeenCalledTimes(1);
-    const [, globalPayload] = addDoc.mock.calls[0];
-    expect(globalPayload).toMatchObject({
-      userId: null,
-      isAnonymous: true,
-      transactionId: null,
-    });
-    expect(result).toMatchObject({ success: true, transactionId: 'global-doc-2' });
-  });
-
-  it('throws on failure', async () => {
-    addDoc.mockRejectedValue(new Error('Write failed'));
-
-    await expect(logGivingTransaction('uid-1', txData)).rejects.toMatchObject({
-      message: 'Failed to save transaction',
-    });
   });
 });
 

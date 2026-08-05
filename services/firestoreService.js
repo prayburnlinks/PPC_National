@@ -41,7 +41,7 @@ const fetchEvents = async () => {
   eventsCache = snapshot.docs.map(doc => ({
     ...doc.data(),
     id: doc.id,
-    eventDate: parseDate(doc.data().eventDate),
+    eventDate: doc.data().eventDate ? parseDate(doc.data().eventDate) : null,
     endDate: doc.data().endDate ? parseDate(doc.data().endDate) : null,
   }));
   eventsCachedAt = now;
@@ -49,9 +49,13 @@ const fetchEvents = async () => {
 };
 
 // An event stays listed through the whole of its final calendar day —
-// `endDate` for multi-day events, otherwise `eventDate`.
+// `endDate` for multi-day events, otherwise `eventDate`. An event with no
+// date at all is treated as ended so a malformed doc can't sit in the
+// listings forever.
 const hasEventEnded = (event, now = new Date()) => {
-  const lastDay = new Date(event.endDate || event.eventDate);
+  const raw = event.endDate || event.eventDate;
+  if (!raw) return true;
+  const lastDay = new Date(raw);
   lastDay.setHours(23, 59, 59, 999);
   return lastDay < now;
 };
@@ -154,80 +158,6 @@ export const incrementEventAttendeeCount = async (eventId) => {
   const cachedEvent = eventsCache?.find(e => e.id === eventId);
   if (cachedEvent) {
     cachedEvent.attendeeCount = (cachedEvent.attendeeCount || 0) + 1;
-  }
-};
-
-/**
- * ============================================
- * GIVING / TITHE
- * ============================================
- */
-
-/**
- * Log a giving transaction.
- * Pass a falsy `userId` (e.g. an unauthenticated visitor) to log an
- * anonymous transaction — it's recorded only in the global
- * `givingTransactions` collection, not in a per-user subcollection.
- */
-export const logGivingTransaction = async (userId, transactionData) => {
-  try {
-    const transaction = {
-      ...transactionData,
-      createdAt: new Date(),
-      status: 'pending', // manual EFT payment
-    };
-
-    let docRef;
-    if (userId) {
-      const givingRef = collection(db, 'users', userId, 'givingHistory');
-      docRef = await addDoc(givingRef, transaction);
-    }
-
-    // Also create a global giving record for analytics
-    const globalRef = await addDoc(collection(db, 'givingTransactions'), {
-      ...transaction,
-      userId: userId || null,
-      isAnonymous: !userId,
-      transactionId: docRef?.id || null,
-    });
-
-    return { success: true, transactionId: docRef?.id || globalRef.id };
-  } catch (error) {
-    console.error('Error logging giving transaction:', error);
-    throw { message: 'Failed to save transaction' };
-  }
-};
-
-/**
- * Get user's giving history
- */
-export const getUserGivingHistory = async (userId) => {
-  try {
-    const givingRef = collection(db, 'users', userId, 'givingHistory');
-    const snapshot = await getDocs(givingRef);
-    return snapshot.docs
-      .map(doc => ({
-        ...doc.data(),
-        id: doc.id,
-        createdAt: parseDate(doc.data().createdAt),
-      }))
-      .sort((a, b) => b.createdAt - a.createdAt);
-  } catch (error) {
-    console.error('Error fetching giving history:', error);
-    return [];
-  }
-};
-
-/**
- * Get user's total giving
- */
-export const getUserTotalGiving = async (userId) => {
-  try {
-    const givingHistory = await getUserGivingHistory(userId);
-    return givingHistory.reduce((total, tx) => total + (tx.amount || 0), 0);
-  } catch (error) {
-    console.error('Error calculating total giving:', error);
-    return 0;
   }
 };
 
@@ -441,11 +371,6 @@ export default {
   // Event Registration
   incrementEventAttendeeCount,
 
-  // Giving
-  logGivingTransaction,
-  getUserGivingHistory,
-  getUserTotalGiving,
-  
   // User
   getUserProfile,
   updateUserProfile,

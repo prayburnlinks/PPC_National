@@ -3,7 +3,7 @@
  * Main dashboard with events, announcements, and quick actions
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   ScrollView,
@@ -13,8 +13,9 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
-import { getUpcomingEvents } from '../services/firestoreService';
+import { getUpcomingEvents, getUserNotifications } from '../services/firestoreService';
 import { useUser } from '../context/UserContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DISTRICTS, CONGREGATIONS, ROLES } from '../constants/config';
@@ -34,7 +35,22 @@ const HomeScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [hasUnread, setHasUnread] = useState(false);
   const isVisitor = user?.role === ROLES.VISITOR;
+
+  // Refresh the unread indicator every time Home regains focus, so reading
+  // notifications and coming back clears the dot.
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      if (user?.uid) {
+        getUserNotifications(user.uid, 20)
+          .then(list => { if (active) setHasUnread(list.some(n => !n.read)); })
+          .catch(() => {});
+      }
+      return () => { active = false; };
+    }, [user?.uid])
+  );
 
   // Districts, Prayer Wall and Store are member-only routes — the Visitor
   // tab stack doesn't register them, so a visitor tapping these tiles
@@ -79,11 +95,11 @@ const HomeScreen = ({ navigation }) => {
             </View>
           </View>
           <TouchableOpacity
-            onPress={() => alert('🔔 Notifications coming soon!')}
+            onPress={() => navigation.navigate(user?.uid ? 'Notifications' : 'SignIn')}
             style={styles.notifBell}
           >
             <Text style={styles.notifIcon}>🔔</Text>
-            <View style={styles.notifDot} />
+            {hasUnread && <View style={styles.notifDot} />}
           </TouchableOpacity>
         </View>
         <Text style={styles.greeting}>{getGreeting()}, beloved</Text>

@@ -193,6 +193,12 @@ export const sendResetEmail = async (email) => {
     await sendPasswordResetEmail(auth, email);
     return { success: true, message: 'Password reset email sent' };
   } catch (error) {
+    // Never reveal whether an account exists. The project has email
+    // enumeration protection enabled (so Firebase won't throw user-not-found)
+    // — this guard keeps that promise even if the setting is ever toggled.
+    if (error.code === 'auth/user-not-found') {
+      return { success: true, message: 'Password reset email sent' };
+    }
     console.error('Reset email error:', error);
     throw { message: getErrorMessage(error.code) };
   }
@@ -299,8 +305,11 @@ const getErrorMessage = (code) => {
   const errorMessages = {
     'auth/invalid-email': 'Invalid email address',
     'auth/user-disabled': 'This account has been disabled',
-    'auth/user-not-found': 'Email not found',
-    'auth/wrong-password': 'Incorrect password',
+    'auth/user-not-found': 'Incorrect email or password',
+    'auth/wrong-password': 'Incorrect email or password',
+    // With email enumeration protection enabled, Firebase returns this
+    // single code for any wrong email/password combination.
+    'auth/invalid-credential': 'Incorrect email or password',
     'auth/email-already-in-use': 'Email already in use',
     'auth/weak-password': 'Password should be at least 6 characters',
     'auth/operation-not-allowed': 'Operation not allowed',

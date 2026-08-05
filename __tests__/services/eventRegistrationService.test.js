@@ -116,6 +116,16 @@ describe('registerForEvent', () => {
       message: 'Quota exceeded',
     });
   });
+
+  it('still succeeds when the attendee count bump fails', async () => {
+    getDoc.mockResolvedValue({ exists: () => false });
+    setDoc.mockResolvedValue();
+    incrementEventAttendeeCount.mockRejectedValue(new Error('offline'));
+
+    const result = await registerForEvent(mockUser, mockPaidEvent);
+
+    expect(result).toEqual({ success: true, registrationId: 'uid-1_event-1' });
+  });
 });
 
 describe('getUserEventRegistrationsMap', () => {

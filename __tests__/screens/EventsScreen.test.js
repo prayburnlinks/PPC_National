@@ -6,7 +6,6 @@ import { UserContext } from '../../context/UserContext';
 
 jest.mock('../../services/firestoreService', () => ({
   getAllEvents: jest.fn(),
-  logGivingTransaction: jest.fn(),
 }));
 
 jest.mock('../../services/eventRegistrationService', () => ({
@@ -20,7 +19,7 @@ jest.mock('expo-clipboard', () => ({
 
 import * as Clipboard from 'expo-clipboard';
 
-import { getAllEvents, logGivingTransaction } from '../../services/firestoreService';
+import { getAllEvents } from '../../services/firestoreService';
 import {
   registerForEvent,
   getUserEventRegistrationsMap,
@@ -122,14 +121,12 @@ describe('EventsScreen', () => {
         expect.anything()
       );
     });
-    expect(logGivingTransaction).not.toHaveBeenCalled();
   });
 
   // EVT-04
   it('registers a member for a paid event and surfaces EFT details', async () => {
     getAllEvents.mockResolvedValue({ events: [paidEvent] });
     registerForEvent.mockResolvedValue(undefined);
-    logGivingTransaction.mockResolvedValue(undefined);
 
     const { getByText, queryByText } = renderScreen();
     await waitFor(() => getByText('Leaders Retreat'));
@@ -151,15 +148,7 @@ describe('EventsScreen', () => {
     fireEvent.press(getByText('Register — R350'));
 
     await waitFor(() => {
-      expect(logGivingTransaction).toHaveBeenCalledWith(
-        'uid-1',
-        expect.objectContaining({
-          fund: 'event_registration',
-          amount: 350,
-          eventId: 'evt-paid',
-          reference: 'Alice · RETREAT26',
-        })
-      );
+      expect(registerForEvent).toHaveBeenCalledWith(mockUser, paidEvent);
       expect(Alert.alert).toHaveBeenCalledWith(
         'Registration Successful! 🎉',
         expect.stringContaining('R350 EFT payment'),

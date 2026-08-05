@@ -72,7 +72,15 @@ export const registerForEvent = async (user, event) => {
       rejectionReason: null,
     });
 
-    await incrementEventAttendeeCount(event.id);
+    // Non-fatal bookkeeping: the registration itself succeeded, so a failed
+    // counter bump must not surface as a registration error. The count is
+    // advisory — the Admin Events tab derives true counts from the
+    // registration docs themselves.
+    try {
+      await incrementEventAttendeeCount(event.id);
+    } catch (countError) {
+      console.error('Attendee count bump failed (non-fatal):', countError);
+    }
 
     return { success: true, registrationId: id };
   } catch (error) {

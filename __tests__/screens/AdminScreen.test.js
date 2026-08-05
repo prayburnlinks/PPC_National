@@ -164,25 +164,72 @@ describe('AdminScreen approve/reject', () => {
     });
   });
 
-  it('removes user from list after rejection', async () => {
+  it('rejects a user with a typed reason through the reject modal', async () => {
     rejectUser.mockResolvedValue({ success: true });
-    jest.spyOn(require('react-native').Alert, 'alert').mockImplementation(
-      (title, msg, buttons) => {
-        const rejectButton = buttons?.find((b) => b.text === 'Reject');
-        if (rejectButton) rejectButton.onPress();
-      }
-    );
 
-    const { getByText, queryByText } = renderAdmin();
+    const { getByText, queryByText, getByPlaceholderText } = renderAdmin();
     await waitFor(() => getByText('Reject'));
 
     await act(async () => {
       fireEvent.press(getByText('Reject'));
     });
 
+    // Modal opens with an optional reason field
+    await waitFor(() => getByText("Reject John Smith's registration?"));
+    fireEvent.changeText(
+      getByPlaceholderText('Reason (optional — shown to the user)'),
+      'Congregation could not verify membership'
+    );
+
+    await act(async () => {
+      fireEvent.press(getByText('Confirm Reject'));
+    });
+
     await waitFor(() => {
-      expect(rejectUser).toHaveBeenCalledWith('u1');
+      expect(rejectUser).toHaveBeenCalledWith('u1', 'Congregation could not verify membership');
       expect(queryByText('John Smith')).toBeFalsy();
+    });
+  });
+
+  it('rejects an event payment with the reason passed through', async () => {
+    const { rejectEventRegistration } = require('../../services/eventRegistrationService');
+    rejectEventRegistration.mockResolvedValue({ success: true });
+    getPendingEventRegistrations.mockResolvedValue([
+      {
+        id: 'u2_e1',
+        userId: 'u2',
+        userName: 'Mary Adams',
+        eventName: 'Youth Camp',
+        registrationFee: 250,
+        currency: 'R',
+        congregation: 'Ebenezer',
+        fileName: 'proof.jpg',
+        mimeType: 'image/jpeg',
+      },
+    ]);
+
+    const { getByText, getByPlaceholderText } = renderAdmin();
+    await waitFor(() => getByText(/Payments/));
+    await act(async () => {
+      fireEvent.press(getByText(/Payments/));
+    });
+
+    await waitFor(() => getByText('Reject'));
+    await act(async () => {
+      fireEvent.press(getByText('Reject'));
+    });
+
+    await waitFor(() => getByText('Reject payment from Mary Adams for Youth Camp?'));
+    fireEvent.changeText(
+      getByPlaceholderText('Reason (optional — shown to the user)'),
+      'Reference did not match'
+    );
+    await act(async () => {
+      fireEvent.press(getByText('Confirm Reject'));
+    });
+
+    await waitFor(() => {
+      expect(rejectEventRegistration).toHaveBeenCalledWith('u2_e1', 'u2', 'admin-uid', 'Reference did not match');
     });
   });
 

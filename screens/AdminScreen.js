@@ -12,6 +12,7 @@ import {
   Image,
   Linking,
   Share,
+  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
@@ -48,6 +49,9 @@ const AdminScreen = ({ navigation }) => {
   const [viewingRegistrationProof, setViewingRegistrationProof] = useState(null);
   const [viewingOrderProof, setViewingOrderProof] = useState(null);
   const [loadError, setLoadError] = useState(false);
+  const [rejectTarget, setRejectTarget] = useState(null); // { kind: 'user'|'payment'|'order', item }
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectSubmitting, setRejectSubmitting] = useState(false);
 
   const loadAll = useCallback(async () => {
     try {
@@ -104,29 +108,38 @@ const AdminScreen = ({ navigation }) => {
     );
   };
 
-  const handleReject = (user) => {
-    Alert.alert(
-      'Reject Account',
-      `Reject ${user.name}'s registration?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reject',
-          style: 'destructive',
-          onPress: async () => {
-            setProcessingUids(prev => [...prev, user.uid]);
-            try {
-              await rejectUser(user.uid);
-              setPendingUsers(prev => prev.filter(u => u.uid !== user.uid));
-            } catch {
-              Alert.alert('Error', 'Failed to reject user. Please try again.');
-            } finally {
-              setProcessingUids(prev => prev.filter(id => id !== user.uid));
-            }
-          },
-        },
-      ]
-    );
+  // All three reject flows go through one modal so the reviewer can give an
+  // optional reason — it's surfaced to the member in their notification and
+  // on the rejected item (Alert.prompt would be iOS-only).
+  const handleReject = (user) => setRejectTarget({ kind: 'user', item: user });
+
+  const closeRejectModal = () => {
+    setRejectTarget(null);
+    setRejectReason('');
+  };
+
+  const handleConfirmReject = async () => {
+    if (!rejectTarget) return;
+    const { kind, item } = rejectTarget;
+    const reason = rejectReason.trim();
+    setRejectSubmitting(true);
+    try {
+      if (kind === 'user') {
+        await rejectUser(item.uid, reason);
+        setPendingUsers(prev => prev.filter(u => u.uid !== item.uid));
+      } else if (kind === 'payment') {
+        await rejectEventRegistration(item.id, item.userId, reviewer?.uid, reason);
+        setPendingEventPayments(prev => prev.filter(r => r.id !== item.id));
+      } else {
+        await rejectMerchOrder(item.id, item.userId, reviewer?.uid, reason);
+        setPendingMerchOrders(prev => prev.filter(o => o.id !== item.id));
+      }
+      closeRejectModal();
+    } catch {
+      Alert.alert('Error', 'Failed to reject. Please try again.');
+    } finally {
+      setRejectSubmitting(false);
+    }
   };
 
   const handleApproveEventPayment = (registration) => {
@@ -150,24 +163,7 @@ const AdminScreen = ({ navigation }) => {
   };
 
   const handleRejectEventPayment = (registration) => {
-    Alert.alert('Reject Payment', `Reject proof of payment from ${registration.userName} for ${registration.eventName}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Reject',
-        style: 'destructive',
-        onPress: async () => {
-          setProcessingRegistrationIds(prev => [...prev, registration.id]);
-          try {
-            await rejectEventRegistration(registration.id, registration.userId, reviewer?.uid);
-            setPendingEventPayments(prev => prev.filter(r => r.id !== registration.id));
-          } catch {
-            Alert.alert('Error', 'Failed to reject payment. Please try again.');
-          } finally {
-            setProcessingRegistrationIds(prev => prev.filter(id => id !== registration.id));
-          }
-        },
-      },
-    ]);
+    setRejectTarget({ kind: 'payment', item: registration });
   };
 
   const handleApproveMerchOrder = (order) => {
@@ -191,24 +187,7 @@ const AdminScreen = ({ navigation }) => {
   };
 
   const handleRejectMerchOrder = (order) => {
-    Alert.alert('Reject Order', `Reject ${order.itemName} order from ${order.userName}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Reject',
-        style: 'destructive',
-        onPress: async () => {
-          setProcessingOrderIds(prev => [...prev, order.id]);
-          try {
-            await rejectMerchOrder(order.id, order.userId, reviewer?.uid);
-            setPendingMerchOrders(prev => prev.filter(o => o.id !== order.id));
-          } catch {
-            Alert.alert('Error', 'Failed to reject order. Please try again.');
-          } finally {
-            setProcessingOrderIds(prev => prev.filter(id => id !== order.id));
-          }
-        },
-      },
-    ]);
+    setRejectTarget({ kind: 'order', item: order });
   };
 
   const formatDate = (date) => {
@@ -689,6 +668,50 @@ const AdminScreen = ({ navigation }) => {
         </View>
       </Modal>
 
+      {/* Reject Reason Modal */}
+      <Modal
+        visible={!!rejectTarget}
+        transparent
+        animationType="fade"
+        onRequestClose={closeRejectModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.rejectModalBox}>
+            <Text style={styles.rejectModalTitle}>
+              {rejectTarget?.kind === 'user'
+                ? `Reject ${rejectTarget?.item?.name}'s registration?`
+                : rejectTarget?.kind === 'payment'
+                ? `Reject payment from ${rejectTarget?.item?.userName} for ${rejectTarget?.item?.eventName}?`
+                : `Reject ${rejectTarget?.item?.itemName} order from ${rejectTarget?.item?.userName}?`}
+            </Text>
+            <TextInput
+              style={styles.reasonInput}
+              placeholder="Reason (optional — shown to the user)"
+              placeholderTextColor={colors.textSecondary}
+              value={rejectReason}
+              onChangeText={setRejectReason}
+              multiline
+            />
+            <View style={styles.actions}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={closeRejectModal} disabled={rejectSubmitting}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmRejectBtn, rejectSubmitting && { opacity: 0.6 }]}
+                onPress={handleConfirmReject}
+                disabled={rejectSubmitting}
+              >
+                {rejectSubmitting ? (
+                  <ActivityIndicator color={colors.white} size="small" />
+                ) : (
+                  <Text style={styles.confirmRejectBtnText}>Confirm Reject</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Merch Order Proof Viewer Modal */}
       <Modal
         visible={!!viewingOrderProof}
@@ -977,6 +1000,56 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.lg,
+  },
+  rejectModalBox: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    width: '100%',
+    padding: spacing.lg,
+  },
+  rejectModalTitle: {
+    fontSize: typography.sizes.sm,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+  },
+  reasonInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    fontSize: typography.sizes.sm,
+    color: colors.textPrimary,
+    minHeight: 70,
+    textAlignVertical: 'top',
+    marginBottom: spacing.md,
+  },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceLight,
+    alignItems: 'center',
+  },
+  cancelBtnText: {
+    fontSize: typography.sizes.sm,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  confirmRejectBtn: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.red,
+    alignItems: 'center',
+  },
+  confirmRejectBtnText: {
+    fontSize: typography.sizes.sm,
+    fontWeight: '700',
+    color: colors.white,
   },
   modalBox: {
     backgroundColor: colors.white,

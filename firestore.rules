@@ -82,11 +82,14 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin();
 
-      // Any signed-in member registering for an event bumps the counter —
-      // scoped to exactly that single-field, single-step increment.
+      // A member registering for an event bumps the counter — scoped to
+      // exactly that single-field, single-step increment, and only once
+      // their own registration doc for this event actually exists
+      // (registerForEvent creates the registration before incrementing).
       allow update: if isAuthenticated()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['attendeeCount'])
-        && request.resource.data.attendeeCount == resource.data.attendeeCount + 1;
+        && request.resource.data.attendeeCount == resource.data.attendeeCount + 1
+        && exists(/databases/$(database)/documents/eventRegistrations/$(request.auth.uid + '_' + eventId));
     }
 
     match /districts/{districtId} {
@@ -129,9 +132,28 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated()
         && request.resource.data.createdBy == request.auth.uid;
+      // Praying toggles exactly one step: the caller adds themself (count +1)
+      // or removes themself (count -1). Values are validated, not just keys,
+      // so a crafted write can't inflate the counter or edit other people's
+      // entries in prayingBy.
       allow update: if isAuthenticated()
         && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['prayCount', 'prayingBy']);
+            .hasOnly(['prayCount', 'prayingBy'])
+        && (
+          (
+            request.resource.data.prayCount == resource.data.prayCount + 1
+            && request.resource.data.prayingBy.size() == resource.data.prayingBy.size() + 1
+            && request.resource.data.prayingBy.hasAll(resource.data.prayingBy)
+            && request.auth.uid in request.resource.data.prayingBy
+            && !(request.auth.uid in resource.data.prayingBy)
+          ) || (
+            request.resource.data.prayCount == resource.data.prayCount - 1
+            && request.resource.data.prayingBy.size() == resource.data.prayingBy.size() - 1
+            && resource.data.prayingBy.hasAll(request.resource.data.prayingBy)
+            && request.auth.uid in resource.data.prayingBy
+            && !(request.auth.uid in request.resource.data.prayingBy)
+          )
+        );
       allow delete: if isAuthenticated() && isOwner(resource.data.createdBy);
     }
 

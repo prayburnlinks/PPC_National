@@ -6,14 +6,16 @@ import { DISTRICTS, CONGREGATIONS } from '../../constants/config';
 
 jest.mock('../../services/firestoreService', () => ({
   getUpcomingEvents: jest.fn(),
+  getUserNotifications: jest.fn(),
 }));
 
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({ navigate: jest.fn(), goBack: jest.fn() }),
   useRoute: () => ({ params: {} }),
+  useFocusEffect: (cb) => require('react').useEffect(cb, [cb]),
 }));
 
-import { getUpcomingEvents } from '../../services/firestoreService';
+import { getUpcomingEvents, getUserNotifications } from '../../services/firestoreService';
 
 const mockUser = {
   uid: 'uid-1',
@@ -34,6 +36,7 @@ const renderHome = (user = mockUser) => {
 beforeEach(() => {
   jest.clearAllMocks();
   getUpcomingEvents.mockResolvedValue([]);
+  getUserNotifications.mockResolvedValue([]);
 });
 
 describe('HomeScreen rendering', () => {
@@ -102,5 +105,37 @@ describe('HomeScreen events', () => {
     await waitFor(() => {
       expect(getByText(/No upcoming events/i)).toBeTruthy();
     });
+  });
+});
+
+describe('HomeScreen notification bell', () => {
+  it('navigates a member to Notifications and shows the dot only when unread exist', async () => {
+    getUserNotifications.mockResolvedValue([{ id: 'n1', read: false }]);
+    const navigation = { navigate: jest.fn(), goBack: jest.fn() };
+    const { getByText } = render(
+      <UserContext.Provider value={{ user: mockUser, onLogin: jest.fn(), onLogout: jest.fn() }}>
+        <HomeScreen navigation={navigation} />
+      </UserContext.Provider>
+    );
+
+    await waitFor(() => expect(getUserNotifications).toHaveBeenCalledWith('uid-1', 20));
+
+    require('@testing-library/react-native').fireEvent.press(getByText('🔔'));
+    expect(navigation.navigate).toHaveBeenCalledWith('Notifications');
+  });
+
+  it('sends a visitor to the SignIn prompt instead', async () => {
+    const navigation = { navigate: jest.fn(), goBack: jest.fn() };
+    const { getByText } = render(
+      <UserContext.Provider value={{ user: { role: 'visitor', name: 'Visitor' }, onLogin: jest.fn(), onLogout: jest.fn() }}>
+        <HomeScreen navigation={navigation} />
+      </UserContext.Provider>
+    );
+
+    await waitFor(() => getByText('🔔'));
+    require('@testing-library/react-native').fireEvent.press(getByText('🔔'));
+
+    expect(navigation.navigate).toHaveBeenCalledWith('SignIn');
+    expect(getUserNotifications).not.toHaveBeenCalled();
   });
 });
