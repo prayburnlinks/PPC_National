@@ -160,6 +160,7 @@ export const submitOrderPayment = async (order, user, file) => {
       mimeType: file.mimeType || 'application/octet-stream',
       status: 'payment_submitted',
       paymentSubmittedAt: serverTimestamp(),
+      rejectionReason: null,
     });
     return { success: true };
   } catch (error) {

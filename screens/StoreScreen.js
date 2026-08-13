@@ -16,6 +16,7 @@ import { useUser } from '../context/UserContext';
 import { getMerchItems, createMerchOrder, submitOrderPayment } from '../services/merchService';
 import { BANK_DETAILS } from '../constants/config';
 import * as DocumentPicker from 'expo-document-picker';
+import * as Clipboard from 'expo-clipboard';
 
 const StoreScreen = ({ navigation }) => {
   const { user } = useUser();
@@ -198,7 +199,18 @@ const StoreScreen = ({ navigation }) => {
                     </View>
                     <View style={styles.bankRow}>
                       <Text style={styles.bankLabel}>Number</Text>
-                      <Text style={styles.bankValue}>{BANK_DETAILS.accountNumber}</Text>
+                      <View style={styles.bankValueRow}>
+                        <Text style={styles.bankValue}>{BANK_DETAILS.accountNumber}</Text>
+                        <TouchableOpacity
+                          style={styles.copyButton}
+                          onPress={async () => {
+                            await Clipboard.setStringAsync(BANK_DETAILS.accountNumber);
+                            Alert.alert('Copied', `"${BANK_DETAILS.accountNumber}" copied to clipboard!`);
+                          }}
+                        >
+                          <Text style={styles.copyButtonText}>Copy</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                     <View style={styles.bankRow}>
                       <Text style={styles.bankLabel}>Branch</Text>
@@ -347,6 +359,12 @@ const styles = StyleSheet.create({
   },
   bankLabel: { fontSize: typography.sizes.xs, color: colors.textSecondary },
   bankValue: { fontSize: typography.sizes.xs, fontWeight: '700', color: colors.textPrimary },
+  bankValueRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  copyButton: {
+    backgroundColor: colors.surfaceLight, borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.sm, paddingVertical: 2,
+  },
+  copyButtonText: { fontSize: typography.sizes.xs, fontWeight: '700', color: colors.blue },
   referenceRow: { borderBottomWidth: 0 },
   referenceValue: { color: colors.blue },
   popHint: { fontSize: typography.sizes.xs, color: colors.textSecondary, marginTop: spacing.md, marginBottom: spacing.md },

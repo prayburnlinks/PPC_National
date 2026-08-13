@@ -2,11 +2,19 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // Proof of payment uploads — only the uploader or leaders/admins can read
-    match /pop/{userId}/{fileName} {
+    // Reviewer access mirrors firestore.rules: admins read any proof of
+    // payment, leaders only those from members of their own congregation.
+    function canReviewProofOf(userId) {
+      let reviewer = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+      return reviewer.role == 'admin'
+        || (reviewer.role == 'leader'
+            && reviewer.congregation == firestore.get(/databases/(default)/documents/users/$(userId)).data.congregation);
+    }
+
+    // Event registration payment proof — same shape as merchOrders/
+    match /eventRegistrations/{userId}/{fileName} {
       allow read: if request.auth != null && (
-        request.auth.uid == userId ||
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'leader']
+        request.auth.uid == userId || canReviewProofOf(userId)
       );
       allow write: if request.auth != null && request.auth.uid == userId
                    && request.resource.size < 5 * 1024 * 1024
@@ -16,8 +24,7 @@ service firebase.storage {
     // Merch order payment proof — same shape as pop/
     match /merchOrders/{userId}/{fileName} {
       allow read: if request.auth != null && (
-        request.auth.uid == userId ||
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'leader']
+        request.auth.uid == userId || canReviewProofOf(userId)
       );
       allow write: if request.auth != null && request.auth.uid == userId
                    && request.resource.size < 5 * 1024 * 1024

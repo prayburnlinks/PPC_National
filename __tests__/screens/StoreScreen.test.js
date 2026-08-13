@@ -9,6 +9,10 @@ jest.mock('../../services/merchService', () => ({
   submitOrderPayment: jest.fn(),
 }));
 
+jest.mock('expo-clipboard', () => ({
+  setStringAsync: jest.fn(),
+}));
+
 import { getMerchItems, createMerchOrder } from '../../services/merchService';
 
 const mockUser = { uid: 'uid-1', name: 'Alice', congregation: 'Ebenezer' };
@@ -95,6 +99,7 @@ describe('StoreScreen', () => {
       expect(createMerchOrder).toHaveBeenCalledWith(mockUser, mockItem, 'M', 1);
       expect(getByText('Alice · Burning Fire T-Shirt')).toBeTruthy();
       expect(getByText('Upload Proof of Payment')).toBeTruthy();
+      expect(getByText('Copy')).toBeTruthy();
     });
   });
 });

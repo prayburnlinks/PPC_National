@@ -17,7 +17,6 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
-import { logGivingTransaction } from '../services/firestoreService';
 import { GIVING_FUNDS, BANK_DETAILS } from '../constants/config';
 import { useUser } from '../context/UserContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -31,7 +30,6 @@ const GivingScreen = ({ navigation }) => {
   const [customAmount, setCustomAmount] = useState('');
   const [visitorName, setVisitorName] = useState('');
   const [showBankModal, setShowBankModal] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [givingReference, setGivingReference] = useState('');
 
   const getDisplayAmount = () => {
@@ -44,7 +42,10 @@ const GivingScreen = ({ navigation }) => {
     return `${user.name} · ${user.congregation}`;
   };
 
-  const handleProceedToGive = async () => {
+  // Display-only: shows the EFT details for the chosen amount. No giving
+  // record is written — we can't know whether the user actually completed
+  // the payment in their banking app.
+  const handleProceedToGive = () => {
     if (!selectedFund || !selectedAmount || (selectedAmount === 'other' && !customAmount)) {
       Alert.alert('Error', 'Please select an amount');
       return;
@@ -57,24 +58,8 @@ const GivingScreen = ({ navigation }) => {
       return;
     }
 
-    setLoading(true);
-    try {
-      const reference = getReferenceText();
-
-      await logGivingTransaction(user?.uid, {
-        fund: selectedFund,
-        amount: Math.round(amount * 100) / 100,
-        paymentMethod: 'eft',
-        reference,
-      });
-
-      setGivingReference(reference);
-      setLoading(false);
-      setShowBankModal(true);
-    } catch (error) {
-      setLoading(false);
-      Alert.alert('Error', error.message || 'Failed to process transaction');
-    }
+    setGivingReference(getReferenceText());
+    setShowBankModal(true);
   };
 
   return (
@@ -177,11 +162,7 @@ const GivingScreen = ({ navigation }) => {
           </View>
 
           {/* CTA Button */}
-          <TouchableOpacity
-            style={[styles.giveButton, loading && styles.giveButtonDisabled]}
-            onPress={handleProceedToGive}
-            disabled={loading}
-          >
+          <TouchableOpacity style={styles.giveButton} onPress={handleProceedToGive}>
             <Text style={styles.giveButtonText}>
               Proceed to Give {getDisplayAmount()} →
             </Text>

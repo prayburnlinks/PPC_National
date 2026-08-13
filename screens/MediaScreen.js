@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   ScrollView,
@@ -9,9 +9,15 @@ import {
   Linking,
   Animated,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getLiveStatus } from '../services/firestoreService';
+
+// How often to re-check live status while the Media tab is focused. Tab
+// screens stay mounted when you switch away, so a plain one-time fetch on
+// mount would leave the LIVE badge stuck stale for the rest of the session.
+const LIVE_STATUS_POLL_MS = 60 * 1000;
 
 // Update these with the real channel/page URLs
 const YOUTUBE_CHANNEL_URL = 'https://www.youtube.com/@PPCNationalChurch';
@@ -111,9 +117,18 @@ const MediaScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const [liveStatus, setLiveStatus] = useState({ isLive: false, title: '' });
 
-  useEffect(() => {
-    getLiveStatus().then(setLiveStatus);
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+      const refresh = () => getLiveStatus().then((status) => { if (isActive) setLiveStatus(status); });
+      refresh();
+      const interval = setInterval(refresh, LIVE_STATUS_POLL_MS);
+      return () => {
+        isActive = false;
+        clearInterval(interval);
+      };
+    }, [])
+  );
 
   return (
     <View style={styles.container}>

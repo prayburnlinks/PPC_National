@@ -107,20 +107,16 @@ describe('loginUser', () => {
     expect(result.success).toBe(true);
   });
 
-  it('throws a friendly message for wrong-password error', async () => {
-    signInWithEmailAndPassword.mockRejectedValue({ code: 'auth/wrong-password' });
+  // With email enumeration protection enabled, every bad email/password
+  // combination maps to the same message — no account-existence leak.
+  it('throws the same friendly message for any bad credential error', async () => {
+    for (const code of ['auth/wrong-password', 'auth/user-not-found', 'auth/invalid-credential']) {
+      signInWithEmailAndPassword.mockRejectedValue({ code });
 
-    await expect(loginUser('test@test.com', 'wrong')).rejects.toMatchObject({
-      message: 'Incorrect password',
-    });
-  });
-
-  it('throws a friendly message for user-not-found error', async () => {
-    signInWithEmailAndPassword.mockRejectedValue({ code: 'auth/user-not-found' });
-
-    await expect(loginUser('test@test.com', 'password')).rejects.toMatchObject({
-      message: 'Email not found',
-    });
+      await expect(loginUser('test@test.com', 'wrong')).rejects.toMatchObject({
+        message: 'Incorrect email or password',
+      });
+    }
   });
 });
 
@@ -309,11 +305,18 @@ describe('sendResetEmail', () => {
     expect(result.success).toBe(true);
   });
 
-  it('throws a friendly message on error', async () => {
+  it('reports success for an unknown email — no account-existence leak', async () => {
     sendPasswordResetEmail.mockRejectedValue({ code: 'auth/user-not-found' });
 
-    await expect(sendResetEmail('nope@test.com')).rejects.toMatchObject({
-      message: 'Email not found',
+    const result = await sendResetEmail('nope@test.com');
+    expect(result.success).toBe(true);
+  });
+
+  it('throws a friendly message on a real error', async () => {
+    sendPasswordResetEmail.mockRejectedValue({ code: 'auth/too-many-requests' });
+
+    await expect(sendResetEmail('test@test.com')).rejects.toMatchObject({
+      message: 'Too many attempts. Please try again later.',
     });
   });
 });

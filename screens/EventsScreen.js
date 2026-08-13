@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   ScrollView,
@@ -10,17 +10,16 @@ import {
   Alert,
   Image,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
+import { BANK_DETAILS } from '../constants/config';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../context/UserContext';
+import { getAllEvents } from '../services/firestoreService';
 import {
-  getAllEvents,
   registerForEvent,
-  isUserRegisteredForEvent,
-  logGivingTransaction,
-} from '../services/firestoreService';
-import { submitPOP } from '../services/popService';
-import * as DocumentPicker from 'expo-document-picker';
+  getUserEventRegistrationsMap,
+} from '../services/eventRegistrationService';
 
 const EventsScreen = ({ navigation }) => {
   const { user } = useUser();
@@ -30,7 +29,11 @@ const EventsScreen = ({ navigation }) => {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [registering, setRegistering] = useState(false);
   const [registeredIds, setRegisteredIds] = useState(new Set());
-  const [popUploading, setPopUploading] = useState(false);
+  const [registrations, setRegistrations] = useState(new Map());
+  // Mirrors `registering` state but updates synchronously — state updates
+  // are batched by React, so two taps in the same tick could both read the
+  // same stale (pre-update) state before a re-render happens.
+  const registeringRef = useRef(false);
 
   const loadEvents = useCallback(async () => {
     setLoading(true);
@@ -39,11 +42,9 @@ const EventsScreen = ({ navigation }) => {
     setEvents(list);
 
     if (user?.uid) {
-      const checks = await Promise.all(
-        list.map(e => isUserRegisteredForEvent(user.uid, e.id))
-      );
-      const ids = new Set(list.filter((_, i) => checks[i]).map(e => e.id));
-      setRegisteredIds(ids);
+      const regsMap = await getUserEventRegistrationsMap(user.uid);
+      setRegistrations(regsMap);
+      setRegisteredIds(new Set(regsMap.keys()));
     }
     setLoading(false);
   }, [user?.uid]);
@@ -62,53 +63,38 @@ const EventsScreen = ({ navigation }) => {
 
   const handleRegister = async () => {
     if (!selectedEvent) return;
+    if (!user?.uid) {
+      Alert.alert('Sign In Required', 'Please sign in or create an account to register for events.');
+      return;
+    }
+    if (
+      selectedEvent.capacity &&
+      (selectedEvent.attendeeCount || 0) >= selectedEvent.capacity
+    ) {
+      Alert.alert('Event Full', 'This event has reached its capacity.');
+      return;
+    }
+    if (registeringRef.current) return;
+    registeringRef.current = true;
     setRegistering(true);
     try {
-      await registerForEvent(user.uid, selectedEvent.id);
-
-      if (selectedEvent.requiresPayment && selectedEvent.registrationFee > 0) {
-        await logGivingTransaction(user.uid, {
-          fund: 'event_registration',
-          amount: selectedEvent.registrationFee,
-          eventId: selectedEvent.id,
-          eventName: selectedEvent.name,
-          paymentMethod: 'eft',
-          reference: `${user.name} · ${selectedEvent.paymentReference || selectedEvent.name}`,
-        });
-      }
+      await registerForEvent(user, selectedEvent);
 
       setRegisteredIds(prev => new Set([...prev, selectedEvent.id]));
-      setRegistering(false);
       setSelectedEvent(null);
 
       Alert.alert(
         'Registration Successful! 🎉',
         selectedEvent.requiresPayment
-          ? `You are registered for ${selectedEvent.name}.\n\nPlease complete your R${selectedEvent.registrationFee} EFT payment using:\n\nRef: ${user.name} · ${selectedEvent.paymentReference || selectedEvent.name}\nAccount: ${selectedEvent.bankDetails?.accountNumber}`
+          ? `You are registered for ${selectedEvent.name}.\n\nPlease complete your R${selectedEvent.registrationFee} EFT payment using:\n\nRef: ${user.name} · ${selectedEvent.paymentReference || selectedEvent.name}\nBank: ${BANK_DETAILS.bank}\nAccount: ${BANK_DETAILS.accountNumber}`
           : `You are registered for ${selectedEvent.name}.`,
         [{ text: 'OK' }]
       );
     } catch (error) {
-      setRegistering(false);
       Alert.alert('Error', error.message || 'Failed to register');
-    }
-  };
-
-  const handleUploadPOP = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['image/jpeg', 'image/png', 'application/pdf'],
-        copyToCacheDirectory: true,
-      });
-      if (result.canceled) return;
-      const file = result.assets[0];
-      setPopUploading(true);
-      await submitPOP(user, file);
-      Alert.alert('Submitted', 'Your proof of payment has been submitted and is awaiting review.');
-    } catch (error) {
-      Alert.alert('Upload Failed', error.message || 'Failed to upload proof of payment.');
     } finally {
-      setPopUploading(false);
+      registeringRef.current = false;
+      setRegistering(false);
     }
   };
 
@@ -175,7 +161,7 @@ const EventsScreen = ({ navigation }) => {
                   <Text style={styles.eventName}>{event.name}</Text>
                   <Text style={styles.eventVenue}>📍 {event.venue}</Text>
                   <Text style={styles.eventDate}>🗓 {formatDate(event.eventDate)}</Text>
-                  {user?.popStatus === 'approved' && (
+                  {['confirmed', 'approved'].includes(registrations.get(event.id)?.status) && (
                     <View style={styles.paidBadge}>
                       <Text style={styles.paidBadgeText}>✅ Registered & Paid</Text>
                     </View>
@@ -194,35 +180,6 @@ const EventsScreen = ({ navigation }) => {
               </TouchableOpacity>
             );
           })}
-          {/* Proof of Payment */}
-          <View style={styles.popSection}>
-            <Text style={styles.popSectionTitle}>Proof of Payment</Text>
-            {user?.popStatus === 'approved' ? (
-              <View style={styles.popApproved}>
-                <Text style={styles.popApprovedText}>✅ Payment verified — Registered & Paid</Text>
-              </View>
-            ) : user?.popStatus === 'pending' ? (
-              <View style={styles.popPending}>
-                <Text style={styles.popPendingText}>⏳ Proof of payment submitted — awaiting review</Text>
-              </View>
-            ) : user?.popStatus === 'rejected' ? (
-              <View>
-                <View style={styles.popRejected}>
-                  <Text style={styles.popRejectedText}>❌ Proof of payment was rejected. Please resubmit.</Text>
-                </View>
-                <TouchableOpacity style={styles.popUploadBtn} onPress={handleUploadPOP} disabled={popUploading}>
-                  {popUploading ? <ActivityIndicator color={colors.white} /> : <Text style={styles.popUploadBtnText}>Resubmit Proof of Payment</Text>}
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View>
-                <Text style={styles.popHint}>Upload your proof of payment (JPG, PNG or PDF)</Text>
-                <TouchableOpacity style={styles.popUploadBtn} onPress={handleUploadPOP} disabled={popUploading}>
-                  {popUploading ? <ActivityIndicator color={colors.white} /> : <Text style={styles.popUploadBtnText}>Upload Proof of Payment</Text>}
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
 
           <View style={{ height: spacing.xxxl + insets.bottom }} />
         </ScrollView>
@@ -300,19 +257,30 @@ const EventsScreen = ({ navigation }) => {
                     </Text>
                     <View style={styles.bankRow}>
                       <Text style={styles.bankLabel}>Bank</Text>
-                      <Text style={styles.bankValue}>{selectedEvent.bankDetails?.bank}</Text>
+                      <Text style={styles.bankValue}>{BANK_DETAILS.bank}</Text>
                     </View>
                     <View style={styles.bankRow}>
                       <Text style={styles.bankLabel}>Account</Text>
-                      <Text style={styles.bankValue}>{selectedEvent.bankDetails?.accountName}</Text>
+                      <Text style={styles.bankValue}>{BANK_DETAILS.accountName}</Text>
                     </View>
                     <View style={styles.bankRow}>
                       <Text style={styles.bankLabel}>Number</Text>
-                      <Text style={styles.bankValue}>{selectedEvent.bankDetails?.accountNumber}</Text>
+                      <View style={styles.bankValueRow}>
+                        <Text style={styles.bankValue}>{BANK_DETAILS.accountNumber}</Text>
+                        <TouchableOpacity
+                          style={styles.copyButton}
+                          onPress={async () => {
+                            await Clipboard.setStringAsync(BANK_DETAILS.accountNumber);
+                            Alert.alert('Copied', `"${BANK_DETAILS.accountNumber}" copied to clipboard!`);
+                          }}
+                        >
+                          <Text style={styles.copyButtonText}>Copy</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                     <View style={styles.bankRow}>
                       <Text style={styles.bankLabel}>Branch</Text>
-                      <Text style={styles.bankValue}>{selectedEvent.bankDetails?.branchCode}</Text>
+                      <Text style={styles.bankValue}>{BANK_DETAILS.branchCode}</Text>
                     </View>
                     <View style={[styles.bankRow, styles.referenceRow]}>
                       <Text style={styles.bankLabel}>Reference</Text>
@@ -467,6 +435,12 @@ const styles = StyleSheet.create({
   },
   bankLabel: { fontSize: typography.sizes.xs, color: colors.textSecondary },
   bankValue: { fontSize: typography.sizes.xs, fontWeight: '700', color: colors.textPrimary },
+  bankValueRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  copyButton: {
+    backgroundColor: colors.surfaceLight, borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.sm, paddingVertical: 2,
+  },
+  copyButtonText: { fontSize: typography.sizes.xs, fontWeight: '700', color: colors.blue },
   referenceRow: { borderBottomWidth: 0 },
   referenceValue: { color: colors.blue },
   registeredConfirm: {
@@ -485,25 +459,6 @@ const styles = StyleSheet.create({
     alignItems: 'center', marginTop: spacing.sm,
   },
   closeButtonText: { color: colors.textSecondary, fontSize: typography.sizes.sm, fontWeight: '600' },
-  popSection: {
-    backgroundColor: colors.white, borderRadius: borderRadius.lg,
-    padding: spacing.lg, marginTop: spacing.md,
-    borderWidth: 1, borderColor: colors.border,
-  },
-  popSectionTitle: {
-    fontSize: typography.sizes.sm, fontWeight: '700',
-    color: colors.textSecondary, letterSpacing: 0.5,
-    marginBottom: spacing.md,
-  },
-  popApproved: { backgroundColor: '#F0FBF6', borderRadius: borderRadius.md, padding: spacing.md },
-  popApprovedText: { color: colors.green, fontSize: typography.sizes.sm, fontWeight: '600' },
-  popPending: { backgroundColor: '#FFFBEB', borderRadius: borderRadius.md, padding: spacing.md },
-  popPendingText: { color: colors.gold, fontSize: typography.sizes.sm, fontWeight: '600' },
-  popRejected: { backgroundColor: '#FFF0EE', borderRadius: borderRadius.md, padding: spacing.md, marginBottom: spacing.md },
-  popRejectedText: { color: colors.red, fontSize: typography.sizes.sm, fontWeight: '600' },
-  popHint: { fontSize: typography.sizes.xs, color: colors.textSecondary, marginBottom: spacing.md },
-  popUploadBtn: { backgroundColor: colors.blue, borderRadius: borderRadius.md, paddingVertical: spacing.md, alignItems: 'center' },
-  popUploadBtnText: { color: colors.white, fontSize: typography.sizes.sm, fontWeight: '600' },
 });
 
 export default EventsScreen;

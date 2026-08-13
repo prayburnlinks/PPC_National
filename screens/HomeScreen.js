@@ -3,7 +3,7 @@
  * Main dashboard with events, announcements, and quick actions
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   ScrollView,
@@ -13,11 +13,13 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
-import { getUpcomingEvents } from '../services/firestoreService';
+import { getUpcomingEvents, getUserNotifications } from '../services/firestoreService';
 import { useUser } from '../context/UserContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { DISTRICTS, CONGREGATIONS } from '../constants/config';
+import { DISTRICTS, CONGREGATIONS, ROLES } from '../constants/config';
+import appConfig from '../app.json';
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -26,11 +28,40 @@ const getGreeting = () => {
   return 'Good evening';
 };
 
+const appVersion = appConfig?.expo?.version || '1.0.0';
+
 const HomeScreen = ({ navigation }) => {
   const { user } = useUser();
   const insets = useSafeAreaInsets();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [hasUnread, setHasUnread] = useState(false);
+  const isVisitor = user?.role === ROLES.VISITOR;
+
+  // Refresh the unread indicator every time Home regains focus, so reading
+  // notifications and coming back clears the dot.
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      if (user?.uid) {
+        getUserNotifications(user.uid, 20)
+          .then(list => { if (active) setHasUnread(list.some(n => !n.read)); })
+          .catch(() => {});
+      }
+      return () => { active = false; };
+    }, [user?.uid])
+  );
+
+  // Districts, Prayer Wall and Store are member-only routes — the Visitor
+  // tab stack doesn't register them, so a visitor tapping these tiles
+  // needs to be routed to the sign-in prompt instead of a dead navigate().
+  const navigateMemberOnly = (routeName) => {
+    if (isVisitor) {
+      navigation.navigate('SignIn');
+    } else {
+      navigation.navigate(routeName);
+    }
+  };
 
   useEffect(() => {
     loadUpcomingEvents();
@@ -64,17 +95,23 @@ const HomeScreen = ({ navigation }) => {
             </View>
           </View>
           <TouchableOpacity
-            onPress={() => alert('🔔 Notifications coming soon!')}
+            onPress={() => navigation.navigate(user?.uid ? 'Notifications' : 'SignIn')}
             style={styles.notifBell}
           >
             <Text style={styles.notifIcon}>🔔</Text>
-            <View style={styles.notifDot} />
+            {hasUnread && <View style={styles.notifDot} />}
           </TouchableOpacity>
         </View>
         <Text style={styles.greeting}>{getGreeting()}, beloved</Text>
         <Text style={styles.greetingName}>{user?.name || 'Member'} 🙌</Text>
-        <View style={styles.districtChip}>
-          <Text style={styles.districtText}>📍 {user?.district ? `${user.district} District` : 'District'}</Text>
+        <View style={styles.headerBadges}>
+          <View style={styles.districtChip}>
+            <Text style={styles.districtText}>📍 {user?.district ? `${user.district} District` : 'District'}</Text>
+          </View>
+          <View style={styles.releaseChip}>
+            <Text style={styles.releaseChipText}>Current release</Text>
+            <Text style={styles.releaseChipVersion}>v{appVersion}</Text>
+          </View>
         </View>
       </View>
 
@@ -132,7 +169,7 @@ const HomeScreen = ({ navigation }) => {
 
           <TouchableOpacity
             style={[styles.quickCard, styles.quickCardOrange]}
-            onPress={() => navigation.navigate('Districts')}
+            onPress={() => navigateMemberOnly('Districts')}
           >
             <Text style={styles.quickIcon}>🗺</Text>
             <Text style={styles.quickTitle}>Districts</Text>
@@ -141,7 +178,7 @@ const HomeScreen = ({ navigation }) => {
 
           <TouchableOpacity
             style={[styles.quickCard, styles.quickCardWhite]}
-            onPress={() => navigation.navigate('PrayerWall')}
+            onPress={() => navigateMemberOnly('PrayerWall')}
           >
             <Text style={styles.quickIcon}>🙏</Text>
             <Text style={styles.quickTitleDark}>Prayer Wall</Text>
@@ -150,7 +187,7 @@ const HomeScreen = ({ navigation }) => {
 
           <TouchableOpacity
             style={[styles.quickCard, styles.quickCardWhite]}
-            onPress={() => navigation.navigate('Store')}
+            onPress={() => navigateMemberOnly('Store')}
           >
             <Text style={styles.quickIcon}>🛍️</Text>
             <Text style={styles.quickTitleDark}>Store</Text>
@@ -282,6 +319,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: spacing.md,
   },
+  headerBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
   districtChip: {
     backgroundColor: 'rgba(212, 160, 23, 0.18)',
     borderWidth: 1,
@@ -290,12 +334,32 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.md,
     alignSelf: 'flex-start',
-    marginTop: spacing.md,
   },
   districtText: {
     color: colors.gold,
     fontSize: typography.sizes.sm,
     fontWeight: '600',
+  },
+  releaseChip: {
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: borderRadius.full,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  releaseChipText: {
+    color: colors.white,
+    fontSize: typography.sizes.sm,
+    fontWeight: '600',
+  },
+  releaseChipVersion: {
+    color: colors.gold,
+    fontSize: typography.sizes.sm,
+    fontWeight: '700',
   },
   ticker: {
     backgroundColor: colors.orangeRed,

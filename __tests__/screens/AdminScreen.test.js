@@ -9,10 +9,11 @@ jest.mock('../../services/authService', () => ({
   rejectUser: jest.fn(),
 }));
 
-jest.mock('../../services/popService', () => ({
-  getPendingPOPs: jest.fn(),
-  approvePOP: jest.fn(),
-  rejectPOP: jest.fn(),
+jest.mock('../../services/eventRegistrationService', () => ({
+  getPendingEventRegistrations: jest.fn(),
+  approveEventRegistration: jest.fn(),
+  rejectEventRegistration: jest.fn(),
+  getEventRegistrationsByEvent: jest.fn(),
 }));
 
 jest.mock('../../services/merchService', () => ({
@@ -27,7 +28,7 @@ import {
   rejectUser,
 } from '../../services/authService';
 
-import { getPendingPOPs } from '../../services/popService';
+import { getPendingEventRegistrations, getEventRegistrationsByEvent } from '../../services/eventRegistrationService';
 import { getPendingMerchOrders } from '../../services/merchService';
 
 const mockAdmin = {
@@ -70,8 +71,9 @@ const renderAdmin = (user = mockAdmin) => {
 beforeEach(() => {
   jest.clearAllMocks();
   getPendingRegistrations.mockResolvedValue(mockPendingUsers);
-  getPendingPOPs.mockResolvedValue([]);
+  getPendingEventRegistrations.mockResolvedValue([]);
   getPendingMerchOrders.mockResolvedValue([]);
+  getEventRegistrationsByEvent.mockResolvedValue([]);
 });
 
 describe('AdminScreen rendering', () => {
@@ -162,25 +164,72 @@ describe('AdminScreen approve/reject', () => {
     });
   });
 
-  it('removes user from list after rejection', async () => {
+  it('rejects a user with a typed reason through the reject modal', async () => {
     rejectUser.mockResolvedValue({ success: true });
-    jest.spyOn(require('react-native').Alert, 'alert').mockImplementation(
-      (title, msg, buttons) => {
-        const rejectButton = buttons?.find((b) => b.text === 'Reject');
-        if (rejectButton) rejectButton.onPress();
-      }
-    );
 
-    const { getByText, queryByText } = renderAdmin();
+    const { getByText, queryByText, getByPlaceholderText } = renderAdmin();
     await waitFor(() => getByText('Reject'));
 
     await act(async () => {
       fireEvent.press(getByText('Reject'));
     });
 
+    // Modal opens with an optional reason field
+    await waitFor(() => getByText("Reject John Smith's registration?"));
+    fireEvent.changeText(
+      getByPlaceholderText('Reason (optional — shown to the user)'),
+      'Congregation could not verify membership'
+    );
+
+    await act(async () => {
+      fireEvent.press(getByText('Confirm Reject'));
+    });
+
     await waitFor(() => {
-      expect(rejectUser).toHaveBeenCalledWith('u1');
+      expect(rejectUser).toHaveBeenCalledWith('u1', 'Congregation could not verify membership');
       expect(queryByText('John Smith')).toBeFalsy();
+    });
+  });
+
+  it('rejects an event payment with the reason passed through', async () => {
+    const { rejectEventRegistration } = require('../../services/eventRegistrationService');
+    rejectEventRegistration.mockResolvedValue({ success: true });
+    getPendingEventRegistrations.mockResolvedValue([
+      {
+        id: 'u2_e1',
+        userId: 'u2',
+        userName: 'Mary Adams',
+        eventName: 'Youth Camp',
+        registrationFee: 250,
+        currency: 'R',
+        congregation: 'Ebenezer',
+        fileName: 'proof.jpg',
+        mimeType: 'image/jpeg',
+      },
+    ]);
+
+    const { getByText, getByPlaceholderText } = renderAdmin();
+    await waitFor(() => getByText(/Payments/));
+    await act(async () => {
+      fireEvent.press(getByText(/Payments/));
+    });
+
+    await waitFor(() => getByText('Reject'));
+    await act(async () => {
+      fireEvent.press(getByText('Reject'));
+    });
+
+    await waitFor(() => getByText('Reject payment from Mary Adams for Youth Camp?'));
+    fireEvent.changeText(
+      getByPlaceholderText('Reason (optional — shown to the user)'),
+      'Reference did not match'
+    );
+    await act(async () => {
+      fireEvent.press(getByText('Confirm Reject'));
+    });
+
+    await waitFor(() => {
+      expect(rejectEventRegistration).toHaveBeenCalledWith('u2_e1', 'u2', 'admin-uid', 'Reference did not match');
     });
   });
 
@@ -224,7 +273,7 @@ describe('AdminScreen leader role (cannot approve/reject user registrations)', (
 
   it('never calls getPendingRegistrations for a leader reviewer', async () => {
     renderAdmin(mockLeader);
-    await waitFor(() => expect(getPendingPOPs).toHaveBeenCalled());
+    await waitFor(() => expect(getPendingEventRegistrations).toHaveBeenCalled());
 
     expect(getPendingRegistrations).not.toHaveBeenCalled();
   });
@@ -239,5 +288,93 @@ describe('AdminScreen leader role (cannot approve/reject user registrations)', (
 
     expect(queryByText('Pending Approvals')).toBeFalsy();
     expect(getByText('Proof of Payments')).toBeTruthy();
+  });
+});
+
+describe('AdminScreen Events tab', () => {
+  const mockGroups = [
+    {
+      eventId: 'e1',
+      eventName: 'National Sisters Conference',
+      eventDate: new Date('2026-07-12'),
+      attendees: [
+        { id: 'u1_e1', userName: 'Alice Adams', congregation: 'Ceres', district: 'Boland', status: 'approved', requiresPayment: true, registeredAt: new Date('2026-08-01') },
+        { id: 'u2_e1', userName: 'Ben Botha', congregation: 'Paarl', district: 'Boland', status: 'awaiting_payment', requiresPayment: true, registeredAt: new Date('2026-08-02') },
+      ],
+    },
+    {
+      eventId: 'e2',
+      eventName: 'Youth Rally',
+      eventDate: new Date('2026-09-01'),
+      attendees: [
+        { id: 'u3_e2', userName: 'Cara Nel', congregation: 'George', district: 'Garden Route', status: 'confirmed', requiresPayment: false, registeredAt: new Date('2026-08-03') },
+      ],
+    },
+  ];
+
+  it('lists each event with registration and paid counts', async () => {
+    getEventRegistrationsByEvent.mockResolvedValue(mockGroups);
+
+    const { getByText } = renderAdmin();
+    await waitFor(() => getByText('Events'));
+    fireEvent.press(getByText('Events'));
+
+    await waitFor(() => {
+      expect(getByText('National Sisters Conference')).toBeTruthy();
+      expect(getByText('2 registered · 1 paid')).toBeTruthy();
+      expect(getByText('Youth Rally')).toBeTruthy();
+      expect(getByText('1 registered · free event')).toBeTruthy();
+    });
+  });
+
+  it('expands an event to show attendees with status badges', async () => {
+    getEventRegistrationsByEvent.mockResolvedValue(mockGroups);
+
+    const { getByText, queryByText } = renderAdmin();
+    await waitFor(() => getByText('Events'));
+    fireEvent.press(getByText('Events'));
+
+    await waitFor(() => getByText('National Sisters Conference'));
+    expect(queryByText('Alice Adams')).toBeNull();
+
+    fireEvent.press(getByText('National Sisters Conference'));
+
+    expect(getByText('Alice Adams')).toBeTruthy();
+    expect(getByText('Paid ✓')).toBeTruthy();
+    expect(getByText('Ben Botha')).toBeTruthy();
+    expect(getByText('Awaiting Payment')).toBeTruthy();
+  });
+
+  it('shares an attendee list as CSV', async () => {
+    const { Share } = require('react-native');
+    jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' });
+    getEventRegistrationsByEvent.mockResolvedValue(mockGroups);
+
+    const { getByText } = renderAdmin();
+    await waitFor(() => getByText('Events'));
+    fireEvent.press(getByText('Events'));
+
+    await waitFor(() => getByText('National Sisters Conference'));
+    fireEvent.press(getByText('National Sisters Conference'));
+    fireEvent.press(getByText('⬆  Share Attendee List (CSV)'));
+
+    await waitFor(() => {
+      expect(Share.share).toHaveBeenCalledWith({
+        title: 'National Sisters Conference — Attendees',
+        message: expect.stringContaining('name,congregation,district,status,registered'),
+      });
+    });
+    const csv = Share.share.mock.calls[0][0].message;
+    expect(csv).toContain('Alice Adams,Ceres,Boland,Paid ✓');
+    expect(csv).toContain('Ben Botha,Paarl,Boland,Awaiting Payment');
+  });
+
+  it('shows the Events tab to leaders with congregation scoping', async () => {
+    getEventRegistrationsByEvent.mockResolvedValue([]);
+
+    const { getByText } = renderAdmin(mockLeader);
+    await waitFor(() => getByText('Events'));
+
+    expect(getEventRegistrationsByEvent).toHaveBeenCalledWith('leader', 'Ebenezer');
   });
 });

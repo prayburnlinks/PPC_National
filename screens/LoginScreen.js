@@ -17,6 +17,8 @@ import { loginUser, sendResetEmail } from '../services/authService';
 import { useUser } from '../context/UserContext';
 import { ROLES } from '../constants/config';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { signOut } from 'firebase/auth';
+import { auth } from '../firebase-config';
 
 const LoginScreen = ({ navigation }) => {
   const { onLogin } = useUser();
@@ -49,6 +51,21 @@ const LoginScreen = ({ navigation }) => {
       setResetLoading(false);
       Alert.alert('Error', error.message || 'Failed to send reset email');
     }
+  };
+
+  // A user whose account was blocked/rejected after they last logged in can
+  // land here with their real Firebase Auth session still alive underneath
+  // (App.js deliberately avoids signing them out automatically — see the
+  // comment there). This is a safe place to clear it: it's a deliberate,
+  // user-initiated action, not a background auth-state callback, so there's
+  // no in-flight registration write to disrupt.
+  const handleContinueAsVisitor = async () => {
+    try {
+      await signOut(auth);
+    } catch {
+      // Already signed out, or offline — proceed to visitor mode regardless.
+    }
+    onLogin({ role: ROLES.VISITOR, name: 'Visitor' });
   };
 
   const handleLogin = async () => {
@@ -170,7 +187,7 @@ const LoginScreen = ({ navigation }) => {
 
           <TouchableOpacity
             style={styles.visitorButton}
-            onPress={() => onLogin({ role: ROLES.VISITOR, name: 'Visitor' })}
+            onPress={handleContinueAsVisitor}
           >
             <Text style={styles.visitorButtonText}>Continue as Visitor</Text>
           </TouchableOpacity>
@@ -181,6 +198,7 @@ const LoginScreen = ({ navigation }) => {
             "The fire must be kept burning on the altar continuously; it must not go out."
           </Text>
           <Text style={styles.footerRef}>— Leviticus 6:13</Text>
+          <Text style={styles.footerCredit}>Developed by Prayburn Links</Text>
         </View>
       </ScrollView>
       {/* Forgot Password Modal */}
@@ -428,6 +446,11 @@ const styles = StyleSheet.create({
     color: colors.red,
     fontWeight: '700',
     marginTop: spacing.xs,
+  },
+  footerCredit: {
+    fontSize: typography.sizes.xs,
+    color: colors.textSecondary,
+    marginTop: spacing.lg,
   },
   modalOverlay: {
     flex: 1,

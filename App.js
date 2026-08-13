@@ -8,7 +8,7 @@ import { auth } from './firebase-config';
 import { onAuthStateChanged } from 'firebase/auth';
 import { getCurrentUser } from './services/authService';
 import { colors } from './constants/theme';
-import { ROLES, USER_STATUS, NATIONAL_WOMENS_BOARD } from './constants/config';
+import { ROLES, USER_STATUS, NATIONAL_WOMENS_BOARD, NATIONAL_YOUTH_BOARD, NATIONAL_SUNDAY_SCHOOL_BOARD } from './constants/config';
 import { UserContext } from './context/UserContext';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
@@ -23,7 +23,6 @@ import PrayerWallScreen from './screens/PrayerWallScreen';
 import AdminScreen from './screens/AdminScreen';
 import NationalBoardScreen from './screens/NationalBoardScreen';
 import DocumentsScreen from './screens/DocumentsScreen';
-import GivingHistoryScreen from './screens/GivingHistoryScreen';
 import MyEventsScreen from './screens/MyEventsScreen';
 import MyPrayerRequestsScreen from './screens/MyPrayerRequestsScreen';
 import NotificationsScreen from './screens/NotificationsScreen';
@@ -158,7 +157,7 @@ export default function App() {
             {user && <Stack.Screen name="Events" component={EventsScreen} />}
             {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && <Stack.Screen name="Admin" component={AdminScreen} />}
             {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && <Stack.Screen name="Documents" component={DocumentsScreen} />}
-            {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && <Stack.Screen name="AdminMerchItems" component={AdminMerchItemsScreen} />}
+            {user?.role === ROLES.ADMIN && <Stack.Screen name="AdminMerchItems" component={AdminMerchItemsScreen} />}
             {user && <Stack.Screen name="NationalBoard" component={NationalBoardScreen} />}
             {user && (
               <Stack.Screen
@@ -167,7 +166,20 @@ export default function App() {
                 initialParams={{ title: "National Women's Board", board: NATIONAL_WOMENS_BOARD }}
               />
             )}
-            {user && user.role !== ROLES.VISITOR && <Stack.Screen name="GivingHistory" component={GivingHistoryScreen} />}
+            {user && (
+              <Stack.Screen
+                name="NationalYouthBoard"
+                component={NationalBoardScreen}
+                initialParams={{ title: 'National Youth Board', board: NATIONAL_YOUTH_BOARD }}
+              />
+            )}
+            {user && (
+              <Stack.Screen
+                name="NationalSundaySchoolBoard"
+                component={NationalBoardScreen}
+                initialParams={{ title: 'National Sunday School Board', board: NATIONAL_SUNDAY_SCHOOL_BOARD }}
+              />
+            )}
             {user && user.role !== ROLES.VISITOR && <Stack.Screen name="MyEvents" component={MyEventsScreen} />}
             {user && user.role !== ROLES.VISITOR && <Stack.Screen name="MyPrayerRequests" component={MyPrayerRequestsScreen} />}
             {user && user.role !== ROLES.VISITOR && <Stack.Screen name="Notifications" component={NotificationsScreen} />}

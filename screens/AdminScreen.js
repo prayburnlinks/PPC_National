@@ -11,12 +11,14 @@ import {
   Modal,
   Image,
   Linking,
+  Share,
+  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { ROLES } from '../constants/config';
 import { getPendingRegistrations, approveUser, rejectUser } from '../services/authService';
-import { getPendingPOPs, approvePOP, rejectPOP } from '../services/popService';
+import { getPendingEventRegistrations, approveEventRegistration, rejectEventRegistration, getEventRegistrationsByEvent } from '../services/eventRegistrationService';
 import { getPendingMerchOrders, approveMerchOrder, rejectMerchOrder } from '../services/merchService';
 import { useUser } from '../context/UserContext';
 
@@ -26,30 +28,46 @@ const AdminScreen = ({ navigation }) => {
   // Only Admins can approve/reject user registrations (firestore.rules
   // grants that to isAdmin() only) — Leaders get Payments review instead.
   const isAdminReviewer = reviewer?.role === ROLES.ADMIN;
-  const TABS = isAdminReviewer ? ['Pending', 'Payments', 'Merch Orders', 'Actions'] : ['Payments', 'Merch Orders', 'Actions'];
+  const TABS = isAdminReviewer
+    ? ['Pending', 'Payments', 'Merch Orders', 'Events', 'Actions']
+    : ['Payments', 'Merch Orders', 'Events', 'Actions'];
   const [pendingUsers, setPendingUsers] = useState([]);
-  const [pendingPOPs, setPendingPOPs] = useState([]);
+  const [pendingEventPayments, setPendingEventPayments] = useState([]);
   const [pendingMerchOrders, setPendingMerchOrders] = useState([]);
+  const [eventGroups, setEventGroups] = useState([]);
+  const [expandedEventIds, setExpandedEventIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState(isAdminReviewer ? 'Pending' : 'Payments');
-  const [processingUid, setProcessingUid] = useState(null);
-  const [processingPopId, setProcessingPopId] = useState(null);
-  const [processingOrderId, setProcessingOrderId] = useState(null);
-  const [viewingPOP, setViewingPOP] = useState(null);
+  // Arrays, not a single id — otherwise acting on item B while item A is
+  // still processing reassigns the shared id to B, which makes A's buttons
+  // reappear and lets it be re-tapped (double-fire) while its own request
+  // is still in flight.
+  const [processingUids, setProcessingUids] = useState([]);
+  const [processingRegistrationIds, setProcessingRegistrationIds] = useState([]);
+  const [processingOrderIds, setProcessingOrderIds] = useState([]);
+  const [viewingRegistrationProof, setViewingRegistrationProof] = useState(null);
   const [viewingOrderProof, setViewingOrderProof] = useState(null);
+  const [loadError, setLoadError] = useState(false);
+  const [rejectTarget, setRejectTarget] = useState(null); // { kind: 'user'|'payment'|'order', item }
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectSubmitting, setRejectSubmitting] = useState(false);
 
   const loadAll = useCallback(async () => {
     try {
-      const [users, pops, orders] = await Promise.all([
+      const [users, registrations, orders, groups] = await Promise.all([
         isAdminReviewer ? getPendingRegistrations() : Promise.resolve([]),
-        getPendingPOPs(reviewer?.role, reviewer?.congregation),
+        getPendingEventRegistrations(reviewer?.role, reviewer?.congregation),
         getPendingMerchOrders(reviewer?.role, reviewer?.congregation),
+        getEventRegistrationsByEvent(reviewer?.role, reviewer?.congregation),
       ]);
       setPendingUsers(users);
-      setPendingPOPs(pops);
+      setPendingEventPayments(registrations);
       setPendingMerchOrders(orders);
+      setEventGroups(groups);
+      setLoadError(false);
     } catch {
+      setLoadError(true);
       Alert.alert('Error', 'Failed to load admin data. Please try again.');
     } finally {
       setLoading(false);
@@ -75,14 +93,14 @@ const AdminScreen = ({ navigation }) => {
         {
           text: 'Approve',
           onPress: async () => {
-            setProcessingUid(user.uid);
+            setProcessingUids(prev => [...prev, user.uid]);
             try {
               await approveUser(user.uid);
               setPendingUsers(prev => prev.filter(u => u.uid !== user.uid));
             } catch {
               Alert.alert('Error', 'Failed to approve user. Please try again.');
             } finally {
-              setProcessingUid(null);
+              setProcessingUids(prev => prev.filter(id => id !== user.uid));
             }
           },
         },
@@ -90,70 +108,62 @@ const AdminScreen = ({ navigation }) => {
     );
   };
 
-  const handleReject = (user) => {
-    Alert.alert(
-      'Reject Account',
-      `Reject ${user.name}'s registration?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reject',
-          style: 'destructive',
-          onPress: async () => {
-            setProcessingUid(user.uid);
-            try {
-              await rejectUser(user.uid);
-              setPendingUsers(prev => prev.filter(u => u.uid !== user.uid));
-            } catch {
-              Alert.alert('Error', 'Failed to reject user. Please try again.');
-            } finally {
-              setProcessingUid(null);
-            }
-          },
-        },
-      ]
-    );
+  // All three reject flows go through one modal so the reviewer can give an
+  // optional reason — it's surfaced to the member in their notification and
+  // on the rejected item (Alert.prompt would be iOS-only).
+  const handleReject = (user) => setRejectTarget({ kind: 'user', item: user });
+
+  const closeRejectModal = () => {
+    setRejectTarget(null);
+    setRejectReason('');
   };
 
-  const handleApprovePOP = (pop) => {
-    Alert.alert('Approve POP', `Approve proof of payment from ${pop.userName}?`, [
+  const handleConfirmReject = async () => {
+    if (!rejectTarget) return;
+    const { kind, item } = rejectTarget;
+    const reason = rejectReason.trim();
+    setRejectSubmitting(true);
+    try {
+      if (kind === 'user') {
+        await rejectUser(item.uid, reason);
+        setPendingUsers(prev => prev.filter(u => u.uid !== item.uid));
+      } else if (kind === 'payment') {
+        await rejectEventRegistration(item.id, item.userId, reviewer?.uid, reason);
+        setPendingEventPayments(prev => prev.filter(r => r.id !== item.id));
+      } else {
+        await rejectMerchOrder(item.id, item.userId, reviewer?.uid, reason);
+        setPendingMerchOrders(prev => prev.filter(o => o.id !== item.id));
+      }
+      closeRejectModal();
+    } catch {
+      Alert.alert('Error', 'Failed to reject. Please try again.');
+    } finally {
+      setRejectSubmitting(false);
+    }
+  };
+
+  const handleApproveEventPayment = (registration) => {
+    Alert.alert('Approve Payment', `Approve proof of payment from ${registration.userName} for ${registration.eventName}?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Approve',
         onPress: async () => {
-          setProcessingPopId(pop.id);
+          setProcessingRegistrationIds(prev => [...prev, registration.id]);
           try {
-            await approvePOP(pop.id, pop.userId, reviewer?.uid);
-            setPendingPOPs(prev => prev.filter(p => p.id !== pop.id));
+            await approveEventRegistration(registration.id, registration.userId, reviewer?.uid);
+            setPendingEventPayments(prev => prev.filter(r => r.id !== registration.id));
           } catch {
             Alert.alert('Error', 'Failed to approve payment. Please try again.');
           } finally {
-            setProcessingPopId(null);
+            setProcessingRegistrationIds(prev => prev.filter(id => id !== registration.id));
           }
         },
       },
     ]);
   };
 
-  const handleRejectPOP = (pop) => {
-    Alert.alert('Reject POP', `Reject proof of payment from ${pop.userName}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Reject',
-        style: 'destructive',
-        onPress: async () => {
-          setProcessingPopId(pop.id);
-          try {
-            await rejectPOP(pop.id, pop.userId, reviewer?.uid);
-            setPendingPOPs(prev => prev.filter(p => p.id !== pop.id));
-          } catch {
-            Alert.alert('Error', 'Failed to reject payment. Please try again.');
-          } finally {
-            setProcessingPopId(null);
-          }
-        },
-      },
-    ]);
+  const handleRejectEventPayment = (registration) => {
+    setRejectTarget({ kind: 'payment', item: registration });
   };
 
   const handleApproveMerchOrder = (order) => {
@@ -162,14 +172,14 @@ const AdminScreen = ({ navigation }) => {
       {
         text: 'Approve',
         onPress: async () => {
-          setProcessingOrderId(order.id);
+          setProcessingOrderIds(prev => [...prev, order.id]);
           try {
             await approveMerchOrder(order.id, order.userId, reviewer?.uid);
             setPendingMerchOrders(prev => prev.filter(o => o.id !== order.id));
           } catch {
             Alert.alert('Error', 'Failed to approve order. Please try again.');
           } finally {
-            setProcessingOrderId(null);
+            setProcessingOrderIds(prev => prev.filter(id => id !== order.id));
           }
         },
       },
@@ -177,24 +187,7 @@ const AdminScreen = ({ navigation }) => {
   };
 
   const handleRejectMerchOrder = (order) => {
-    Alert.alert('Reject Order', `Reject ${order.itemName} order from ${order.userName}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Reject',
-        style: 'destructive',
-        onPress: async () => {
-          setProcessingOrderId(order.id);
-          try {
-            await rejectMerchOrder(order.id, order.userId, reviewer?.uid);
-            setPendingMerchOrders(prev => prev.filter(o => o.id !== order.id));
-          } catch {
-            Alert.alert('Error', 'Failed to reject order. Please try again.');
-          } finally {
-            setProcessingOrderId(null);
-          }
-        },
-      },
-    ]);
+    setRejectTarget({ kind: 'order', item: order });
   };
 
   const formatDate = (date) => {
@@ -204,6 +197,44 @@ const AdminScreen = ({ navigation }) => {
       month: 'short',
       year: 'numeric',
     });
+  };
+
+  const REG_STATUS = {
+    confirmed: { label: 'Registered', color: colors.green },
+    approved: { label: 'Paid ✓', color: colors.green },
+    awaiting_payment: { label: 'Awaiting Payment', color: '#E67E22' },
+    payment_submitted: { label: 'Under Review', color: colors.blue },
+    rejected: { label: 'Rejected', color: colors.red },
+  };
+
+  const toggleEventExpanded = (eventId) => {
+    setExpandedEventIds(prev =>
+      prev.includes(eventId) ? prev.filter(id => id !== eventId) : [...prev, eventId]
+    );
+  };
+
+  const shareAttendeeCsv = async (group) => {
+    const esc = (v) => {
+      const s = String(v ?? '');
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = group.attendees.map(a =>
+      [
+        a.userName,
+        a.congregation,
+        a.district,
+        REG_STATUS[a.status]?.label || a.status,
+        formatDate(a.registeredAt?.toDate?.() || a.registeredAt),
+      ].map(esc).join(',')
+    );
+    try {
+      await Share.share({
+        title: `${group.eventName} — Attendees`,
+        message: ['name,congregation,district,status,registered', ...rows].join('\n'),
+      });
+    } catch {
+      // User dismissed the share sheet — nothing to do
+    }
   };
 
   const roleColor = (role) => {
@@ -224,9 +255,9 @@ const AdminScreen = ({ navigation }) => {
           <Text style={styles.headerSub}>User Management</Text>
         </View>
         <View style={styles.badgeWrap}>
-          {(pendingUsers.length + pendingPOPs.length + pendingMerchOrders.length) > 0 && (
+          {(pendingUsers.length + pendingEventPayments.length + pendingMerchOrders.length) > 0 && (
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>{pendingUsers.length + pendingPOPs.length + pendingMerchOrders.length}</Text>
+              <Text style={styles.badgeText}>{pendingUsers.length + pendingEventPayments.length + pendingMerchOrders.length}</Text>
             </View>
           )}
         </View>
@@ -243,7 +274,7 @@ const AdminScreen = ({ navigation }) => {
             <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
               {tab}
               {tab === 'Pending' && pendingUsers.length > 0 ? ` (${pendingUsers.length})` : ''}
-              {tab === 'Payments' && pendingPOPs.length > 0 ? ` (${pendingPOPs.length})` : ''}
+              {tab === 'Payments' && pendingEventPayments.length > 0 ? ` (${pendingEventPayments.length})` : ''}
               {tab === 'Merch Orders' && pendingMerchOrders.length > 0 ? ` (${pendingMerchOrders.length})` : ''}
             </Text>
           </TouchableOpacity>
@@ -263,9 +294,11 @@ const AdminScreen = ({ navigation }) => {
         >
           {pendingUsers.length === 0 ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>✅</Text>
-              <Text style={styles.emptyTitle}>All caught up!</Text>
-              <Text style={styles.emptyText}>No pending registrations at this time.</Text>
+              <Text style={styles.emptyIcon}>{loadError ? '⚠️' : '✅'}</Text>
+              <Text style={styles.emptyTitle}>{loadError ? 'Failed to load' : 'All caught up!'}</Text>
+              <Text style={styles.emptyText}>
+                {loadError ? 'Pull down to retry.' : 'No pending registrations at this time.'}
+              </Text>
             </View>
           ) : (
             pendingUsers.map(user => (
@@ -306,7 +339,7 @@ const AdminScreen = ({ navigation }) => {
                   )}
                 </View>
 
-                {processingUid === user.uid ? (
+                {processingUids.includes(user.uid) ? (
                   <ActivityIndicator style={styles.spinner} color={colors.blue} />
                 ) : (
                   <View style={styles.actions}>
@@ -334,70 +367,76 @@ const AdminScreen = ({ navigation }) => {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.blue]} />}
           showsVerticalScrollIndicator={false}
         >
-          {pendingPOPs.length === 0 ? (
+          {pendingEventPayments.length === 0 ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>✅</Text>
-              <Text style={styles.emptyTitle}>All caught up!</Text>
-              <Text style={styles.emptyText}>No pending proof of payments.</Text>
+              <Text style={styles.emptyIcon}>{loadError ? '⚠️' : '✅'}</Text>
+              <Text style={styles.emptyTitle}>{loadError ? 'Failed to load' : 'All caught up!'}</Text>
+              <Text style={styles.emptyText}>
+                {loadError ? 'Pull down to retry.' : 'No pending proof of payments.'}
+              </Text>
             </View>
           ) : (
-            pendingPOPs.map(pop => (
-              <View key={pop.id} style={styles.card}>
+            pendingEventPayments.map(registration => (
+              <View key={registration.id} style={styles.card}>
                 <View style={styles.cardTop}>
                   <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>{pop.userName?.[0]?.toUpperCase() || '?'}</Text>
+                    <Text style={styles.avatarText}>{registration.userName?.[0]?.toUpperCase() || '?'}</Text>
                   </View>
                   <View style={styles.cardInfo}>
-                    <Text style={styles.userName}>{pop.userName}</Text>
-                    <Text style={styles.userEmail}>{pop.congregation || 'No congregation'}</Text>
+                    <Text style={styles.userName}>{registration.userName}</Text>
+                    <Text style={styles.userEmail}>{registration.eventName}</Text>
                     <View style={[styles.rolePill, { borderColor: colors.blue }]}>
                       <Text style={[styles.rolePillText, { color: colors.blue }]}>
-                        {pop.mimeType?.includes('pdf') ? '📄 PDF' : '🖼 Image'}
+                        {registration.mimeType?.includes('pdf') ? '📄 PDF' : '🖼 Image'}
                       </Text>
                     </View>
                   </View>
                 </View>
                 <View style={styles.meta}>
                   <View style={styles.metaRow}>
-                    <Text style={styles.metaLabel}>District</Text>
-                    <Text style={styles.metaValue}>{pop.district || 'N/A'}</Text>
+                    <Text style={styles.metaLabel}>Amount</Text>
+                    <Text style={styles.metaValue}>{registration.currency}{registration.registrationFee}</Text>
+                  </View>
+                  <View style={styles.metaRow}>
+                    <Text style={styles.metaLabel}>Congregation</Text>
+                    <Text style={styles.metaValue}>{registration.congregation || 'N/A'}</Text>
                   </View>
                   <View style={styles.metaRow}>
                     <Text style={styles.metaLabel}>File</Text>
-                    <Text style={styles.metaValue} numberOfLines={1}>{pop.fileName}</Text>
+                    <Text style={styles.metaValue} numberOfLines={1}>{registration.fileName}</Text>
                   </View>
                   <View style={styles.metaRow}>
                     <Text style={styles.metaLabel}>Submitted</Text>
-                    <Text style={styles.metaValue}>{formatDate(pop.submittedAt?.toDate?.() || pop.submittedAt)}</Text>
+                    <Text style={styles.metaValue}>{formatDate(registration.paymentSubmittedAt?.toDate?.() || registration.paymentSubmittedAt)}</Text>
                   </View>
                 </View>
                 {/* View button */}
                 <TouchableOpacity
                   style={styles.viewBtn}
                   onPress={() => {
-                    if (pop.mimeType?.includes('pdf')) {
-                      Linking.openURL(pop.fileUrl).catch(() => Alert.alert('Error', 'Could not open file.'));
+                    if (registration.mimeType?.includes('pdf')) {
+                      Linking.openURL(registration.fileUrl).catch(() => Alert.alert('Error', 'Could not open file.'));
                     } else {
-                      setViewingPOP(pop);
+                      setViewingRegistrationProof(registration);
                     }
                   }}
                 >
                   <Text style={styles.viewBtnText}>👁  View Proof of Payment</Text>
                 </TouchableOpacity>
 
-                {processingPopId === pop.id ? (
+                {processingRegistrationIds.includes(registration.id) ? (
                   <ActivityIndicator style={styles.spinner} color={colors.blue} />
                 ) : (
                   <View style={styles.actions}>
                     <TouchableOpacity
                       style={styles.rejectBtn}
-                      onPress={() => handleRejectPOP(pop)}
+                      onPress={() => handleRejectEventPayment(registration)}
                     >
                       <Text style={styles.rejectBtnText}>Reject</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.approveBtn}
-                      onPress={() => handleApprovePOP(pop)}
+                      onPress={() => handleApproveEventPayment(registration)}
                     >
                       <Text style={styles.approveBtnText}>Approve</Text>
                     </TouchableOpacity>
@@ -415,9 +454,11 @@ const AdminScreen = ({ navigation }) => {
         >
           {pendingMerchOrders.length === 0 ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>✅</Text>
-              <Text style={styles.emptyTitle}>All caught up!</Text>
-              <Text style={styles.emptyText}>No merch orders awaiting review.</Text>
+              <Text style={styles.emptyIcon}>{loadError ? '⚠️' : '✅'}</Text>
+              <Text style={styles.emptyTitle}>{loadError ? 'Failed to load' : 'All caught up!'}</Text>
+              <Text style={styles.emptyText}>
+                {loadError ? 'Pull down to retry.' : 'No merch orders awaiting review.'}
+              </Text>
             </View>
           ) : (
             pendingMerchOrders.map(order => (
@@ -463,7 +504,7 @@ const AdminScreen = ({ navigation }) => {
                   <Text style={styles.viewBtnText}>👁  View Proof of Payment</Text>
                 </TouchableOpacity>
 
-                {processingOrderId === order.id ? (
+                {processingOrderIds.includes(order.id) ? (
                   <ActivityIndicator style={styles.spinner} color={colors.blue} />
                 ) : (
                   <View style={styles.actions}>
@@ -485,6 +526,68 @@ const AdminScreen = ({ navigation }) => {
             ))
           )}
         </ScrollView>
+      ) : activeTab === 'Events' ? (
+        <ScrollView
+          contentContainerStyle={[styles.list, { paddingBottom: spacing.xxxl + insets.bottom }]}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.blue]} />}
+          showsVerticalScrollIndicator={false}
+        >
+          {eventGroups.length === 0 ? (
+            <View style={styles.empty}>
+              <Text style={styles.emptyIcon}>{loadError ? '⚠️' : '📅'}</Text>
+              <Text style={styles.emptyTitle}>{loadError ? 'Failed to load' : 'No Registrations Yet'}</Text>
+              <Text style={styles.emptyText}>
+                {loadError ? 'Pull down to retry.' : 'Event registrations will appear here.'}
+              </Text>
+            </View>
+          ) : (
+            eventGroups.map(group => {
+              const isOpen = expandedEventIds.includes(group.eventId);
+              const paidCount = group.attendees.filter(a => a.status === 'approved').length;
+              const hasPaidEvent = group.attendees.some(a => a.requiresPayment);
+              return (
+                <View key={group.eventId} style={styles.card}>
+                  <TouchableOpacity onPress={() => toggleEventExpanded(group.eventId)}>
+                    <View style={styles.eventHeaderRow}>
+                      <View style={styles.eventHeaderInfo}>
+                        <Text style={styles.userName}>{group.eventName}</Text>
+                        <Text style={styles.userEmail}>
+                          {formatDate(group.eventDate?.toDate?.() || group.eventDate)}
+                        </Text>
+                        <Text style={styles.eventCount}>
+                          {group.attendees.length} registered
+                          {hasPaidEvent ? ` · ${paidCount} paid` : ' · free event'}
+                        </Text>
+                      </View>
+                      <Text style={styles.eventChevron}>{isOpen ? '˅' : '›'}</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  {isOpen && (
+                    <View style={styles.attendeeList}>
+                      {group.attendees.map(a => (
+                        <View key={a.id} style={styles.attendeeRow}>
+                          <View style={styles.attendeeInfo}>
+                            <Text style={styles.attendeeName}>{a.userName || 'Unknown'}</Text>
+                            <Text style={styles.attendeeCong}>{a.congregation || 'N/A'}</Text>
+                          </View>
+                          <View style={[styles.statusPill, { borderColor: (REG_STATUS[a.status]?.color || colors.textSecondary) }]}>
+                            <Text style={[styles.statusPillText, { color: (REG_STATUS[a.status]?.color || colors.textSecondary) }]}>
+                              {REG_STATUS[a.status]?.label || a.status}
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                      <TouchableOpacity style={styles.viewBtn} onPress={() => shareAttendeeCsv(group)}>
+                        <Text style={styles.viewBtnText}>⬆  Share Attendee List (CSV)</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              );
+            })
+          )}
+        </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={[styles.list, { paddingBottom: spacing.xxxl + insets.bottom }]} showsVerticalScrollIndicator={false}>
           <View style={styles.card}>
@@ -503,7 +606,7 @@ const AdminScreen = ({ navigation }) => {
               <Text style={styles.actionIcon}>💳</Text>
               <View style={styles.actionText}>
                 <Text style={styles.actionLabel}>Proof of Payments</Text>
-                <Text style={styles.actionSub}>{pendingPOPs.length} payments awaiting review</Text>
+                <Text style={styles.actionSub}>{pendingEventPayments.length} payments awaiting review</Text>
               </View>
               <Text style={styles.actionArrow}>›</Text>
             </TouchableOpacity>
@@ -515,40 +618,96 @@ const AdminScreen = ({ navigation }) => {
               </View>
               <Text style={styles.actionArrow}>›</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionRow} onPress={() => navigation.navigate('AdminMerchItems')}>
-              <Text style={styles.actionIcon}>🏷️</Text>
+            <TouchableOpacity style={styles.actionRow} onPress={() => setActiveTab('Events')}>
+              <Text style={styles.actionIcon}>📅</Text>
               <View style={styles.actionText}>
-                <Text style={styles.actionLabel}>Manage Merchandise</Text>
-                <Text style={styles.actionSub}>Add or edit store items</Text>
+                <Text style={styles.actionLabel}>Event Registrations</Text>
+                <Text style={styles.actionSub}>
+                  {eventGroups.reduce((n, g) => n + g.attendees.length, 0)} registrations across {eventGroups.length} events
+                </Text>
               </View>
               <Text style={styles.actionArrow}>›</Text>
             </TouchableOpacity>
+            {isAdminReviewer && (
+              <TouchableOpacity style={styles.actionRow} onPress={() => navigation.navigate('AdminMerchItems')}>
+                <Text style={styles.actionIcon}>🏷️</Text>
+                <View style={styles.actionText}>
+                  <Text style={styles.actionLabel}>Manage Merchandise</Text>
+                  <Text style={styles.actionSub}>Add or edit store items</Text>
+                </View>
+                <Text style={styles.actionArrow}>›</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </ScrollView>
       )}
 
-      {/* POP Image Viewer Modal */}
+      {/* Event Registration Payment Proof Viewer Modal */}
       <Modal
-        visible={!!viewingPOP}
+        visible={!!viewingRegistrationProof}
         transparent
         animationType="fade"
-        onRequestClose={() => setViewingPOP(null)}
+        onRequestClose={() => setViewingRegistrationProof(null)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{viewingPOP?.userName} — Proof of Payment</Text>
-              <TouchableOpacity onPress={() => setViewingPOP(null)} style={styles.modalClose}>
+              <Text style={styles.modalTitle}>{viewingRegistrationProof?.userName} — Proof of Payment</Text>
+              <TouchableOpacity onPress={() => setViewingRegistrationProof(null)} style={styles.modalClose}>
                 <Text style={styles.modalCloseText}>✕</Text>
               </TouchableOpacity>
             </View>
-            {viewingPOP?.fileUrl && (
+            {viewingRegistrationProof?.fileUrl && (
               <Image
-                source={{ uri: viewingPOP.fileUrl }}
+                source={{ uri: viewingRegistrationProof.fileUrl }}
                 style={styles.modalImage}
                 resizeMode="contain"
               />
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Reject Reason Modal */}
+      <Modal
+        visible={!!rejectTarget}
+        transparent
+        animationType="fade"
+        onRequestClose={closeRejectModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.rejectModalBox}>
+            <Text style={styles.rejectModalTitle}>
+              {rejectTarget?.kind === 'user'
+                ? `Reject ${rejectTarget?.item?.name}'s registration?`
+                : rejectTarget?.kind === 'payment'
+                ? `Reject payment from ${rejectTarget?.item?.userName} for ${rejectTarget?.item?.eventName}?`
+                : `Reject ${rejectTarget?.item?.itemName} order from ${rejectTarget?.item?.userName}?`}
+            </Text>
+            <TextInput
+              style={styles.reasonInput}
+              placeholder="Reason (optional — shown to the user)"
+              placeholderTextColor={colors.textSecondary}
+              value={rejectReason}
+              onChangeText={setRejectReason}
+              multiline
+            />
+            <View style={styles.actions}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={closeRejectModal} disabled={rejectSubmitting}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmRejectBtn, rejectSubmitting && { opacity: 0.6 }]}
+                onPress={handleConfirmReject}
+                disabled={rejectSubmitting}
+              >
+                {rejectSubmitting ? (
+                  <ActivityIndicator color={colors.white} size="small" />
+                ) : (
+                  <Text style={styles.confirmRejectBtnText}>Confirm Reject</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -652,9 +811,10 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.blue,
   },
   tabText: {
-    fontSize: typography.sizes.sm,
+    fontSize: typography.sizes.xs,
     fontWeight: '600',
     color: colors.textSecondary,
+    textAlign: 'center',
   },
   tabTextActive: {
     color: colors.blue,
@@ -663,6 +823,61 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  eventHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  eventHeaderInfo: {
+    flex: 1,
+  },
+  eventCount: {
+    fontSize: typography.sizes.xs,
+    fontWeight: '700',
+    color: colors.blue,
+    marginTop: 2,
+  },
+  eventChevron: {
+    fontSize: 22,
+    color: colors.textSecondary,
+    paddingLeft: spacing.md,
+  },
+  attendeeList: {
+    marginTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  attendeeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  attendeeInfo: {
+    flex: 1,
+    paddingRight: spacing.sm,
+  },
+  attendeeName: {
+    fontSize: typography.sizes.sm,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  attendeeCong: {
+    fontSize: typography.sizes.xs,
+    color: colors.textSecondary,
+    marginTop: 1,
+  },
+  statusPill: {
+    borderWidth: 1,
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+  },
+  statusPillText: {
+    fontSize: typography.sizes.xs,
+    fontWeight: '700',
   },
   list: {
     padding: spacing.lg,
@@ -785,6 +1000,56 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.lg,
+  },
+  rejectModalBox: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    width: '100%',
+    padding: spacing.lg,
+  },
+  rejectModalTitle: {
+    fontSize: typography.sizes.sm,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+  },
+  reasonInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    fontSize: typography.sizes.sm,
+    color: colors.textPrimary,
+    minHeight: 70,
+    textAlignVertical: 'top',
+    marginBottom: spacing.md,
+  },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceLight,
+    alignItems: 'center',
+  },
+  cancelBtnText: {
+    fontSize: typography.sizes.sm,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  confirmRejectBtn: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.red,
+    alignItems: 'center',
+  },
+  confirmRejectBtnText: {
+    fontSize: typography.sizes.sm,
+    fontWeight: '700',
+    color: colors.white,
   },
   modalBox: {
     backgroundColor: colors.white,

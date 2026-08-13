@@ -26,20 +26,20 @@
       ]
     },
     {
-      "collectionGroup": "proofOfPayments",
+      "collectionGroup": "eventRegistrations",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "submittedAt", "order": "DESCENDING" }
+        { "fieldPath": "paymentSubmittedAt", "order": "DESCENDING" }
       ]
     },
     {
-      "collectionGroup": "proofOfPayments",
+      "collectionGroup": "eventRegistrations",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "congregation", "order": "ASCENDING" },
-        { "fieldPath": "submittedAt", "order": "DESCENDING" }
+        { "fieldPath": "paymentSubmittedAt", "order": "DESCENDING" }
       ]
     },
     {

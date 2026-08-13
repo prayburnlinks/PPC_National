@@ -91,13 +91,6 @@ const ProfileScreen = ({ navigation }) => {
             </View>
             <Text style={styles.rowArrow}>›</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('GivingHistory')}>
-            <View style={styles.rowLeft}>
-              <Text style={styles.rowIcon}>💝</Text>
-              <Text style={styles.rowLabel}>Giving History</Text>
-            </View>
-            <Text style={styles.rowArrow}>›</Text>
-          </TouchableOpacity>
           <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('MyPrayerRequests')}>
             <View style={styles.rowLeft}>
               <Text style={styles.rowIcon}>🙏</Text>
