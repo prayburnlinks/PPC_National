@@ -43,3 +43,9 @@ coverage/
 
 # Scripts with credentials
 scripts/
+
+# Google Play service account key (secret — never commit)
+google-service-account.json
+
+# Firebase CLI local cache
+.firebase/

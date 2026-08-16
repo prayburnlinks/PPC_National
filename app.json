@@ -20,7 +20,7 @@
     ],
     "ios": {
       "supportsTabletMode": false,
-      "bundleIdentifier": "com.ppcnationalchurch.app",
+      "bundleIdentifier": "com.ilovemychurch.app",
       "buildNumber": "1"
     },
     "android": {
@@ -28,7 +28,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0A1F44"
       },
-      "package": "com.ppcnationalchurch.app",
+      "package": "com.ilovemychurch.app",
       "versionCode": 1
     },
     "web": {

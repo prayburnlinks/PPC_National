@@ -22,9 +22,15 @@ import {
   where,
   getDocs,
 } from 'firebase/firestore';
-import { auth, db } from '../firebase-config';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { app, auth, db } from '../firebase-config';
 import { ROLES, USER_STATUS } from '../constants/config';
 import { createUserNotification } from './firestoreService';
+import { normalizePhone, identifierKind } from '../utils/phone';
+
+// Must match the region declared in functions/index.js, or the callable
+// resolves to a URL that doesn't exist.
+const PHONE_SIGNIN_REGION = 'us-central1';
 
 /**
  * Register a new user
@@ -56,6 +62,10 @@ export const registerUser = async (userData) => {
       email,
       name,
       phone,
+      // Canonical form of `phone`, used to look the member up when they sign
+      // in by number. Kept alongside the raw value so the profile still shows
+      // the number the way they typed it.
+      phoneNormalized: normalizePhone(phone),
       congregation,
       district,
       role,
@@ -98,10 +108,28 @@ export const registerUser = async (userData) => {
 };
 
 /**
- * Login user
+ * Turn whatever the member typed into the email address Firebase Auth needs.
+ *
+ * Anything containing "@" (or unrecognisable) is passed straight through so
+ * Firebase gives its usual verdict. A valid SA mobile number goes to the
+ * resolvePhoneSignIn function, which checks the password before handing back
+ * the matching email — see functions/index.js for why that ordering matters.
  */
-export const loginUser = async (email, password) => {
+const resolveIdentifierToEmail = async (identifier, password) => {
+  const value = String(identifier ?? '').trim();
+  if (identifierKind(value) !== 'phone') return value;
+
+  const callable = httpsCallable(getFunctions(app, PHONE_SIGNIN_REGION), 'resolvePhoneSignIn');
+  const { data } = await callable({ phone: normalizePhone(value), password });
+  return data.email;
+};
+
+/**
+ * Login user. `identifier` may be an email address or an SA mobile number.
+ */
+export const loginUser = async (identifier, password) => {
   try {
+    const email = await resolveIdentifierToEmail(identifier, password);
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
 
@@ -151,7 +179,7 @@ export const loginUser = async (email, password) => {
     console.error('Login error:', error);
     throw {
       code: error.code,
-      message: getErrorMessage(error.code || error.message),
+      message: getErrorMessage(error.code || error.message, error.message),
     };
   }
 };
@@ -301,7 +329,18 @@ const notifyAdminOfNewRegistration = async (uid, userData) => {
 /**
  * Map Firebase error codes to user-friendly messages
  */
-const getErrorMessage = (code) => {
+const getErrorMessage = (code, fallbackMessage) => {
+  // Errors raised by resolvePhoneSignIn already carry member-facing wording
+  // (wrong details, shared number, rate limited), so pass those straight
+  // through rather than flattening them to the generic message below.
+  const callableMessages = [
+    'functions/unauthenticated',
+    'functions/failed-precondition',
+    'functions/resource-exhausted',
+    'functions/unavailable',
+  ];
+  if (callableMessages.includes(code) && fallbackMessage) return fallbackMessage;
+
   const errorMessages = {
     'auth/invalid-email': 'Invalid email address',
     'auth/user-disabled': 'This account has been disabled',

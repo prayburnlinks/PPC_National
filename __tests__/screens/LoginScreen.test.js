@@ -26,6 +26,9 @@ import { signOut } from 'firebase/auth';
 
 const mockOnLogin = jest.fn();
 
+// The sign-in field takes an email address or a mobile number.
+const SIGN_IN_PLACEHOLDER = 'your@email.com or 082 123 4567';
+
 const renderLogin = (overrides = {}) => {
   const contextValue = { user: null, onLogin: mockOnLogin, onLogout: jest.fn(), ...overrides };
   const navigation = { navigate: jest.fn(), goBack: jest.fn() };
@@ -47,10 +50,25 @@ describe('LoginScreen rendering', () => {
     expect(getByText('Welcome Back')).toBeTruthy();
   });
 
-  it('renders email and password inputs', () => {
-    const { getByPlaceholderText } = renderLogin();
-    expect(getByPlaceholderText('your@email.com')).toBeTruthy();
+  it('renders the identifier and password inputs', () => {
+    const { getByPlaceholderText, getByText } = renderLogin();
+    expect(getByPlaceholderText(SIGN_IN_PLACEHOLDER)).toBeTruthy();
     expect(getByPlaceholderText('••••••••')).toBeTruthy();
+    expect(getByText('Email or Mobile Number')).toBeTruthy();
+  });
+
+  it('passes a mobile number through to loginUser unchanged', async () => {
+    loginUser.mockResolvedValue({ success: true, user: { name: 'Member', role: 'member' } });
+    const { getByPlaceholderText, getByText } = renderLogin();
+
+    fireEvent.changeText(getByPlaceholderText(SIGN_IN_PLACEHOLDER), '082 123 4567');
+    fireEvent.changeText(getByPlaceholderText('••••••••'), 'password123');
+    await act(async () => {
+      fireEvent.press(getByText('Sign In'));
+    });
+
+    // Normalization belongs to authService, so the screen must not pre-process.
+    await waitFor(() => expect(loginUser).toHaveBeenCalledWith('082 123 4567', 'password123'));
   });
 });
 
@@ -77,7 +95,7 @@ describe('LoginScreen login flow', () => {
 
     const { getByPlaceholderText, getByText } = renderLogin();
 
-    fireEvent.changeText(getByPlaceholderText('your@email.com'), '  test@church.com  ');
+    fireEvent.changeText(getByPlaceholderText(SIGN_IN_PLACEHOLDER), '  test@church.com  ');
     fireEvent.changeText(getByPlaceholderText('••••••••'), 'password123');
 
     await act(async () => {
@@ -93,7 +111,7 @@ describe('LoginScreen login flow', () => {
 
     const { getByPlaceholderText, getByText } = renderLogin();
 
-    fireEvent.changeText(getByPlaceholderText('your@email.com'), 'test@church.com');
+    fireEvent.changeText(getByPlaceholderText(SIGN_IN_PLACEHOLDER), 'test@church.com');
     fireEvent.changeText(getByPlaceholderText('••••••••'), 'password123');
 
     await act(async () => {
@@ -109,7 +127,7 @@ describe('LoginScreen login flow', () => {
 
     const { getByPlaceholderText, getByText } = renderLogin();
 
-    fireEvent.changeText(getByPlaceholderText('your@email.com'), 'test@church.com');
+    fireEvent.changeText(getByPlaceholderText(SIGN_IN_PLACEHOLDER), 'test@church.com');
     fireEvent.changeText(getByPlaceholderText('••••••••'), 'wrongpassword');
 
     await act(async () => {
