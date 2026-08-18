@@ -22,6 +22,7 @@ import {
   limit,
 } from 'firebase/firestore';
 import { db } from '../firebase-config';
+import { normalizePhone } from '../utils/phone';
 
 const parseDate = (raw) => {
   if (raw?.toDate) return raw.toDate();
@@ -193,6 +194,14 @@ export const updateUserProfile = async (userId, updates) => {
     const safe = Object.fromEntries(
       Object.entries(updates).filter(([k]) => PROFILE_ALLOWED_FIELDS.includes(k))
     );
+
+    // phoneNormalized is what phone sign-in looks members up by, so it has to
+    // move whenever phone does — otherwise editing your number here silently
+    // leaves you signing in with the old one, or unable to at all.
+    if ('phone' in safe) {
+      safe.phoneNormalized = normalizePhone(safe.phone);
+    }
+
     const userRef = doc(db, 'users', userId);
     await updateDoc(userRef, { ...safe, updatedAt: new Date() });
     return { success: true };

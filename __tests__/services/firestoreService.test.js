@@ -302,6 +302,35 @@ describe('updateUserProfile', () => {
     expect(updates).not.toHaveProperty('role');
     expect(updates).not.toHaveProperty('status');
   });
+
+  it('keeps phoneNormalized in step when the number changes', async () => {
+    updateDoc.mockResolvedValue();
+
+    await updateUserProfile('uid-1', { phone: '073 481 0683' });
+
+    const [, updates] = updateDoc.mock.calls[0];
+    expect(updates).toHaveProperty('phone', '073 481 0683');
+    // Without this, phone sign-in keeps matching the member's old number.
+    expect(updates).toHaveProperty('phoneNormalized', '0734810683');
+  });
+
+  it('records an unusable number as null rather than a stale match', async () => {
+    updateDoc.mockResolvedValue();
+
+    await updateUserProfile('uid-1', { phone: 'not a number' });
+
+    const [, updates] = updateDoc.mock.calls[0];
+    expect(updates.phoneNormalized).toBeNull();
+  });
+
+  it('leaves phoneNormalized alone when the number is not being edited', async () => {
+    updateDoc.mockResolvedValue();
+
+    await updateUserProfile('uid-1', { name: 'Bob' });
+
+    const [, updates] = updateDoc.mock.calls[0];
+    expect(updates).not.toHaveProperty('phoneNormalized');
+  });
 });
 
 describe('createUserNotification', () => {
