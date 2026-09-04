@@ -49,3 +49,6 @@ google-service-account.json
 
 # Firebase CLI local cache
 .firebase/
+
+# Firestore CSV exports (contain member emails/phone numbers)
+*.csv

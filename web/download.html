@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Get PPC I Love My Church</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #0A1F44;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem 1.25rem 3rem;
+    }
+    h1 { font-size: 1.8rem; margin-bottom: 0.5rem; }
+    .intro { opacity: 0.85; max-width: 34rem; line-height: 1.6; margin: 0 auto; }
+    .cards {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.25rem;
+      justify-content: center;
+      margin-top: 2.5rem;
+      width: 100%;
+      max-width: 46rem;
+    }
+    .card {
+      flex: 1 1 20rem;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 12px;
+      padding: 1.5rem 1.4rem 1.6rem;
+      text-align: left;
+    }
+    .card h2 { font-size: 1.15rem; margin-bottom: 0.35rem; }
+    .version { font-size: 0.82rem; opacity: 0.6; margin-bottom: 1.1rem; }
+    a.button {
+      display: block;
+      color: #0A1F44;
+      background: #fff;
+      border: 1px solid #fff;
+      border-radius: 8px;
+      padding: 0.8rem 1.2rem;
+      text-decoration: none;
+      font-size: 0.98rem;
+      font-weight: 600;
+      text-align: center;
+    }
+    a.button.secondary {
+      color: #fff;
+      background: transparent;
+      border-color: rgba(255, 255, 255, 0.5);
+      font-weight: 500;
+      margin-top: 0.6rem;
+    }
+    a.button:hover { opacity: 0.9; }
+    ol { margin: 1.2rem 0 0 1.1rem; line-height: 1.65; opacity: 0.85; font-size: 0.92rem; }
+    li { margin-bottom: 0.45rem; }
+    .note {
+      margin-top: 1rem;
+      font-size: 0.82rem;
+      opacity: 0.65;
+      line-height: 1.5;
+      border-top: 1px solid rgba(255, 255, 255, 0.14);
+      padding-top: 0.9rem;
+    }
+    code {
+      display: block;
+      word-break: break-all;
+      font-size: 0.72rem;
+      opacity: 0.75;
+      margin-top: 0.4rem;
+      line-height: 1.45;
+    }
+    footer { margin-top: 2.5rem; font-size: 0.85rem; opacity: 0.6; }
+    footer a { color: #fff; }
+  </style>
+</head>
+<body>
+  <h1>PPC I Love My Church</h1>
+  <p class="intro">The official mobile app of the Pentecostal Protestant Church (Pinkster Protestante Kerk) — events, church documents, the church store, and more.</p>
+
+  <div class="cards">
+    <div class="card">
+      <h2>Android</h2>
+      <p class="version">Version 1.0.0 &middot; Android 7.0 or newer</p>
+      <a class="button" href="/app/ilovemychurch.apk">Download the app (APK)</a>
+      <ol>
+        <li>Tap <strong>Download the app</strong> above.</li>
+        <li>Open the downloaded file. Android will ask permission to install apps from this source — tap <strong>Settings</strong> and allow it.</li>
+        <li>Tap <strong>Install</strong>, then open the app and sign in with your mobile number or email.</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>iPhone &amp; iPad</h2>
+      <p class="version">Version 1.0.0 &middot; iOS 15.1 or newer</p>
+      <a class="button" href="https://apps.apple.com/app/expo-go/id982107779">Step 1 — Install Expo Go</a>
+      <a class="button secondary" href="exp://u.expo.dev/4159b7fe-4875-4e33-a6e7-ab4b38b2b314?channel-name=expo-go&amp;runtime-version=exposdk:54.0.0">Step 2 — Open the church app</a>
+      <ol>
+        <li>Tap <strong>Step 1</strong> and install <strong>Expo Go</strong> from the App Store (it is free).</li>
+        <li>Come back to this page and tap <strong>Step 2</strong>. Choose <strong>Open</strong> when iPhone asks.</li>
+        <li>The church app loads inside Expo Go. Sign in with your mobile number or email.</li>
+      </ol>
+      <p class="note">
+        While we are testing, the iPhone version runs inside Expo Go, so you will see the Expo screen first each time. Open Expo Go and tap
+        <strong>PPC I Love My Church</strong> under Recently opened to get back in.
+        If Step 2 does not open, paste this into Expo Go &rarr; <em>Enter URL manually</em>:
+        <code>exp://u.expo.dev/4159b7fe-4875-4e33-a6e7-ab4b38b2b314?channel-name=expo-go&amp;runtime-version=exposdk:54.0.0</code>
+      </p>
+    </div>
+  </div>
+
+  <footer>
+    <a href="/privacy-policy.html">Privacy Policy</a>
+  </footer>
+</body>
+</html>
