@@ -3,7 +3,7 @@
  * User profile and account settings
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   ScrollView,
@@ -12,9 +12,14 @@ import {
   Text,
   Alert,
   Image,
+  Modal,
+  TextInput,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
-import { logoutUser, getCurrentUser } from '../services/authService';
+import { logoutUser, getCurrentUser, deleteMyAccount } from '../services/authService';
 import { useUser } from '../context/UserContext';
 import { ROLES } from '../constants/config';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,6 +27,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 const ProfileScreen = ({ navigation }) => {
   const { user, onLogin, onLogout } = useUser();
   const insets = useSafeAreaInsets();
+  const [deleteVisible, setDeleteVisible] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     getCurrentUser().then(fresh => { if (fresh) onLogin(fresh); }).catch(console.error);
@@ -42,6 +50,33 @@ const ProfileScreen = ({ navigation }) => {
         style: 'destructive',
       },
     ]);
+  };
+
+  const closeDeleteSheet = () => {
+    if (deleting) return;
+    setDeleteVisible(false);
+    setDeletePassword('');
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deletePassword) {
+      Alert.alert('Password Required', 'Please enter your password to confirm.');
+      return;
+    }
+    setDeleting(true);
+    try {
+      await deleteMyAccount(deletePassword);
+      setDeleteVisible(false);
+      setDeletePassword('');
+      // deleteMyAccount has already signed the session out; onLogout is what
+      // sends the app back to the login screen.
+      onLogout?.();
+      Alert.alert('Account Deleted', 'Your account has been removed. We are sorry to see you go.');
+    } catch (error) {
+      Alert.alert('Could Not Delete Account', error.message || 'Please try again.');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -142,9 +177,72 @@ const ProfileScreen = ({ navigation }) => {
           <Text style={styles.logoutButtonText}>Sign Out</Text>
         </TouchableOpacity>
 
+        {/* Apple's Guideline 5.1.1(v) requires account deletion to be reachable
+            from inside the app, not just by emailing the church office. */}
+        <TouchableOpacity style={styles.deleteButton} onPress={() => setDeleteVisible(true)}>
+          <Text style={styles.deleteButtonText}>Delete Account</Text>
+        </TouchableOpacity>
+
         <View style={styles.spacer} />
       </View>
       </ScrollView>
+
+      <Modal
+        visible={deleteVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={closeDeleteSheet}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={[styles.modalContent, { paddingBottom: spacing.lg + insets.bottom }]}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Delete Account</Text>
+            <Text style={styles.modalBody}>
+              This permanently deletes your profile, your sign-in, your prayer requests and your
+              notifications. It cannot be undone.
+            </Text>
+            <Text style={styles.modalBody}>
+              Event registrations and merchandise orders stay in the church's financial records, but
+              your name is removed from them.
+            </Text>
+
+            <Text style={styles.modalLabel}>CONFIRM YOUR PASSWORD</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={deletePassword}
+              onChangeText={setDeletePassword}
+              placeholder="Password"
+              placeholderTextColor={colors.placeholder}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!deleting}
+            />
+
+            <TouchableOpacity
+              style={[styles.modalDeleteButton, deleting && styles.modalButtonDisabled]}
+              onPress={handleDeleteAccount}
+              disabled={deleting}
+            >
+              {deleting ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={styles.modalDeleteButtonText}>Delete My Account</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalCancelButton}
+              onPress={closeDeleteSheet}
+              disabled={deleting}
+            >
+              <Text style={styles.modalCancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 };
@@ -288,8 +386,95 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.red,
   },
+  deleteButton: {
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  deleteButtonText: {
+    fontSize: typography.sizes.sm,
+    fontWeight: '600',
+    color: colors.textTertiary,
+    textDecorationLine: 'underline',
+  },
   spacer: {
     height: spacing.lg,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(10,31,68,0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.lg,
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: colors.border,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: spacing.lg,
+  },
+  modalTitle: {
+    fontSize: typography.sizes.xl,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+  },
+  modalBody: {
+    fontSize: typography.sizes.sm,
+    color: colors.textSecondary,
+    lineHeight: 20,
+    marginBottom: spacing.md,
+  },
+  modalLabel: {
+    fontSize: typography.sizes.xs,
+    fontWeight: '700',
+    color: colors.textTertiary,
+    letterSpacing: 0.5,
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    fontSize: typography.sizes.base,
+    color: colors.textPrimary,
+    backgroundColor: colors.background,
+    marginBottom: spacing.lg,
+  },
+  modalDeleteButton: {
+    backgroundColor: colors.red,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  modalButtonDisabled: {
+    opacity: 0.7,
+  },
+  modalDeleteButtonText: {
+    fontSize: typography.sizes.base,
+    fontWeight: '700',
+    color: colors.white,
+  },
+  modalCancelButton: {
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    marginTop: spacing.xs,
+  },
+  modalCancelButtonText: {
+    fontSize: typography.sizes.base,
+    fontWeight: '600',
+    color: colors.textSecondary,
   },
 });
 

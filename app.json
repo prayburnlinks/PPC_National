@@ -19,9 +19,12 @@
       "**/*"
     ],
     "ios": {
-      "supportsTabletMode": false,
+      "supportsTablet": false,
       "bundleIdentifier": "com.ilovemychurch.app",
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {

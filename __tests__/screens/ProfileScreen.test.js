@@ -7,9 +7,10 @@ import { UserContext } from '../../context/UserContext';
 jest.mock('../../services/authService', () => ({
   logoutUser: jest.fn(),
   getCurrentUser: jest.fn(),
+  deleteMyAccount: jest.fn(),
 }));
 
-import { logoutUser, getCurrentUser } from '../../services/authService';
+import { logoutUser, getCurrentUser, deleteMyAccount } from '../../services/authService';
 
 const memberUser = {
   uid: 'uid-1',
@@ -128,5 +129,63 @@ describe('ProfileScreen', () => {
       expect(logoutUser).toHaveBeenCalled();
       expect(onLogout).toHaveBeenCalled();
     });
+  });
+
+  // PROF-07 — Apple Guideline 5.1.1(v): deletion has to be reachable in-app.
+  it('opens the delete sheet and states what survives deletion', () => {
+    const { getByText } = renderScreen();
+
+    fireEvent.press(getByText('Delete Account'));
+
+    expect(getByText(/permanently deletes your profile/i)).toBeTruthy();
+    expect(getByText(/stay in the church's financial records/i)).toBeTruthy();
+    expect(getByText('CONFIRM YOUR PASSWORD')).toBeTruthy();
+  });
+
+  // PROF-08
+  it('refuses to delete without a password, and does not call the service', () => {
+    const { getByText } = renderScreen();
+
+    fireEvent.press(getByText('Delete Account'));
+    fireEvent.press(getByText('Delete My Account'));
+
+    expect(deleteMyAccount).not.toHaveBeenCalled();
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'Password Required',
+      'Please enter your password to confirm.'
+    );
+  });
+
+  // PROF-09
+  it('deletes the account with the entered password and returns to login', async () => {
+    deleteMyAccount.mockResolvedValue({ success: true });
+    const { getByText, getByPlaceholderText, onLogout } = renderScreen();
+
+    fireEvent.press(getByText('Delete Account'));
+    fireEvent.changeText(getByPlaceholderText('Password'), 'correct-horse');
+    fireEvent.press(getByText('Delete My Account'));
+
+    await waitFor(() => {
+      expect(deleteMyAccount).toHaveBeenCalledWith('correct-horse');
+      expect(onLogout).toHaveBeenCalled();
+    });
+  });
+
+  // PROF-10 — a wrong password must leave the member signed in, not stranded.
+  it('surfaces a failure and keeps the session when deletion is refused', async () => {
+    deleteMyAccount.mockRejectedValue({ message: 'That password is not correct.' });
+    const { getByText, getByPlaceholderText, onLogout } = renderScreen();
+
+    fireEvent.press(getByText('Delete Account'));
+    fireEvent.changeText(getByPlaceholderText('Password'), 'wrong');
+    fireEvent.press(getByText('Delete My Account'));
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Could Not Delete Account',
+        'That password is not correct.'
+      );
+    });
+    expect(onLogout).not.toHaveBeenCalled();
   });
 });

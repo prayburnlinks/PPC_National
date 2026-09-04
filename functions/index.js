@@ -109,3 +109,159 @@ exports.resolvePhoneSignIn = onCall(
     return { email };
   }
 );
+
+/**
+ * deleteMyAccount lets a member erase their own account from inside the app.
+ *
+ * Apple's Guideline 5.1.1(v) requires this of any app that creates accounts,
+ * and the "email the church office to be removed" answer Google Play accepted
+ * is explicitly not enough. It has to run server-side: firestore.rules quite
+ * deliberately refuses members write access to other members' documents, and
+ * merchOrders carries `allow delete: if false`, so nothing but the Admin SDK
+ * can do this cleanup.
+ *
+ * Records that carry money are anonymised rather than destroyed — the
+ * congregation still has to reconcile what was paid, so orders and event
+ * registrations keep their amounts and proof-of-payment files while every
+ * human identifier on them is overwritten. What makes the surviving rows
+ * genuinely anonymous rather than merely pseudonymous is that users/{uid} and
+ * the Auth record are gone by the end of this function: the uid still stamped
+ * on those documents (and on the storage paths under their fileUrl) is then a
+ * key with nothing left to unlock. That retention is disclosed in
+ * web/privacy-policy.html — keep the two in step.
+ */
+
+const ANONYMISED_NAME = 'Deleted member';
+
+// Firestore refuses a batch of more than 500 writes; 400 leaves headroom.
+const BATCH_LIMIT = 400;
+
+const commitInBatches = async (db, docs, mutate) => {
+  for (let i = 0; i < docs.length; i += BATCH_LIMIT) {
+    const batch = db.batch();
+    for (const snapshot of docs.slice(i, i + BATCH_LIMIT)) mutate(batch, snapshot);
+    await batch.commit();
+  }
+};
+
+exports.deleteMyAccount = onCall(
+  { region: 'us-central1', cors: true, maxInstances: 5 },
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) {
+      throw new HttpsError('unauthenticated', 'Please sign in again, then try deleting your account.');
+    }
+
+    const password = request.data?.password;
+    if (typeof password !== 'string' || !password) {
+      throw new HttpsError('invalid-argument', 'Please enter your password to confirm.');
+    }
+
+    const authUser = await admin.auth().getUser(uid).catch(() => null);
+    if (!authUser?.email) {
+      throw new HttpsError(
+        'failed-precondition',
+        'This account cannot be deleted from the app. Please contact the church office.'
+      );
+    }
+
+    // Re-check the password even though the caller is already signed in.
+    // Handsets get shared in a congregation and stay signed in for months, so
+    // without this a borrowed phone is enough to wipe somebody else's account.
+    let res;
+    try {
+      res = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${WEB_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: authUser.email, password, returnSecureToken: false }),
+        }
+      );
+    } catch (err) {
+      throw new HttpsError('unavailable', 'Could not reach the sign-in service. Please try again.');
+    }
+
+    if (!res.ok) {
+      const code = (await res.json().catch(() => ({})))?.error?.message || '';
+      if (code.startsWith('TOO_MANY_ATTEMPTS')) {
+        throw new HttpsError('resource-exhausted', 'Too many attempts. Please try again later.');
+      }
+      throw new HttpsError('unauthenticated', 'That password is not correct.');
+    }
+
+    const db = admin.firestore();
+    const { FieldValue } = admin.firestore;
+    const profileRef = db.collection('users').doc(uid);
+    const profile = await profileRef.get();
+
+    // Never strand the congregation without an administrator: approvals,
+    // rejections and every admin screen would become unreachable with no way
+    // back in from the app. Members and leaders are never blocked, so this
+    // cannot stop an App Store reviewer deleting the test account they are
+    // given — give them a member account, not an admin one.
+    if (profile.data()?.role === 'admin') {
+      const admins = await db.collection('users').where('role', '==', 'admin').limit(2).get();
+      if (admins.size <= 1) {
+        throw new HttpsError(
+          'failed-precondition',
+          'You are the only administrator. Please make someone else an admin before deleting your account.'
+        );
+      }
+    }
+
+    const [registrations, orders] = await Promise.all([
+      db.collection('eventRegistrations').where('userId', '==', uid).get(),
+      db.collection('merchOrders').where('userId', '==', uid).get(),
+    ]);
+
+    await commitInBatches(db, registrations.docs, (batch, snapshot) =>
+      batch.update(snapshot.ref, {
+        userName: ANONYMISED_NAME,
+        memberDeletedAt: FieldValue.serverTimestamp(),
+      })
+    );
+
+    await commitInBatches(db, orders.docs, (batch, snapshot) =>
+      batch.update(snapshot.ref, {
+        userName: ANONYMISED_NAME,
+        // `reference` is what the member quotes on the bank transfer and is
+        // built as "<name> · <item>", so the name has to come out of it too.
+        reference: `${ANONYMISED_NAME} · ${snapshot.data().itemName || ''}`.trim(),
+        memberDeletedAt: FieldValue.serverTimestamp(),
+      })
+    );
+
+    // Everything below is personal content, erased outright.
+    const ownPrayers = await db.collection('prayerRequests').where('createdBy', '==', uid).get();
+    await commitInBatches(db, ownPrayers.docs, (batch, snapshot) => batch.delete(snapshot.ref));
+
+    // The uid is also scattered across other members' prayer requests as a
+    // "praying for this" mark, so pull it out and correct each counter.
+    const prayedFor = await db
+      .collection('prayerRequests')
+      .where('prayingBy', 'array-contains', uid)
+      .get();
+    await commitInBatches(db, prayedFor.docs, (batch, snapshot) =>
+      batch.update(snapshot.ref, {
+        prayingBy: FieldValue.arrayRemove(uid),
+        prayCount: FieldValue.increment(-1),
+      })
+    );
+
+    // Admin alerts about this member's registration embed the whole signup
+    // payload — name, email, phone — so they go as well.
+    const adminAlerts = await db.collection('notifications').where('userId', '==', uid).get();
+    await commitInBatches(db, adminAlerts.docs, (batch, snapshot) => batch.delete(snapshot.ref));
+
+    // recursiveDelete takes the profile's notifications and givingHistory
+    // subcollections with it; a plain delete would orphan them.
+    await db.recursiveDelete(profileRef);
+
+    // The Auth record goes last. While it survives, a failure anywhere above
+    // leaves the member able to sign in and try again rather than half-erased.
+    await admin.auth().deleteUser(uid);
+
+    return { success: true };
+  }
+);
