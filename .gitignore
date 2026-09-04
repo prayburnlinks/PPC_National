@@ -52,3 +52,6 @@ google-service-account.json
 
 # Firestore CSV exports (contain member emails/phone numbers)
 *.csv
+
+# EAS store metadata — carries the App Review demo password
+store.config.json
