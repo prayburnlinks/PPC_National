@@ -130,8 +130,11 @@ service cloud.firestore {
 
     match /prayerRequests/{requestId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated()
-        && request.resource.data.createdBy == request.auth.uid;
+      // Posting goes through the submitPrayerRequest callable so the
+      // profanity filter required by App Store Guideline 1.2 cannot be
+      // skipped by writing straight to Firestore. The Admin SDK the callable
+      // runs under bypasses these rules, so this shuts the client route only.
+      allow create: if false;
       // Praying toggles exactly one step: the caller adds themself (count +1)
       // or removes themself (count -1). Values are validated, not just keys,
       // so a crafted write can't inflate the counter or edit other people's
@@ -154,7 +157,26 @@ service cloud.firestore {
             && !(request.auth.uid in request.resource.data.prayingBy)
           )
         );
+      // Admins take a reported request off the wall without destroying it, so
+      // the moderation queue still has something to show if the author appeals.
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['hidden', 'hiddenReason', 'reviewedBy', 'reviewedAt']);
+
       allow delete: if isAuthenticated() && isOwner(resource.data.createdBy);
+      allow delete: if isAdmin();
+    }
+
+    // Moderation queue for reported prayer requests. Entries are written by
+    // the reportPrayerRequest callable under the Admin SDK, never by a client,
+    // so there is deliberately no create rule — a member cannot forge a report
+    // against someone, and cannot read who reported what.
+    match /contentReports/{reportId} {
+      allow read: if isAdmin();
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'reviewedBy', 'reviewedAt']);
+      allow create, delete: if false;
     }
 
     match /eventRegistrations/{registrationId} {

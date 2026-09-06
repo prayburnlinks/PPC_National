@@ -21,8 +21,13 @@ import {
   orderBy,
   limit,
 } from 'firebase/firestore';
-import { db } from '../firebase-config';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { app, db } from '../firebase-config';
 import { normalizePhone } from '../utils/phone';
+
+// Must match the region declared in functions/index.js, or the callables
+// resolve to URLs that don't exist.
+const FUNCTIONS_REGION = 'us-central1';
 
 const parseDate = (raw) => {
   if (raw?.toDate) return raw.toDate();
@@ -280,7 +285,20 @@ export const markNotificationAsRead = async (userId, notificationId) => {
 /**
  * Prayer Wall functions
  */
-export const getPrayerRequests = async (scope = 'national', district = null) => {
+/**
+ * Fetch the wall.
+ *
+ * `viewer` is optional and carries the signed-in member's uid and block list.
+ * Three kinds of request are dropped for them: ones an admin has hidden, ones
+ * this member reported (App Store Guideline 1.2 — reporting has to visibly do
+ * something for the reporter), and ones written by a member they blocked.
+ *
+ * The filtering is client-side on purpose. Firestore cannot express "not in
+ * this array" as a query, and adding `hidden` to the where-clause would need a
+ * new composite index for every scope; the wall is capped at 50 rows, so the
+ * cost of filtering in memory is nil.
+ */
+export const getPrayerRequests = async (scope = 'national', district = null, viewer = null) => {
   try {
     const col = collection(db, 'prayerRequests');
     let q;
@@ -292,31 +310,135 @@ export const getPrayerRequests = async (scope = 'national', district = null) => 
       q = query(col, orderBy('createdAt', 'desc'), limit(50));
     }
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ ...d.data(), id: d.id, createdAt: parseDate(d.data().createdAt) }));
+    const blocked = Array.isArray(viewer?.blockedUsers) ? viewer.blockedUsers : [];
+    return snap.docs
+      .map(d => ({ ...d.data(), id: d.id, createdAt: parseDate(d.data().createdAt) }))
+      .filter(r => !r.hidden)
+      .filter(r => !(viewer?.uid && Array.isArray(r.reportedBy) && r.reportedBy.includes(viewer.uid)))
+      .filter(r => !blocked.includes(r.createdBy));
   } catch (error) {
     console.error('Error fetching prayer requests:', error);
     return [];
   }
 };
 
-export const submitPrayerRequest = async (userId, { title, body, scope = 'national', district = null, congregation = null }) => {
+/**
+ * Post to the wall.
+ *
+ * Goes through a callable rather than writing to Firestore directly: the
+ * profanity check has to run somewhere the member cannot reach, and
+ * firestore.rules now refuses client creates on prayerRequests. Scope,
+ * district and congregation are all resolved server-side from the caller's
+ * own profile, so `userId` is no longer trusted from here — it stays in the
+ * signature only because callers still pass it.
+ */
+export const submitPrayerRequest = async (userId, { title, body, scope = 'national' }) => {
   try {
-    const payload = {
-      title,
-      body,
-      scope,
-      district: district || null,
-      congregation: congregation || null,
-      createdBy: userId,
-      createdAt: serverTimestamp(),
-      prayCount: 0,
-      prayingBy: [],
-    };
-    const ref = await addDoc(collection(db, 'prayerRequests'), payload);
-    return { success: true, id: ref.id };
+    const callable = httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'submitPrayerRequest');
+    const { data } = await callable({ title, body, scope });
+    return { success: true, ...data };
   } catch (error) {
     console.error('Error submitting prayer request:', error);
-    throw { message: 'Failed to submit prayer request' };
+    // The rejection wording from the filter is member-facing and specific
+    // ("please rephrase"), so it is surfaced rather than flattened.
+    throw { message: error?.message || 'Failed to submit prayer request' };
+  }
+};
+
+/**
+ * Report someone else's prayer request. The wall hides it from this member
+ * immediately; an admin sees it in the moderation queue and decides whether it
+ * comes off the wall for everyone.
+ */
+export const reportPrayerRequest = async (requestId, reason = '') => {
+  try {
+    const callable = httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'reportPrayerRequest');
+    const { data } = await callable({ requestId, reason });
+    return { success: true, ...data };
+  } catch (error) {
+    console.error('Error reporting prayer request:', error);
+    throw { message: error?.message || 'Failed to report this request' };
+  }
+};
+
+/**
+ * Block a member: everything they have written disappears from this member's
+ * wall, and stays gone. Private to the blocker — the blocked member is never
+ * told, and nothing of theirs is removed for anyone else.
+ */
+export const blockMember = async (userId, blockedUserId) => {
+  try {
+    if (!userId || !blockedUserId || userId === blockedUserId) {
+      throw new Error('invalid block');
+    }
+    await updateDoc(doc(db, 'users', userId), { blockedUsers: arrayUnion(blockedUserId) });
+    return { success: true };
+  } catch (error) {
+    console.error('Error blocking member:', error);
+    throw { message: 'Failed to block this member' };
+  }
+};
+
+/**
+ * The moderation queue, admin-only by firestore.rules.
+ *
+ * Status is filtered in memory rather than in the query: pairing
+ * `where('status')` with `orderBy('createdAt')` would need a new composite
+ * index, and the queue is capped at 50 rows.
+ */
+export const getOpenContentReports = async () => {
+  try {
+    const q = query(collection(db, 'contentReports'), orderBy('createdAt', 'desc'), limit(50));
+    const snap = await getDocs(q);
+    return snap.docs
+      .map(d => ({ ...d.data(), id: d.id, createdAt: parseDate(d.data().createdAt) }))
+      .filter(r => r.status === 'open');
+  } catch (error) {
+    console.error('Error fetching content reports:', error);
+    return [];
+  }
+};
+
+/**
+ * Take a reported request off the wall for everyone. Hidden rather than
+ * deleted, so the report still has something behind it if the author asks why.
+ */
+export const hidePrayerRequest = async (requestId, reviewerUid) => {
+  try {
+    await updateDoc(doc(db, 'prayerRequests', requestId), {
+      hidden: true,
+      hiddenReason: 'reported',
+      reviewedBy: reviewerUid,
+      reviewedAt: serverTimestamp(),
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('Error hiding prayer request:', error);
+    throw { message: 'Failed to hide this request' };
+  }
+};
+
+export const resolveContentReport = async (reportId, reviewerUid, status = 'actioned') => {
+  try {
+    await updateDoc(doc(db, 'contentReports', reportId), {
+      status,
+      reviewedBy: reviewerUid,
+      reviewedAt: serverTimestamp(),
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('Error resolving content report:', error);
+    throw { message: 'Failed to update this report' };
+  }
+};
+
+export const unblockMember = async (userId, blockedUserId) => {
+  try {
+    await updateDoc(doc(db, 'users', userId), { blockedUsers: arrayRemove(blockedUserId) });
+    return { success: true };
+  } catch (error) {
+    console.error('Error unblocking member:', error);
+    throw { message: 'Failed to unblock this member' };
   }
 };
 
@@ -393,6 +515,12 @@ export default {
   getPrayerRequests,
   getUserPrayerRequests,
   submitPrayerRequest,
+  reportPrayerRequest,
+  blockMember,
+  unblockMember,
+  getOpenContentReports,
+  hidePrayerRequest,
+  resolveContentReport,
   prayForRequest,
 
   // Live Status

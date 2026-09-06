@@ -22,6 +22,14 @@ jest.mock('../../services/merchService', () => ({
   rejectMerchOrder: jest.fn(),
 }));
 
+// The Reported tab reads the moderation queue. Without this mock the real
+// module drags in firebase's ESM build, which jest cannot parse.
+jest.mock('../../services/firestoreService', () => ({
+  getOpenContentReports: jest.fn(() => Promise.resolve([])),
+  hidePrayerRequest: jest.fn(),
+  resolveContentReport: jest.fn(),
+}));
+
 import {
   getPendingRegistrations,
   approveUser,

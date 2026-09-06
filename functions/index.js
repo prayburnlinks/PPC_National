@@ -265,3 +265,188 @@ exports.deleteMyAccount = onCall(
     return { success: true };
   }
 );
+
+/**
+ * Prayer wall moderation — App Store Guideline 1.2.
+ *
+ * Apple requires four things of any app carrying user-generated content: a
+ * filter on what gets posted, a way to report what slips through, a way to
+ * block an abusive author, and published contact details. The prayer wall is
+ * this app's only UGC surface, so the first three hang off it (the fourth is
+ * the support address on the privacy policy site and the App Store listing).
+ *
+ * Submission moved server-side because a filter the client enforces is a
+ * filter a client can skip. firestore.rules now refuses direct creates on
+ * prayerRequests, which leaves this callable as the only way in.
+ *
+ * Blocking is deliberately NOT here: it is a private, per-member preference
+ * stored on the blocker's own profile, so it needs no privileged write and no
+ * round trip. See blockMember in services/firestoreService.js.
+ */
+
+// Only invective belongs on this list. A prayer wall is exactly where people
+// write about addiction, abuse, assault, illness, suicide and grief, and a
+// word list that caught those would silence the requests that matter most —
+// so none of them appear here, and none should be added.
+const DEFAULT_BLOCKED_TERMS = [
+  'fuck', 'shit', 'cunt', 'bitch', 'bastard', 'asshole', 'whore', 'slut',
+  'dickhead', 'motherfucker', 'wanker', 'poes', 'doos', 'fok', 'naai',
+];
+
+/**
+ * Church admins extend the list at config/moderation without a deploy; the
+ * constant above is only a floor. A read failure must not take the prayer
+ * wall down, so it degrades to the built-in list.
+ */
+const loadBlockedTerms = async () => {
+  try {
+    const snap = await admin.firestore().collection('config').doc('moderation').get();
+    const extra = snap.exists ? snap.data()?.blockedTerms : null;
+    if (Array.isArray(extra)) {
+      return [...DEFAULT_BLOCKED_TERMS, ...extra.filter((t) => typeof t === 'string' && t)];
+    }
+  } catch (err) {
+    console.error('Could not read config/moderation, using built-in list:', err);
+  }
+  return DEFAULT_BLOCKED_TERMS;
+};
+
+/**
+ * Fold the obvious evasions — leetspeak, padding punctuation, drawn-out
+ * letters — back onto plain words so "f.u.c.k" and "fuuuck" match "fuck".
+ * Anything cleverer than this is what the report mechanism is for.
+ */
+const normaliseForMatch = (text) =>
+  String(text ?? '')
+    .toLowerCase()
+    .replace(/[0@]/g, 'o')
+    .replace(/[1!|]/g, 'i')
+    .replace(/3/g, 'e')
+    .replace(/4/g, 'a')
+    .replace(/[5$]/g, 's')
+    .replace(/7/g, 't')
+    .replace(/[^a-z]+/g, ' ')
+    // "f.u.c.k" and "f u c k" arrive here as loose single letters; glue a run
+    // of them back into one word, leaving real words either side alone.
+    .replace(/\b([a-z])\s+(?=[a-z]\b)/g, '$1')
+    .replace(/(.)\1+/g, '$1')
+    .trim();
+
+const findBlockedTerm = (text, terms) => {
+  const haystack = ` ${normaliseForMatch(text)} `;
+  return terms.find((term) => {
+    const needle = normaliseForMatch(term);
+    return needle && haystack.includes(` ${needle} `);
+  }) || null;
+};
+
+exports.submitPrayerRequest = onCall(
+  { region: 'us-central1', cors: true, maxInstances: 10 },
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) {
+      throw new HttpsError('unauthenticated', 'Please sign in to post a prayer request.');
+    }
+
+    const title = String(request.data?.title ?? '').trim();
+    const body = String(request.data?.body ?? '').trim();
+    const scope = request.data?.scope === 'district' ? 'district' : 'national';
+
+    if (!body) throw new HttpsError('invalid-argument', 'Please enter a prayer request.');
+    if (title.length > 100) {
+      throw new HttpsError('invalid-argument', 'Title must be 100 characters or less.');
+    }
+    if (body.length > 500) {
+      throw new HttpsError('invalid-argument', 'Prayer request must be 500 characters or less.');
+    }
+
+    const blockedTerms = await loadBlockedTerms();
+    if (findBlockedTerm(`${title} ${body}`, blockedTerms)) {
+      // The matched word is deliberately not echoed back: naming it just
+      // teaches someone determined which spelling to try next.
+      throw new HttpsError(
+        'invalid-argument',
+        'Please rephrase your request — it contains language that is not allowed on the prayer wall.'
+      );
+    }
+
+    const db = admin.firestore();
+    const { FieldValue } = admin.firestore;
+    const profile = (await db.collection('users').doc(uid).get()).data();
+
+    await db.collection('prayerRequests').add({
+      title: title || 'Prayer Request',
+      body,
+      scope,
+      district: scope === 'district' ? (profile?.district ?? null) : null,
+      congregation: profile?.congregation ?? null,
+      createdBy: uid,
+      createdAt: FieldValue.serverTimestamp(),
+      prayCount: 0,
+      prayingBy: [],
+      reportedBy: [],
+      reportCount: 0,
+      hidden: false,
+    });
+
+    return { success: true };
+  }
+);
+
+exports.reportPrayerRequest = onCall(
+  { region: 'us-central1', cors: true, maxInstances: 10 },
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) {
+      throw new HttpsError('unauthenticated', 'Please sign in to report a prayer request.');
+    }
+
+    const requestId = String(request.data?.requestId ?? '').trim();
+    // Free text from a member, so it is capped and stored as data only — it is
+    // shown to admins in the moderation queue, never re-posted to the wall.
+    const reason = String(request.data?.reason ?? '').trim().slice(0, 300);
+    if (!requestId) throw new HttpsError('invalid-argument', 'Missing prayer request.');
+
+    const db = admin.firestore();
+    const { FieldValue } = admin.firestore;
+    const ref = db.collection('prayerRequests').doc(requestId);
+    const snap = await ref.get();
+
+    if (!snap.exists) {
+      throw new HttpsError('not-found', 'That prayer request no longer exists.');
+    }
+
+    const data = snap.data();
+    if (data.createdBy === uid) {
+      throw new HttpsError('failed-precondition', 'You cannot report your own prayer request.');
+    }
+    // Reporting twice is a no-op rather than an error: the member's intent is
+    // already recorded, and the wall already hides it from them.
+    if (Array.isArray(data.reportedBy) && data.reportedBy.includes(uid)) {
+      return { success: true, alreadyReported: true };
+    }
+
+    await ref.update({
+      reportedBy: FieldValue.arrayUnion(uid),
+      reportCount: FieldValue.increment(1),
+    });
+
+    // Snapshot the text into the report. The request may be deleted before an
+    // admin reads the queue, and a report with no record of what was said is
+    // not something anyone can act on.
+    await db.collection('contentReports').add({
+      requestId,
+      requestTitle: data.title ?? null,
+      requestBody: data.body ?? null,
+      authorId: data.createdBy ?? null,
+      reportedBy: uid,
+      reason: reason || null,
+      status: 'open',
+      createdAt: FieldValue.serverTimestamp(),
+      reviewedBy: null,
+      reviewedAt: null,
+    });
+
+    return { success: true };
+  }
+);

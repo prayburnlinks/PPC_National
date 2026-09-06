@@ -20,6 +20,7 @@ import { ROLES } from '../constants/config';
 import { getPendingRegistrations, approveUser, rejectUser } from '../services/authService';
 import { getPendingEventRegistrations, approveEventRegistration, rejectEventRegistration, getEventRegistrationsByEvent } from '../services/eventRegistrationService';
 import { getPendingMerchOrders, approveMerchOrder, rejectMerchOrder } from '../services/merchService';
+import { getOpenContentReports, hidePrayerRequest, resolveContentReport } from '../services/firestoreService';
 import { useUser } from '../context/UserContext';
 
 const AdminScreen = ({ navigation }) => {
@@ -28,8 +29,10 @@ const AdminScreen = ({ navigation }) => {
   // Only Admins can approve/reject user registrations (firestore.rules
   // grants that to isAdmin() only) — Leaders get Payments review instead.
   const isAdminReviewer = reviewer?.role === ROLES.ADMIN;
+  // Reported content is admins only — firestore.rules restricts contentReports
+  // to isAdmin(), so showing a leader the tab would only ever load nothing.
   const TABS = isAdminReviewer
-    ? ['Pending', 'Payments', 'Merch Orders', 'Events', 'Actions']
+    ? ['Pending', 'Payments', 'Merch Orders', 'Reported', 'Events', 'Actions']
     : ['Payments', 'Merch Orders', 'Events', 'Actions'];
   const [pendingUsers, setPendingUsers] = useState([]);
   const [pendingEventPayments, setPendingEventPayments] = useState([]);
@@ -49,22 +52,26 @@ const AdminScreen = ({ navigation }) => {
   const [viewingRegistrationProof, setViewingRegistrationProof] = useState(null);
   const [viewingOrderProof, setViewingOrderProof] = useState(null);
   const [loadError, setLoadError] = useState(false);
+  const [contentReports, setContentReports] = useState([]);
+  const [processingReportIds, setProcessingReportIds] = useState([]);
   const [rejectTarget, setRejectTarget] = useState(null); // { kind: 'user'|'payment'|'order', item }
   const [rejectReason, setRejectReason] = useState('');
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
 
   const loadAll = useCallback(async () => {
     try {
-      const [users, registrations, orders, groups] = await Promise.all([
+      const [users, registrations, orders, groups, reports] = await Promise.all([
         isAdminReviewer ? getPendingRegistrations() : Promise.resolve([]),
         getPendingEventRegistrations(reviewer?.role, reviewer?.congregation),
         getPendingMerchOrders(reviewer?.role, reviewer?.congregation),
         getEventRegistrationsByEvent(reviewer?.role, reviewer?.congregation),
+        isAdminReviewer ? getOpenContentReports() : Promise.resolve([]),
       ]);
       setPendingUsers(users);
       setPendingEventPayments(registrations);
       setPendingMerchOrders(orders);
       setEventGroups(groups);
+      setContentReports(reports);
       setLoadError(false);
     } catch {
       setLoadError(true);
@@ -83,6 +90,35 @@ const AdminScreen = ({ navigation }) => {
     setRefreshing(true);
     loadAll();
   };
+
+  // Both outcomes close the report; they differ only in whether the request
+  // also comes off the wall. Hidden rather than deleted, so there is still
+  // something to point at if the author asks why it disappeared.
+  const finishReport = async (report, { hide }) => {
+    setProcessingReportIds(prev => [...prev, report.id]);
+    try {
+      if (hide) await hidePrayerRequest(report.requestId, reviewer?.uid);
+      await resolveContentReport(report.id, reviewer?.uid, hide ? 'actioned' : 'dismissed');
+      setContentReports(prev => prev.filter(r => r.id !== report.id));
+    } catch (e) {
+      Alert.alert('Error', e?.message || 'Failed to update this report');
+    } finally {
+      setProcessingReportIds(prev => prev.filter(id => id !== report.id));
+    }
+  };
+
+  const handleRemoveReported = (report) => {
+    Alert.alert(
+      'Remove from wall?',
+      'This prayer request will no longer be visible to any member.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: () => finishReport(report, { hide: true }) },
+      ]
+    );
+  };
+
+  const handleDismissReport = (report) => finishReport(report, { hide: false });
 
   const handleApprove = (user) => {
     Alert.alert(
@@ -524,6 +560,56 @@ const AdminScreen = ({ navigation }) => {
                 )}
               </View>
             ))
+          )}
+        </ScrollView>
+      ) : activeTab === 'Reported' ? (
+        <ScrollView
+          contentContainerStyle={[styles.list, { paddingBottom: spacing.xxxl + insets.bottom }]}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.blue]} />}
+          showsVerticalScrollIndicator={false}
+        >
+          {contentReports.length === 0 ? (
+            <View style={styles.empty}>
+              <Text style={styles.emptyIcon}>{loadError ? '⚠️' : '✅'}</Text>
+              <Text style={styles.emptyTitle}>{loadError ? 'Failed to load' : 'Nothing reported'}</Text>
+              <Text style={styles.emptyText}>
+                {loadError ? 'Pull down to retry.' : 'No prayer requests are awaiting review.'}
+              </Text>
+            </View>
+          ) : (
+            contentReports.map(report => {
+              const busy = processingReportIds.includes(report.id);
+              return (
+                <View key={report.id} style={styles.card}>
+                  <Text style={styles.userName}>{report.requestTitle || 'Prayer Request'}</Text>
+                  <Text style={styles.reportBody}>{report.requestBody || '(no text recorded)'}</Text>
+                  {report.reason ? (
+                    <Text style={styles.reportReason}>Reason given: {report.reason}</Text>
+                  ) : null}
+                  <Text style={styles.reportMeta}>
+                    Reported {report.createdAt ? new Date(report.createdAt).toLocaleDateString() : ''}
+                  </Text>
+                  {busy ? (
+                    <ActivityIndicator style={styles.spinner} color={colors.blue} />
+                  ) : (
+                    <View style={styles.actions}>
+                      <TouchableOpacity
+                        style={styles.rejectBtn}
+                        onPress={() => handleRemoveReported(report)}
+                      >
+                        <Text style={styles.rejectBtnText}>Remove from wall</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.approveBtn}
+                        onPress={() => handleDismissReport(report)}
+                      >
+                        <Text style={styles.approveBtnText}>Keep it</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              );
+            })
           )}
         </ScrollView>
       ) : activeTab === 'Events' ? (
@@ -1093,6 +1179,24 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     gap: spacing.md,
+  },
+  reportBody: {
+    fontSize: typography.sizes.sm,
+    color: colors.textSecondary,
+    lineHeight: 19,
+    marginTop: spacing.sm,
+  },
+  reportReason: {
+    fontSize: typography.sizes.sm,
+    color: colors.textPrimary,
+    fontStyle: 'italic',
+    marginTop: spacing.sm,
+  },
+  reportMeta: {
+    fontSize: typography.sizes.xs,
+    color: colors.textTertiary,
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
   },
   rejectBtn: {
     flex: 1,
