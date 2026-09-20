@@ -32,7 +32,7 @@
         "backgroundColor": "#0A1F44"
       },
       "package": "com.ilovemychurch.app",
-      "versionCode": 2
+      "versionCode": 3
     },
     "web": {
       "favicon": "./assets/favicon.png"

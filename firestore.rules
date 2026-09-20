@@ -187,6 +187,17 @@ service cloud.firestore {
         resource.data.congregation == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.congregation
       );
 
+      // registerForEvent checks "am I already registered?" with a direct get
+      // on `${uid}_${eventId}` — which, for a first-time registration, reads a
+      // document that does not exist yet. `resource` is null then, so the
+      // ownership clause above cannot be evaluated and every clause fails, and
+      // the member's very first registration for any event died with
+      // "Missing or insufficient permissions". The id is deterministic and a
+      // Firebase uid never contains an underscore, so the uid prefix is what
+      // authorises this read. Scoped to `get`: it must not widen `list`.
+      allow get: if isAuthenticated()
+        && registrationId.split('_')[0] == request.auth.uid;
+
       // Registering — doc id is `${uid}_${eventId}` so a member can't
       // create a registration under another event/user's id, and status
       // must match whether the event actually requires payment.
