@@ -364,7 +364,7 @@ describe('AdminScreen Events tab', () => {
 
     await waitFor(() => getByText('National Sisters Conference'));
     fireEvent.press(getByText('National Sisters Conference'));
-    fireEvent.press(getByText('⬆  Share Attendee List (CSV)'));
+    fireEvent.press(getByText('Share Attendee List (CSV)'));
 
     await waitFor(() => {
       expect(Share.share).toHaveBeenCalledWith({

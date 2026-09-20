@@ -11,7 +11,8 @@ import {
   Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing, borderRadius, typography } from '../constants/theme';
+import { colors, spacing, borderRadius, typography, shadows } from '../constants/theme';
+import Icon, { IconBadge, IconText } from '../components/Icon';
 import { useUser } from '../context/UserContext';
 import { getMerchItems, createMerchOrder, submitOrderPayment } from '../services/merchService';
 import { BANK_DETAILS } from '../constants/config';
@@ -85,8 +86,8 @@ const StoreScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>←</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
+          <Icon name="arrow-back" size={20} color={colors.white} />
         </TouchableOpacity>
         <Image source={require('../assets/emblem.jpg')} style={styles.emblem} resizeMode="contain" />
         <Text style={styles.headerTitle}>Store</Text>
@@ -98,7 +99,7 @@ const StoreScreen = ({ navigation }) => {
         </View>
       ) : items.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>🛍️</Text>
+          <IconBadge name="bag-handle-outline" size={72} tone="blue" shape="circle" style={{ marginBottom: spacing.md }} />
           <Text style={styles.emptyTitle}>No Items Yet</Text>
           <Text style={styles.emptyText}>Check back soon for merchandise.</Text>
         </View>
@@ -184,7 +185,7 @@ const StoreScreen = ({ navigation }) => {
                   </>
                 ) : !submitted ? (
                   <View style={styles.paymentInfo}>
-                    <Text style={styles.paymentInfoTitle}>💳 Payment Details</Text>
+                    <IconText name="card-outline" size={16} color={colors.textPrimary} textStyle={styles.paymentInfoTitle} style={{ marginBottom: spacing.sm }}>Payment Details</IconText>
                     <Text style={styles.paymentInfoText}>
                       Complete your EFT payment of{' '}
                       <Text style={{ fontWeight: '700' }}>R{order.totalAmount}</Text>:
@@ -294,6 +295,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
+    ...shadows.sm,
   },
   itemImage: {
     width: '100%',

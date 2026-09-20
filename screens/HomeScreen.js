@@ -14,8 +14,9 @@ import {
   Image,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { colors, spacing, borderRadius, typography } from '../constants/theme';
-import { getUpcomingEvents, getUserNotifications } from '../services/firestoreService';
+import { colors, spacing, borderRadius, typography, shadows } from '../constants/theme';
+import { getUpcomingEvents, getUserNotifications, getLiveStatus } from '../services/firestoreService';
+import Icon from '../components/Icon';
 import { useUser } from '../context/UserContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DISTRICTS, CONGREGATIONS, ROLES } from '../constants/config';
@@ -36,6 +37,7 @@ const HomeScreen = ({ navigation }) => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [hasUnread, setHasUnread] = useState(false);
+  const [liveStatus, setLiveStatus] = useState({ isLive: false, title: '' });
   const isVisitor = user?.role === ROLES.VISITOR;
 
   // Refresh the unread indicator every time Home regains focus, so reading
@@ -43,6 +45,12 @@ const HomeScreen = ({ navigation }) => {
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      // Real live status (same source as the Media tab) — no placeholder stream.
+      if (typeof getLiveStatus === 'function') {
+        Promise.resolve(getLiveStatus())
+          .then(status => { if (active && status) setLiveStatus(status); })
+          .catch(() => {});
+      }
       if (user?.uid) {
         getUserNotifications(user.uid, 20)
           .then(list => { if (active) setHasUnread(list.some(n => !n.read)); })
@@ -97,8 +105,10 @@ const HomeScreen = ({ navigation }) => {
           <TouchableOpacity
             onPress={() => navigation.navigate(user?.uid ? 'Notifications' : 'SignIn')}
             style={styles.notifBell}
+            accessibilityRole="button"
+            accessibilityLabel="Notifications"
           >
-            <Text style={styles.notifIcon}>🔔</Text>
+            <Icon name="notifications-outline" size={19} color={colors.white} />
             {hasUnread && <View style={styles.notifDot} />}
           </TouchableOpacity>
         </View>
@@ -106,7 +116,8 @@ const HomeScreen = ({ navigation }) => {
         <Text style={styles.greetingName}>{user?.name || 'Member'} 🙌</Text>
         <View style={styles.headerBadges}>
           <View style={styles.districtChip}>
-            <Text style={styles.districtText}>📍 {user?.district ? `${user.district} District` : 'District'}</Text>
+            <Icon name="location" size={13} color={colors.gold} />
+            <Text style={styles.districtText}>{user?.district ? `${user.district} District` : 'District'}</Text>
           </View>
           <View style={styles.releaseChip}>
             <Text style={styles.releaseChipText}>Current release</Text>
@@ -130,28 +141,39 @@ const HomeScreen = ({ navigation }) => {
 
         {/* Body Content */}
         <View style={styles.body}>
-        {/* Live Now Section */}
+        {/* Watch / Live section — reflects the real live status */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Live Now</Text>
-            <View style={styles.liveBadge}>
-              <View style={styles.liveDot} />
-              <Text style={styles.liveBadgeText}>LIVE</Text>
-            </View>
+            <Text style={styles.sectionTitle}>{liveStatus.isLive ? 'Live Now' : 'Watch'}</Text>
+            {liveStatus.isLive && (
+              <View style={styles.liveBadge}>
+                <View style={styles.liveDot} />
+                <Text style={styles.liveBadgeText}>LIVE</Text>
+              </View>
+            )}
           </View>
           <TouchableOpacity
             style={styles.liveCard}
             onPress={() => navigation.navigate('Media')}
+            activeOpacity={0.88}
+            accessibilityRole="button"
+            testID="watch-card"
           >
-            <View style={styles.liveBadgeContainer}>
-              <View style={styles.liveDot} />
-              <Text style={styles.liveBadgeText}>LIVE</Text>
-            </View>
+            {liveStatus.isLive && (
+              <View style={styles.liveBadgeContainer}>
+                <View style={styles.liveDot} />
+                <Text style={styles.liveBadgeText}>LIVE</Text>
+              </View>
+            )}
             <Text style={styles.liveMediaLabel}>Media</Text>
-            <Text style={styles.liveTitle}>Sunday Morning Service</Text>
-            <Text style={styles.liveMeta}>🎤 Ps. George Links · 👁 2.4k watching</Text>
+            <Text style={styles.liveTitle}>
+              {liveStatus.isLive ? (liveStatus.title || 'Live Service') : 'Watch our services'}
+            </Text>
+            <Text style={styles.liveMeta}>
+              {liveStatus.isLive ? 'Tap to watch now' : 'Sermons and livestreams on YouTube and Facebook'}
+            </Text>
             <View style={styles.livePlayButton}>
-              <Text style={styles.livePlayIcon}>▶</Text>
+              <Icon name="play" size={18} color={colors.white} style={{ marginLeft: 2 }} />
             </View>
           </TouchableOpacity>
         </View>
@@ -162,7 +184,7 @@ const HomeScreen = ({ navigation }) => {
             style={[styles.quickCard, styles.quickCardPurple]}
             onPress={() => navigation.navigate('Giving')}
           >
-            <Text style={styles.quickIcon}>💝</Text>
+            <View style={styles.quickIconWrap}><Icon name="heart" size={22} color={colors.white} /></View>
             <Text style={styles.quickTitle}>Give & Tithe</Text>
             <Text style={styles.quickSub}>Sow a seed today</Text>
           </TouchableOpacity>
@@ -171,7 +193,7 @@ const HomeScreen = ({ navigation }) => {
             style={[styles.quickCard, styles.quickCardOrange]}
             onPress={() => navigateMemberOnly('Districts')}
           >
-            <Text style={styles.quickIcon}>🗺</Text>
+            <View style={styles.quickIconWrap}><Icon name="map" size={22} color={colors.white} /></View>
             <Text style={styles.quickTitle}>Districts</Text>
             <Text style={styles.quickSub}>{DISTRICTS.length} districts · {CONGREGATIONS.length} congs</Text>
           </TouchableOpacity>
@@ -180,7 +202,7 @@ const HomeScreen = ({ navigation }) => {
             style={[styles.quickCard, styles.quickCardWhite]}
             onPress={() => navigateMemberOnly('PrayerWall')}
           >
-            <Text style={styles.quickIcon}>🙏</Text>
+            <View style={[styles.quickIconWrap, styles.quickIconWrapLight]}><Icon name="flame" size={22} color={colors.blue} /></View>
             <Text style={styles.quickTitleDark}>Prayer Wall</Text>
             <Text style={styles.quickSubDark}>Submit requests</Text>
           </TouchableOpacity>
@@ -189,7 +211,7 @@ const HomeScreen = ({ navigation }) => {
             style={[styles.quickCard, styles.quickCardWhite]}
             onPress={() => navigateMemberOnly('Store')}
           >
-            <Text style={styles.quickIcon}>🛍️</Text>
+            <View style={[styles.quickIconWrap, styles.quickIconWrapLight]}><Icon name="bag-handle" size={22} color={colors.blue} /></View>
             <Text style={styles.quickTitleDark}>Store</Text>
             <Text style={styles.quickSubDark}>Church merchandise</Text>
           </TouchableOpacity>
@@ -223,7 +245,10 @@ const HomeScreen = ({ navigation }) => {
                   </View>
                   <View style={styles.eventInfo}>
                     <Text style={styles.eventTitle}>{event.name}</Text>
-                    <Text style={styles.eventVenue}>📍 {event.venue}</Text>
+                    <View style={styles.eventVenueRow}>
+                      <Icon name="location-outline" size={14} color={colors.textSecondary} />
+                      <Text style={styles.eventVenue}>{event.venue}</Text>
+                    </View>
                     <View style={styles.eventTag}>
                       <Text style={styles.eventTagText}>{event.category}</Text>
                     </View>
@@ -294,9 +319,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
   },
-  notifIcon: {
-    fontSize: typography.sizes.xl,
-  },
   notifDot: {
     position: 'absolute',
     top: 6,
@@ -327,6 +349,9 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   districtChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: 'rgba(212, 160, 23, 0.18)',
     borderWidth: 1,
     borderColor: 'rgba(212, 160, 23, 0.35)',
@@ -434,6 +459,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.darkPurple,
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
+    paddingRight: 72,
     position: 'relative',
   },
   liveBadgeContainer: {
@@ -481,17 +507,18 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
   quickGrid: {
-    display: 'grid',
-    gap: spacing.md,
+    rowGap: spacing.md,
     marginBottom: spacing.lg,
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
   quickCard: {
     width: '48%',
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
     alignItems: 'flex-start',
+    ...shadows.sm,
   },
   quickCardPurple: {
     backgroundColor: colors.purple,
@@ -504,9 +531,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  quickIcon: {
-    fontSize: typography.sizes.h1,
-    marginBottom: spacing.sm,
+  quickIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  quickIconWrapLight: {
+    backgroundColor: colors.blueTint,
   },
   quickTitle: {
     color: colors.white,
@@ -537,6 +572,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
+    ...shadows.sm,
   },
   eventDate: {
     width: 44,
@@ -564,10 +600,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: spacing.xs,
   },
+  eventVenueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: spacing.sm,
+  },
   eventVenue: {
     color: colors.textSecondary,
     fontSize: typography.sizes.sm,
-    marginBottom: spacing.sm,
+    flexShrink: 1,
   },
   eventTag: {
     backgroundColor: colors.surfaceLight,

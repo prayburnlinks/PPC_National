@@ -8,17 +8,18 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
-import { colors, spacing, borderRadius, typography } from '../constants/theme';
+import { colors, spacing, borderRadius, typography, shadows } from '../constants/theme';
+import Icon, { IconBadge, IconText } from '../components/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../context/UserContext';
 import { getUserNotifications, markNotificationAsRead } from '../services/firestoreService';
 
 const TYPE_ICONS = {
-  approval_status: '👤',
-  pop_status: '💳',
-  event_reminder: '📅',
-  giving_receipt: '💝',
-  merch_order_status: '🛍️',
+  approval_status: 'person-circle-outline',
+  pop_status: 'card-outline',
+  event_reminder: 'calendar-outline',
+  giving_receipt: 'heart-outline',
+  merch_order_status: 'bag-handle-outline',
 };
 
 const NotificationsScreen = ({ navigation }) => {
@@ -49,8 +50,8 @@ const NotificationsScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>←</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
+          <Icon name="arrow-back" size={20} color={colors.white} />
         </TouchableOpacity>
         <Image source={require('../assets/emblem.jpg')} style={styles.emblem} resizeMode="contain" />
         <Text style={styles.headerTitle}>Notifications</Text>
@@ -62,7 +63,7 @@ const NotificationsScreen = ({ navigation }) => {
         </View>
       ) : notifications.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>🔔</Text>
+          <IconBadge name="notifications-outline" size={72} tone="blue" shape="circle" style={{ marginBottom: spacing.md }} />
           <Text style={styles.emptyTitle}>No Notifications</Text>
           <Text style={styles.emptyText}>Updates about your account and giving will appear here.</Text>
         </View>
@@ -76,7 +77,7 @@ const NotificationsScreen = ({ navigation }) => {
               activeOpacity={0.8}
             >
               <View style={styles.notifIconBox}>
-                <Text style={styles.notifIcon}>{TYPE_ICONS[item.type] || '🔔'}</Text>
+                <Icon name={TYPE_ICONS[item.type] || 'notifications-outline'} size={22} color={colors.blue} />
               </View>
               <View style={styles.notifInfo}>
                 <Text style={styles.notifTitle}>{item.title}</Text>
@@ -121,6 +122,7 @@ const styles = StyleSheet.create({
     padding: spacing.md, marginBottom: spacing.md,
     flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md,
     borderWidth: 1, borderColor: colors.border,
+    ...shadows.sm,
   },
   notifCardUnread: { borderColor: colors.blue, backgroundColor: colors.surfaceLight },
   notifIconBox: {

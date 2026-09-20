@@ -13,6 +13,7 @@ import {
   Image,
 } from 'react-native';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
+import Icon from '../components/Icon';
 import { loginUser, sendResetEmail } from '../services/authService';
 import { useUser } from '../context/UserContext';
 import { ROLES } from '../constants/config';
@@ -95,7 +96,7 @@ const LoginScreen = ({ navigation }) => {
   return (
     <View style={styles.root}>
       {/* Top blue hero section */}
-      <View style={[styles.hero, { paddingTop: insets.top + spacing.xxxl }]}>
+      <View style={[styles.hero, { paddingTop: insets.top + spacing.xxl }]}>
         <View style={styles.emblemWrapper}>
           <Image
             source={require('../assets/emblem.jpg')}
@@ -157,9 +158,7 @@ const LoginScreen = ({ navigation }) => {
                 onPress={() => setShowPassword(!showPassword)}
                 style={styles.passwordToggle}
               >
-                <Text style={styles.passwordToggleText}>
-                  {showPassword ? '👁️' : '👁️‍🗨️'}
-                </Text>
+                <Icon name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color={colors.textTertiary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -262,9 +261,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   emblemWrapper: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
+    width: 124,
+    height: 124,
+    borderRadius: 62,
     backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
@@ -274,8 +273,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   emblem: {
-    width: 130,
-    height: 130,
+    width: 114,
+    height: 114,
   },
   heroTitle: {
     color: colors.white,

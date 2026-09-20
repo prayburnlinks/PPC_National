@@ -10,7 +10,8 @@ import {
   Animated,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { colors, spacing, borderRadius, typography } from '../constants/theme';
+import { colors, spacing, borderRadius, typography, shadows } from '../constants/theme';
+import Icon, { IconBadge, IconText } from '../components/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getLiveStatus } from '../services/firestoreService';
 
@@ -167,7 +168,7 @@ const MediaScreen = ({ navigation }) => {
               </Text>
               <Text style={styles.liveSub}>Tap to watch now</Text>
               <View style={styles.playButton}>
-                <Text style={styles.playIcon}>▶</Text>
+                <Icon name="play" size={20} color={colors.white} style={{ marginLeft: 2 }} />
               </View>
             </TouchableOpacity>
           )}
@@ -181,13 +182,13 @@ const MediaScreen = ({ navigation }) => {
             activeOpacity={0.85}
           >
             <View style={styles.platformLeft}>
-              <Text style={styles.platformIcon}>▶</Text>
+              <Icon name="logo-youtube" size={30} color={colors.white} />
               <View>
                 <Text style={styles.platformName}>YouTube</Text>
                 <Text style={styles.platformSub}>Sermons, livestreams & more</Text>
               </View>
             </View>
-            <Text style={styles.platformArrow}>›</Text>
+            <Icon name="chevron-forward" size={20} color="rgba(255,255,255,0.85)" />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -196,13 +197,13 @@ const MediaScreen = ({ navigation }) => {
             activeOpacity={0.85}
           >
             <View style={styles.platformLeft}>
-              <Text style={styles.platformIcon}>f</Text>
+              <Icon name="logo-facebook" size={28} color={colors.white} />
               <View>
                 <Text style={styles.platformName}>Facebook</Text>
                 <Text style={styles.platformSub}>Updates, events & live streams</Text>
               </View>
             </View>
-            <Text style={styles.platformArrow}>›</Text>
+            <Icon name="chevron-forward" size={20} color="rgba(255,255,255,0.85)" />
           </TouchableOpacity>
 
           {/* Daily Scripture Board */}
@@ -215,7 +216,7 @@ const MediaScreen = ({ navigation }) => {
             activeOpacity={0.85}
           >
             <View style={styles.featuredThumb}>
-              <Text style={styles.featuredPlay}>▶</Text>
+              <Icon name="play" size={22} color={colors.white} />
             </View>
             <View style={styles.featuredInfo}>
               <Text style={styles.featuredLabel}>FEATURED</Text>
@@ -365,6 +366,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: spacing.md,
+    ...shadows.sm,
   },
   youtubeCard: {
     backgroundColor: '#FF0000',
@@ -469,6 +471,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
+    ...shadows.sm,
   },
   featuredThumb: {
     width: 64,

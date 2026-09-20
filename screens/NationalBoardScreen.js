@@ -9,7 +9,8 @@ import {
   Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing, borderRadius, typography } from '../constants/theme';
+import { colors, spacing, borderRadius, typography, shadows } from '../constants/theme';
+import Icon from '../components/Icon';
 import { NATIONAL_BOARD } from '../constants/config';
 
 const NationalBoardScreen = ({ navigation, route }) => {
@@ -23,8 +24,8 @@ const NationalBoardScreen = ({ navigation, route }) => {
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
       <View style={[styles.hero, { paddingTop: insets.top + spacing.md }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backText}>‹</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
+          <Icon name="arrow-back" size={20} color={colors.white} />
         </TouchableOpacity>
         <Image source={require('../assets/emblem.jpg')} style={styles.emblem} resizeMode="contain" />
         <Text style={styles.heroTitle}>{title}</Text>
@@ -101,6 +102,12 @@ const styles = StyleSheet.create({
   backButton: {
     alignSelf: 'flex-start',
     marginBottom: spacing.md,
+    width: 34,
+    height: 34,
+    borderRadius: borderRadius.full,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   backText: {
     color: colors.white,
@@ -146,6 +153,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.lg,
+    ...shadows.sm,
   },
   photoWrap: {
     width: 64,

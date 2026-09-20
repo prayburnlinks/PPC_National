@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Clipboard from 'expo-clipboard';
-import { colors, spacing, borderRadius, typography } from '../constants/theme';
+import { colors, spacing, borderRadius, typography, shadows } from '../constants/theme';
+import Icon, { IconBadge, IconText } from '../components/Icon';
 import { BANK_DETAILS } from '../constants/config';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../context/UserContext';
@@ -66,8 +67,8 @@ const MyOrdersScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>←</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
+          <Icon name="arrow-back" size={20} color={colors.white} />
         </TouchableOpacity>
         <Image source={require('../assets/emblem.jpg')} style={styles.emblem} resizeMode="contain" />
         <Text style={styles.headerTitle}>My Orders</Text>
@@ -81,7 +82,7 @@ const MyOrdersScreen = ({ navigation }) => {
         <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
           {orders.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>🛍️</Text>
+              <IconBadge name="bag-handle-outline" size={72} tone="blue" shape="circle" style={{ marginBottom: spacing.md }} />
               <Text style={styles.emptyTitle}>No Orders Yet</Text>
               <Text style={styles.emptyText}>Items you order from the Store will appear here.</Text>
             </View>
@@ -183,6 +184,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
+    ...shadows.sm,
   },
   orderRow: {
     flexDirection: 'row',

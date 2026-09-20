@@ -112,7 +112,7 @@ describe('HomeScreen notification bell', () => {
   it('navigates a member to Notifications and shows the dot only when unread exist', async () => {
     getUserNotifications.mockResolvedValue([{ id: 'n1', read: false }]);
     const navigation = { navigate: jest.fn(), goBack: jest.fn() };
-    const { getByText } = render(
+    const { getByLabelText } = render(
       <UserContext.Provider value={{ user: mockUser, onLogin: jest.fn(), onLogout: jest.fn() }}>
         <HomeScreen navigation={navigation} />
       </UserContext.Provider>
@@ -120,20 +120,20 @@ describe('HomeScreen notification bell', () => {
 
     await waitFor(() => expect(getUserNotifications).toHaveBeenCalledWith('uid-1', 20));
 
-    require('@testing-library/react-native').fireEvent.press(getByText('🔔'));
+    require('@testing-library/react-native').fireEvent.press(getByLabelText('Notifications'));
     expect(navigation.navigate).toHaveBeenCalledWith('Notifications');
   });
 
   it('sends a visitor to the SignIn prompt instead', async () => {
     const navigation = { navigate: jest.fn(), goBack: jest.fn() };
-    const { getByText } = render(
+    const { getByLabelText } = render(
       <UserContext.Provider value={{ user: { role: 'visitor', name: 'Visitor' }, onLogin: jest.fn(), onLogout: jest.fn() }}>
         <HomeScreen navigation={navigation} />
       </UserContext.Provider>
     );
 
-    await waitFor(() => getByText('🔔'));
-    require('@testing-library/react-native').fireEvent.press(getByText('🔔'));
+    await waitFor(() => getByLabelText('Notifications'));
+    require('@testing-library/react-native').fireEvent.press(getByLabelText('Notifications'));
 
     expect(navigation.navigate).toHaveBeenCalledWith('SignIn');
     expect(getUserNotifications).not.toHaveBeenCalled();

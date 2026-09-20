@@ -61,7 +61,7 @@ describe('AdminMerchItemsScreen', () => {
     await waitFor(() => getByText('+ Add Item'));
     fireEvent.press(getByText('+ Add Item'));
 
-    fireEvent.press(getByText('📷 Add Photo'));
+    fireEvent.press(getByText('Add Photo'));
     await waitFor(() => {
       expect(DocumentPicker.getDocumentAsync).toHaveBeenCalled();
     });

@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
+import Icon, { IconBadge, IconText } from '../components/Icon';
 import { useUser } from '../context/UserContext';
 import {
   getAllMerchItemsForAdmin,
@@ -117,8 +118,8 @@ const AdminMerchItemsScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-        <TouchableOpacity onPress={() => (showForm ? setShowForm(false) : navigation.goBack())} style={styles.backButton}>
-          <Text style={styles.backButtonText}>←</Text>
+        <TouchableOpacity onPress={() => (showForm ? setShowForm(false) : navigation.goBack())} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
+          <Icon name="arrow-back" size={20} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{showForm ? (editingItem ? 'Edit Item' : 'Add Item') : 'Manage Merchandise'}</Text>
       </View>
@@ -134,7 +135,7 @@ const AdminMerchItemsScreen = ({ navigation }) => {
             ) : editingItem?.imageUrl ? (
               <Image source={{ uri: editingItem.imageUrl }} style={styles.imagePreview} />
             ) : (
-              <Text style={styles.imagePickerText}>📷 Add Photo</Text>
+              <IconText name="camera-outline" size={18} color={colors.blue} textStyle={styles.imagePickerText}>Add Photo</IconText>
             )}
           </TouchableOpacity>
 
@@ -198,7 +199,7 @@ const AdminMerchItemsScreen = ({ navigation }) => {
 
           {items.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>🛍️</Text>
+              <IconBadge name="bag-handle-outline" size={72} tone="blue" shape="circle" style={{ marginBottom: spacing.md }} />
               <Text style={styles.emptyTitle}>No Items Yet</Text>
               <Text style={styles.emptyText}>Add your first merchandise item above.</Text>
             </View>

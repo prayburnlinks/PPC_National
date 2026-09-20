@@ -11,7 +11,8 @@ import {
   Image,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { colors, spacing, borderRadius, typography } from '../constants/theme';
+import { colors, spacing, borderRadius, typography, shadows } from '../constants/theme';
+import Icon, { IconBadge, IconText } from '../components/Icon';
 import { BANK_DETAILS } from '../constants/config';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../context/UserContext';
@@ -111,8 +112,8 @@ const EventsScreen = ({ navigation }) => {
     <View style={styles.container}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>←</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
+          <Icon name="arrow-back" size={20} color={colors.white} />
         </TouchableOpacity>
         <Image source={require('../assets/emblem.jpg')} style={styles.emblem} resizeMode="contain" />
         <Text style={styles.headerTitle}>Events & Registration</Text>
@@ -125,7 +126,7 @@ const EventsScreen = ({ navigation }) => {
         </View>
       ) : events.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>📅</Text>
+          <IconBadge name="calendar-outline" size={72} tone="blue" shape="circle" style={{ marginBottom: spacing.md }} />
           <Text style={styles.emptyTitle}>No Upcoming Events</Text>
           <Text style={styles.emptyText}>Check back soon for new events.</Text>
         </View>
@@ -159,22 +160,22 @@ const EventsScreen = ({ navigation }) => {
                     )}
                   </View>
                   <Text style={styles.eventName}>{event.name}</Text>
-                  <Text style={styles.eventVenue}>📍 {event.venue}</Text>
-                  <Text style={styles.eventDate}>🗓 {formatDate(event.eventDate)}</Text>
+                  <IconText name="location-outline" textStyle={styles.eventVenue}>{event.venue}</IconText>
+                  <IconText name="calendar-outline" textStyle={styles.eventDate}>{formatDate(event.eventDate)}</IconText>
                   {['confirmed', 'approved'].includes(registrations.get(event.id)?.status) && (
                     <View style={styles.paidBadge}>
-                      <Text style={styles.paidBadgeText}>✅ Registered & Paid</Text>
+                      <IconText name="checkmark-circle" color={colors.green} textStyle={styles.paidBadgeText}>Registered & Paid</IconText>
                     </View>
                   )}
                 </View>
 
                 {isRegistered ? (
                   <View style={styles.registeredBadge}>
-                    <Text style={styles.registeredText}>✓</Text>
+                    <Icon name="checkmark" size={16} color={colors.white} />
                   </View>
                 ) : (
                   <View style={styles.registerArrow}>
-                    <Text style={styles.registerArrowText}>›</Text>
+                    <Icon name="chevron-forward" size={18} color={colors.textTertiary} />
                   </View>
                 )}
               </TouchableOpacity>
@@ -215,28 +216,28 @@ const EventsScreen = ({ navigation }) => {
                 <Text style={styles.modalTitle}>{selectedEvent.name}</Text>
 
                 <View style={styles.modalDetailRow}>
-                  <Text style={styles.modalDetailIcon}>🗓</Text>
+                  <Icon name="calendar-outline" size={18} color={colors.blue} style={styles.modalDetailIcon} />
                   <Text style={styles.modalDetailText}>{formatDate(selectedEvent.eventDate)}</Text>
                 </View>
                 {selectedEvent.endDate && (
                   <View style={styles.modalDetailRow}>
-                    <Text style={styles.modalDetailIcon}>🏁</Text>
+                    <Icon name="flag-outline" size={18} color={colors.blue} style={styles.modalDetailIcon} />
                     <Text style={styles.modalDetailText}>Ends {formatDate(selectedEvent.endDate)}</Text>
                   </View>
                 )}
                 <View style={styles.modalDetailRow}>
-                  <Text style={styles.modalDetailIcon}>📍</Text>
+                  <Icon name="location-outline" size={18} color={colors.blue} style={styles.modalDetailIcon} />
                   <Text style={styles.modalDetailText}>{selectedEvent.venue}</Text>
                 </View>
                 {selectedEvent.organizer && (
                   <View style={styles.modalDetailRow}>
-                    <Text style={styles.modalDetailIcon}>🎤</Text>
+                    <Icon name="mic-outline" size={18} color={colors.blue} style={styles.modalDetailIcon} />
                     <Text style={styles.modalDetailText}>{selectedEvent.organizer}</Text>
                   </View>
                 )}
                 {selectedEvent.capacity && (
                   <View style={styles.modalDetailRow}>
-                    <Text style={styles.modalDetailIcon}>👥</Text>
+                    <Icon name="people-outline" size={18} color={colors.blue} style={styles.modalDetailIcon} />
                     <Text style={styles.modalDetailText}>
                       {selectedEvent.attendeeCount || 0} / {selectedEvent.capacity} registered
                     </Text>
@@ -250,7 +251,7 @@ const EventsScreen = ({ navigation }) => {
                 {/* Payment info */}
                 {selectedEvent.requiresPayment && selectedEvent.registrationFee > 0 && !registeredIds.has(selectedEvent.id) && (
                   <View style={styles.paymentInfo}>
-                    <Text style={styles.paymentInfoTitle}>💳 Payment Details</Text>
+                    <IconText name="card-outline" size={16} color={colors.textPrimary} textStyle={styles.paymentInfoTitle} style={{ marginBottom: spacing.sm }}>Payment Details</IconText>
                     <Text style={styles.paymentInfoText}>
                       After registering, complete your EFT payment of{' '}
                       <Text style={{ fontWeight: '700' }}>R{selectedEvent.registrationFee}</Text>:
@@ -361,6 +362,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'flex-start',
     borderWidth: 1, borderColor: colors.border,
     gap: spacing.md,
+    ...shadows.sm,
   },
   dateBadge: {
     width: 50, height: 56, borderRadius: borderRadius.md,

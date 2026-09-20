@@ -47,7 +47,7 @@ describe('MyEventsScreen', () => {
 
     await waitFor(() => {
       expect(getByText('Youth Camp')).toBeTruthy();
-      expect(getByText('📍 Cape Town')).toBeTruthy();
+      expect(getByText('Cape Town')).toBeTruthy();
     });
   });
 

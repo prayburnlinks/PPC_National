@@ -34,7 +34,7 @@ describe('MyPrayerRequestsScreen', () => {
 
     await waitFor(() => {
       expect(getByText('Healing')).toBeTruthy();
-      expect(getByText('🙏 4 praying')).toBeTruthy();
+      expect(getByText('4 praying')).toBeTruthy();
     });
   });
 

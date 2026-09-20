@@ -16,7 +16,8 @@ import {
   Image,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { colors, spacing, borderRadius, typography } from '../constants/theme';
+import { colors, spacing, borderRadius, typography, shadows } from '../constants/theme';
+import Icon, { IconBadge, IconText } from '../components/Icon';
 import { GIVING_FUNDS, BANK_DETAILS } from '../constants/config';
 import { useUser } from '../context/UserContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -88,7 +89,7 @@ const GivingScreen = ({ navigation }) => {
                   ]}
                   onPress={() => setSelectedFund(fund.id)}
                 >
-                  <Text style={styles.fundIcon}>{fund.icon}</Text>
+                  <Icon name={fund.iconName} size={24} color={selectedFund === fund.id ? colors.blue : colors.textSecondary} style={styles.fundIcon} />
                   <Text style={styles.fundName}>{fund.name}</Text>
                 </TouchableOpacity>
               ))}
@@ -150,7 +151,7 @@ const GivingScreen = ({ navigation }) => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Payment Method</Text>
             <View style={styles.methodCard}>
-              <View style={styles.methodIconBox}><Text style={styles.methodIconText}>🏦</Text></View>
+              <View style={styles.methodIconBox}><Icon name="business-outline" size={22} color={colors.blue} /></View>
               <View style={styles.methodInfo}>
                 <Text style={styles.methodTitle}>EFT / Bank Transfer</Text>
                 <Text style={styles.methodSub}>FNB · ABSA · Capitec · Nedbank</Text>
@@ -168,7 +169,7 @@ const GivingScreen = ({ navigation }) => {
             </Text>
           </TouchableOpacity>
 
-          <Text style={styles.secureNote}>🔒 All transactions are secure and encrypted</Text>
+          <IconText name="lock-closed-outline" size={13} color={colors.textTertiary} textStyle={styles.secureNote} style={{ justifyContent: 'center' }}>All transactions are secure and encrypted</IconText>
           <View style={styles.spacer} />
         </View>
       </ScrollView>
@@ -203,7 +204,7 @@ const GivingScreen = ({ navigation }) => {
             ))}
 
             <View style={styles.referenceInfo}>
-              <Text style={styles.referenceTitle}>📌 Your Reference:</Text>
+              <IconText name="pricetag-outline" size={16} color={colors.textPrimary} textStyle={styles.referenceTitle}>Your Reference:</IconText>
               <Text style={styles.referenceExample}>
                 <Text style={{ fontWeight: '700' }}>{givingReference}</Text>
               </Text>
@@ -286,6 +287,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     padding: spacing.md,
     alignItems: 'center',
+    ...shadows.sm,
   },
   fundCardSelected: {
     borderColor: colors.lightBlue,
@@ -347,6 +349,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
+    ...shadows.sm,
   },
   methodIconBox: {
     width: 38,

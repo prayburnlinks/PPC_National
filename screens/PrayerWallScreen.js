@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
+import Icon, { IconBadge, IconText } from '../components/Icon';
 import { useUser } from '../context/UserContext';
 import {
   getPrayerRequests,
@@ -163,13 +164,13 @@ const PrayerWallScreen = () => {
         </View>
         <Text style={styles.requestBody}>{item.body}</Text>
         <View style={styles.requestFooter}>
-          <Text style={styles.requestMeta}>📅 {new Date(item.createdAt).toLocaleDateString()}</Text>
+          <IconText name="calendar-outline" size={13} color={colors.textTertiary} textStyle={styles.requestMeta}>{new Date(item.createdAt).toLocaleDateString()}</IconText>
           <TouchableOpacity
             style={[styles.prayButton, isPraying && styles.prayButtonDisabled]}
             onPress={() => handlePray(item.id)}
             disabled={isPraying}
           >
-            <Text style={styles.prayText}>Praying 🙏</Text>
+            <IconText name="flame" size={15} color={colors.darkBlue} textStyle={styles.prayText}>Praying</IconText>
           </TouchableOpacity>
         </View>
         {/* App Store Guideline 1.2 — members need a way to report content and
@@ -177,12 +178,12 @@ const PrayerWallScreen = () => {
             applies. */}
         {!isOwn && (
           <View style={styles.moderationRow}>
-            <TouchableOpacity onPress={() => handleReport(item)} accessibilityRole="button">
-              <Text style={styles.moderationText}>Report</Text>
+            <TouchableOpacity onPress={() => handleReport(item)} accessibilityRole="button" hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}>
+              <IconText name="flag-outline" size={13} color={colors.textTertiary} textStyle={styles.moderationText}>Report</IconText>
             </TouchableOpacity>
             <Text style={styles.moderationDivider}>·</Text>
-            <TouchableOpacity onPress={() => handleBlock(item)} accessibilityRole="button">
-              <Text style={styles.moderationText}>Block member</Text>
+            <TouchableOpacity onPress={() => handleBlock(item)} accessibilityRole="button" hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}>
+              <IconText name="ban-outline" size={13} color={colors.textTertiary} textStyle={styles.moderationText}>Block member</IconText>
             </TouchableOpacity>
           </View>
         )}

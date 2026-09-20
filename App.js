@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, Image, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -8,6 +8,8 @@ import { auth } from './firebase-config';
 import { onAuthStateChanged } from 'firebase/auth';
 import { getCurrentUser } from './services/authService';
 import { colors } from './constants/theme';
+import { useAppFonts } from './constants/fonts';
+import Icon from './components/Icon';
 import { ROLES, USER_STATUS, NATIONAL_WOMENS_BOARD, NATIONAL_YOUTH_BOARD, NATIONAL_SUNDAY_SCHOOL_BOARD } from './constants/config';
 import { UserContext } from './context/UserContext';
 import LoginScreen from './screens/LoginScreen';
@@ -33,24 +35,34 @@ import AdminMerchItemsScreen from './screens/AdminMerchItemsScreen';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-const TAB_ICONS = { Home: '🏠', Media: '📺', Giving: '💝', Districts: '🗺', PrayerWall: '🙏', Profile: '👤', SignIn: '🔑' };
+// [outline, filled] icon pair per tab
+const TAB_ICONS = {
+  Home: ['home-outline', 'home'],
+  Media: ['play-circle-outline', 'play-circle'],
+  Giving: ['heart-outline', 'heart'],
+  Districts: ['map-outline', 'map'],
+  PrayerWall: ['flame-outline', 'flame'],
+  Profile: ['person-outline', 'person'],
+  SignIn: ['log-in-outline', 'log-in'],
+};
 
 const tabBarScreenOptions = (insets) => ({ route }) => ({
   headerShown: false,
   tabBarActiveTintColor: colors.blue,
   tabBarInactiveTintColor: colors.textSecondary,
-  tabBarLabelStyle: { fontSize: 10, fontWeight: '700' },
+  tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
   tabBarStyle: {
     borderTopWidth: 1,
     borderTopColor: colors.border,
     backgroundColor: colors.white,
     paddingBottom: insets.bottom || 8,
     paddingTop: 8,
-    height: 60 + (insets.bottom || 0),
+    height: 62 + (insets.bottom || 0),
   },
-  tabBarIcon: () => (
-    <Text style={{ fontSize: 18 }}>{TAB_ICONS[route.name] || '📱'}</Text>
-  ),
+  tabBarIcon: ({ focused, color }) => {
+    const [outline, filled] = TAB_ICONS[route.name] || ['apps-outline', 'apps'];
+    return <Icon name={focused ? filled : outline} size={23} color={color} />;
+  },
 });
 
 // Full tabs for authenticated members, leaders and admins
@@ -73,16 +85,16 @@ const SignInPromptScreen = ({ navigation }) => {
   const { onLogout } = React.useContext(UserContext);
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background, padding: 32 }}>
-      <Text style={{ fontSize: 40, marginBottom: 16 }}>🔑</Text>
-      <Text style={{ fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 8, textAlign: 'center' }}>Sign In for Full Access</Text>
-      <Text style={{ fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginBottom: 32 }}>
+      <Icon name="lock-closed-outline" size={44} color={colors.blue} style={{ marginBottom: 16 }} />
+      <Text style={{ fontSize: 20, fontWeight: '700', color: colors.textPrimary, marginBottom: 8, textAlign: 'center' }}>Sign In for Full Access</Text>
+      <Text style={{ fontSize: 14, lineHeight: 20, color: colors.textSecondary, textAlign: 'center', marginBottom: 32 }}>
         Create an account or sign in to access the Prayer Wall, Districts, and your Profile.
       </Text>
       <TouchableOpacity
         onPress={() => onLogout()}
-        style={{ backgroundColor: colors.blue, borderRadius: 8, paddingVertical: 14, paddingHorizontal: 40, marginBottom: 12 }}
+        style={{ backgroundColor: colors.blue, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 40, marginBottom: 12 }}
       >
-        <Text style={{ color: colors.white, fontWeight: '700', fontSize: 14 }}>Sign In</Text>
+        <Text style={{ color: colors.white, fontWeight: '700', fontSize: 15 }}>Sign In</Text>
       </TouchableOpacity>
     </View>
   );
@@ -103,6 +115,7 @@ function VisitorTabs() {
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const fontsReady = useAppFonts();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
@@ -133,10 +146,11 @@ export default function App() {
   const handleLogin = useCallback((userData) => setUser(userData), []);
   const handleLogout = useCallback(() => setUser(null), []);
 
-  if (loading) {
+  if (loading || !fontsReady) {
     return (
       <View style={styles.splash}>
-        <ActivityIndicator size="large" color={colors.blue} />
+        <Image source={require('./assets/splash.png')} style={styles.splashCoin} resizeMode="contain" accessibilityLabel="PPC emblem" />
+        <ActivityIndicator size="small" color={colors.white} style={{ marginTop: -24 }} />
       </View>
     );
   }
@@ -197,6 +211,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: colors.darkBlue,
   },
+  splashCoin: { width: 320, height: 320 },
 });

@@ -10,7 +10,8 @@ import {
   Alert,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { colors, spacing, borderRadius, typography } from '../constants/theme';
+import { colors, spacing, borderRadius, typography, shadows } from '../constants/theme';
+import Icon, { IconBadge, IconText } from '../components/Icon';
 import { BANK_DETAILS } from '../constants/config';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../context/UserContext';
@@ -84,8 +85,8 @@ const MyEventsScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>←</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
+          <Icon name="arrow-back" size={20} color={colors.white} />
         </TouchableOpacity>
         <Image source={require('../assets/emblem.jpg')} style={styles.emblem} resizeMode="contain" />
         <Text style={styles.headerTitle}>My Events</Text>
@@ -97,7 +98,7 @@ const MyEventsScreen = ({ navigation }) => {
         </View>
       ) : events.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>📋</Text>
+          <IconBadge name="clipboard-outline" size={72} tone="blue" shape="circle" style={{ marginBottom: spacing.md }} />
           <Text style={styles.emptyTitle}>No Registered Events</Text>
           <Text style={styles.emptyText}>Events you register for will appear here.</Text>
           <TouchableOpacity style={styles.browseButton} onPress={() => navigation.navigate('Events')}>
@@ -124,8 +125,8 @@ const MyEventsScreen = ({ navigation }) => {
                     <Text style={[styles.categoryTagText, { color: catColor }]}>{event.category}</Text>
                   </View>
                   <Text style={styles.eventName}>{event.name}</Text>
-                  <Text style={styles.eventVenue}>📍 {event.venue}</Text>
-                  <Text style={styles.eventDate}>🗓 {formatDate(event.eventDate)}</Text>
+                  <IconText name="location-outline" textStyle={styles.eventVenue}>{event.venue}</IconText>
+                  <IconText name="calendar-outline" textStyle={styles.eventDate}>{formatDate(event.eventDate)}</IconText>
 
                   {statusStyle && (
                     <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
@@ -171,7 +172,7 @@ const MyEventsScreen = ({ navigation }) => {
                   )}
                 </View>
                 <View style={styles.registeredBadge}>
-                  <Text style={styles.registeredText}>✓</Text>
+                  <Icon name="checkmark" size={16} color={colors.white} />
                 </View>
               </View>
             );
@@ -215,6 +216,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'flex-start',
     borderWidth: 1, borderColor: colors.border,
     gap: spacing.md,
+    ...shadows.sm,
   },
   eventCardPast: { opacity: 0.6 },
   dateBadge: {
