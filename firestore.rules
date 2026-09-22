@@ -274,5 +274,16 @@ service cloud.firestore {
     match /config/liveStatus {
       allow read: if true;
     }
+
+    // Same reasoning: the YouTube/Facebook live links an admin points at a
+    // new stream are used by the Watch/Live buttons visitors tap too.
+    match /config/mediaLinks {
+      allow read: if true;
+    }
+
+    match /featuredVideos/{videoId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
   }
 }
