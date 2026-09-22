@@ -8,8 +8,7 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
-import { colors, spacing, borderRadius, typography, shadows } from '../constants/theme';
-import Icon, { IconBadge, IconText } from '../components/Icon';
+import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../context/UserContext';
 import { getUserPrayerRequests } from '../services/firestoreService';
@@ -36,8 +35,8 @@ const MyPrayerRequestsScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
-          <Icon name="arrow-back" size={20} color={colors.white} />
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
         <Image source={require('../assets/emblem.jpg')} style={styles.emblem} resizeMode="contain" />
         <Text style={styles.headerTitle}>My Prayer Requests</Text>
@@ -49,7 +48,7 @@ const MyPrayerRequestsScreen = ({ navigation }) => {
         </View>
       ) : requests.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <IconBadge name="flame-outline" size={72} tone="blue" shape="circle" style={{ marginBottom: spacing.md }} />
+          <Text style={styles.emptyIcon}>🙏</Text>
           <Text style={styles.emptyTitle}>No Requests Yet</Text>
           <Text style={styles.emptyText}>Prayer requests you submit will appear here.</Text>
           <TouchableOpacity style={styles.browseButton} onPress={() => navigation.navigate('PrayerWall')}>
@@ -68,8 +67,8 @@ const MyPrayerRequestsScreen = ({ navigation }) => {
               </View>
               <Text style={styles.requestBody}>{item.body}</Text>
               <View style={styles.requestFooter}>
-                <IconText name="calendar-outline" size={13} color={colors.textTertiary} textStyle={styles.requestMeta}>{formatDate(item.createdAt)}</IconText>
-                <IconText name="flame" size={13} color={colors.red} textStyle={styles.requestCount}>{item.prayCount || 0} praying</IconText>
+                <Text style={styles.requestMeta}>📅 {formatDate(item.createdAt)}</Text>
+                <Text style={styles.requestCount}>🙏 {item.prayCount || 0} praying</Text>
               </View>
             </View>
           ))}
@@ -108,7 +107,6 @@ const styles = StyleSheet.create({
   requestCard: {
     backgroundColor: colors.white, marginBottom: spacing.md, borderRadius: borderRadius.md,
     padding: spacing.md, borderWidth: 1, borderColor: colors.border,
-    ...shadows.sm,
   },
   requestHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs, gap: spacing.sm },
   requestTitle: { fontWeight: '700', color: colors.textPrimary, flex: 1, fontSize: typography.sizes.sm },

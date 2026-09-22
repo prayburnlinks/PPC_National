@@ -1,6 +1,6 @@
 import React from 'react';
 import { Alert } from 'react-native';
-import { render, fireEvent, waitFor, act, within } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import DistrictsScreen from '../../screens/DistrictsScreen';
 import { UserContext } from '../../context/UserContext';
 import { CONGREGATIONS } from '../../constants/config';
@@ -30,10 +30,6 @@ const leader = { ...member, uid: 'leader-1', role: 'leader' };
 const admin = { uid: 'admin-1', name: 'Admin', role: 'admin', status: 'approved' };
 
 const bolandCongregations = CONGREGATIONS.filter(c => c.district === 'Boland');
-
-// The board and the congregation list both show TBA placeholders, so count
-// each within its own section: 'district-board' or 'district-congregations'.
-const tbaIn = (getByTestId, section) => within(getByTestId(section)).queryAllByText('TBA');
 
 // Resolves once the screen has read the saved names, so tests start from a
 // settled screen rather than racing the initial fetch.
@@ -79,12 +75,12 @@ describe('DistrictsScreen', () => {
 
   // DIST-03
   it('renders unassigned board roles as TBA', async () => {
-    const { getByText, getByTestId } = await renderScreen();
+    const { getByText, getAllByText } = await renderScreen();
 
     // Boland's board is fully unassigned in config
     fireEvent.press(getByText('Boland'));
 
-    expect(tbaIn(getByTestId, 'district-board')).toHaveLength(4);
+    expect(getAllByText('TBA')).toHaveLength(4);
     expect(getByText('Chairperson')).toBeTruthy();
     expect(getByText('Treasurer')).toBeTruthy();
   });
@@ -111,36 +107,34 @@ describe('DistrictsScreen', () => {
     getDistrictDetails.mockResolvedValue({
       boland: { board: { chairperson: 'A. Adams', deputy: 'TBA', secretary: 'TBA', treasurer: 'TBA' } },
     });
-    const { getByText, getByTestId } = await renderScreen();
+    const { getByText, getAllByText } = await renderScreen();
 
     fireEvent.press(getByText('Boland'));
 
     expect(getByText('A. Adams')).toBeTruthy();
-    expect(tbaIn(getByTestId, 'district-board')).toHaveLength(3);
+    expect(getAllByText('TBA')).toHaveLength(3);
   });
 
   // DIST-16
   it('shows a TBA placeholder for every congregation that has no pastor', async () => {
-    const { getByText, getByTestId } = await renderScreen();
+    const { getByText, getAllByText } = await renderScreen();
 
     fireEvent.press(getByText('Boland'));
 
-    expect(tbaIn(getByTestId, 'district-congregations')).toHaveLength(
-      bolandCongregations.filter(c => !c.pastor).length
-    );
+    expect(getAllByText('🙏 TBA')).toHaveLength(bolandCongregations.filter(c => !c.pastor).length);
   });
 
   // DIST-17
   it('shows a pastor an admin has saved, and leaves the rest as TBA', async () => {
     getDistrictDetails.mockResolvedValue({ boland: { pastors: { ceres: 'Ps. J. Smith' } } });
-    const { getByText, getByTestId } = await renderScreen();
+    const { getByText, getAllByText } = await renderScreen();
 
     fireEvent.press(getByText('Boland'));
 
-    expect(getByText('Ps. J. Smith')).toBeTruthy();
-    expect(tbaIn(getByTestId, 'district-congregations')).toHaveLength(bolandCongregations.length - 1);
+    expect(getByText('🙏 Ps. J. Smith')).toBeTruthy();
+    expect(getAllByText('🙏 TBA')).toHaveLength(bolandCongregations.length - 1);
     // A doc holding only pastors does not disturb the board defaults
-    expect(tbaIn(getByTestId, 'district-board')).toHaveLength(4);
+    expect(getAllByText('TBA')).toHaveLength(4);
   });
 
   describe('editing names', () => {
@@ -235,7 +229,7 @@ describe('DistrictsScreen', () => {
 
     // DIST-14
     it('discards unsaved edits on Cancel', async () => {
-      const { getByText, getByTestId, getByLabelText, queryByLabelText } = await renderScreen(admin);
+      const { getByText, getAllByText, getByLabelText, queryByLabelText } = await renderScreen(admin);
 
       fireEvent.press(getByText('Edit'));
       fireEvent.press(getByText('Boland'));
@@ -243,7 +237,7 @@ describe('DistrictsScreen', () => {
       fireEvent.press(getByText('Cancel'));
 
       expect(queryByLabelText('Boland Chairperson')).toBeNull();
-      expect(tbaIn(getByTestId, 'district-board')).toHaveLength(4);
+      expect(getAllByText('TBA')).toHaveLength(4);
       expect(saveDistrictDetails).not.toHaveBeenCalled();
     });
 
@@ -289,7 +283,7 @@ describe('DistrictsScreen', () => {
         expect(saveDistrictDetails).toHaveBeenCalledWith(admin, [
           { name: 'Boland', pastors: { ceres: 'Ps. J. Smith' } },
         ]);
-        expect(getByText('Ps. J. Smith')).toBeTruthy();
+        expect(getByText('🙏 Ps. J. Smith')).toBeTruthy();
       });
 
       // DIST-19
@@ -331,14 +325,14 @@ describe('DistrictsScreen', () => {
         expect(saveDistrictDetails).toHaveBeenLastCalledWith(admin, [
           { name: 'Boland', pastors: { botrivier: 'Ps. K. Jacobs' } },
         ]);
-        expect(getByText('Ps. J. Smith')).toBeTruthy();
-        expect(getByText('Ps. K. Jacobs')).toBeTruthy();
+        expect(getByText('🙏 Ps. J. Smith')).toBeTruthy();
+        expect(getByText('🙏 Ps. K. Jacobs')).toBeTruthy();
       });
 
       // DIST-21
       it('puts the TBA placeholder back when a saved pastor is cleared', async () => {
         getDistrictDetails.mockResolvedValue({ boland: { pastors: { ceres: 'Ps. J. Smith' } } });
-        const { getByText, getByTestId, getByLabelText, queryByText } = await renderScreen(admin);
+        const { getByText, getByLabelText, getAllByText, queryByText } = await renderScreen(admin);
 
         fireEvent.press(getByText('Edit'));
         fireEvent.press(getByText('Boland'));
@@ -350,7 +344,7 @@ describe('DistrictsScreen', () => {
         expect(saveDistrictDetails).toHaveBeenCalledWith(admin, [
           { name: 'Boland', pastors: { ceres: 'TBA' } },
         ]);
-        expect(tbaIn(getByTestId, 'district-congregations')).toHaveLength(bolandCongregations.length);
+        expect(getAllByText('🙏 TBA')).toHaveLength(bolandCongregations.length);
       });
 
       // DIST-22
@@ -371,7 +365,7 @@ describe('DistrictsScreen', () => {
 
       // DIST-23
       it('discards an unsaved pastor on Cancel', async () => {
-        const { getByText, getByTestId, getByLabelText, queryByLabelText } = await renderScreen(admin);
+        const { getByText, getAllByText, getByLabelText, queryByLabelText } = await renderScreen(admin);
 
         fireEvent.press(getByText('Edit'));
         fireEvent.press(getByText('Boland'));
@@ -379,7 +373,7 @@ describe('DistrictsScreen', () => {
         fireEvent.press(getByText('Cancel'));
 
         expect(queryByLabelText('Ceres pastor')).toBeNull();
-        expect(tbaIn(getByTestId, 'district-congregations')).toHaveLength(bolandCongregations.length);
+        expect(getAllByText('🙏 TBA')).toHaveLength(bolandCongregations.length);
         expect(saveDistrictDetails).not.toHaveBeenCalled();
       });
 

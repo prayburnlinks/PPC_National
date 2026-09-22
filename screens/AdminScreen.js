@@ -15,8 +15,7 @@ import {
   TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing, borderRadius, typography, shadows } from '../constants/theme';
-import Icon, { IconBadge, IconText } from '../components/Icon';
+import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { ROLES } from '../constants/config';
 import { getPendingRegistrations, approveUser, rejectUser } from '../services/authService';
 import { getPendingEventRegistrations, approveEventRegistration, rejectEventRegistration, getEventRegistrationsByEvent } from '../services/eventRegistrationService';
@@ -284,8 +283,8 @@ const AdminScreen = ({ navigation }) => {
     <View style={styles.container}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
-          <Icon name="arrow-back" size={20} color={colors.white} />
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Text style={styles.backText}>‹</Text>
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>Admin Panel</Text>
@@ -331,7 +330,7 @@ const AdminScreen = ({ navigation }) => {
         >
           {pendingUsers.length === 0 ? (
             <View style={styles.empty}>
-              <IconBadge name={loadError ? 'alert-circle-outline' : 'checkmark-circle-outline'} size={72} tone={loadError ? 'red' : 'green'} shape="circle" style={{ marginBottom: spacing.md }} />
+              <Text style={styles.emptyIcon}>{loadError ? '⚠️' : '✅'}</Text>
               <Text style={styles.emptyTitle}>{loadError ? 'Failed to load' : 'All caught up!'}</Text>
               <Text style={styles.emptyText}>
                 {loadError ? 'Pull down to retry.' : 'No pending registrations at this time.'}
@@ -406,7 +405,7 @@ const AdminScreen = ({ navigation }) => {
         >
           {pendingEventPayments.length === 0 ? (
             <View style={styles.empty}>
-              <IconBadge name={loadError ? 'alert-circle-outline' : 'checkmark-circle-outline'} size={72} tone={loadError ? 'red' : 'green'} shape="circle" style={{ marginBottom: spacing.md }} />
+              <Text style={styles.emptyIcon}>{loadError ? '⚠️' : '✅'}</Text>
               <Text style={styles.emptyTitle}>{loadError ? 'Failed to load' : 'All caught up!'}</Text>
               <Text style={styles.emptyText}>
                 {loadError ? 'Pull down to retry.' : 'No pending proof of payments.'}
@@ -424,7 +423,7 @@ const AdminScreen = ({ navigation }) => {
                     <Text style={styles.userEmail}>{registration.eventName}</Text>
                     <View style={[styles.rolePill, { borderColor: colors.blue }]}>
                       <Text style={[styles.rolePillText, { color: colors.blue }]}>
-                        {registration.mimeType?.includes('pdf') ? 'PDF' : 'Image'}
+                        {registration.mimeType?.includes('pdf') ? '📄 PDF' : '🖼 Image'}
                       </Text>
                     </View>
                   </View>
@@ -458,7 +457,7 @@ const AdminScreen = ({ navigation }) => {
                     }
                   }}
                 >
-                  <IconText name="eye-outline" size={18} color={colors.blue} textStyle={styles.viewBtnText} style={{ justifyContent: 'center' }}>View Proof of Payment</IconText>
+                  <Text style={styles.viewBtnText}>👁  View Proof of Payment</Text>
                 </TouchableOpacity>
 
                 {processingRegistrationIds.includes(registration.id) ? (
@@ -491,7 +490,7 @@ const AdminScreen = ({ navigation }) => {
         >
           {pendingMerchOrders.length === 0 ? (
             <View style={styles.empty}>
-              <IconBadge name={loadError ? 'alert-circle-outline' : 'checkmark-circle-outline'} size={72} tone={loadError ? 'red' : 'green'} shape="circle" style={{ marginBottom: spacing.md }} />
+              <Text style={styles.emptyIcon}>{loadError ? '⚠️' : '✅'}</Text>
               <Text style={styles.emptyTitle}>{loadError ? 'Failed to load' : 'All caught up!'}</Text>
               <Text style={styles.emptyText}>
                 {loadError ? 'Pull down to retry.' : 'No merch orders awaiting review.'}
@@ -538,7 +537,7 @@ const AdminScreen = ({ navigation }) => {
                     }
                   }}
                 >
-                  <IconText name="eye-outline" size={18} color={colors.blue} textStyle={styles.viewBtnText} style={{ justifyContent: 'center' }}>View Proof of Payment</IconText>
+                  <Text style={styles.viewBtnText}>👁  View Proof of Payment</Text>
                 </TouchableOpacity>
 
                 {processingOrderIds.includes(order.id) ? (
@@ -571,7 +570,7 @@ const AdminScreen = ({ navigation }) => {
         >
           {contentReports.length === 0 ? (
             <View style={styles.empty}>
-              <IconBadge name={loadError ? 'alert-circle-outline' : 'shield-checkmark-outline'} size={72} tone={loadError ? 'red' : 'green'} shape="circle" style={{ marginBottom: spacing.md }} />
+              <Text style={styles.emptyIcon}>{loadError ? '⚠️' : '✅'}</Text>
               <Text style={styles.emptyTitle}>{loadError ? 'Failed to load' : 'Nothing reported'}</Text>
               <Text style={styles.emptyText}>
                 {loadError ? 'Pull down to retry.' : 'No prayer requests are awaiting review.'}
@@ -621,7 +620,7 @@ const AdminScreen = ({ navigation }) => {
         >
           {eventGroups.length === 0 ? (
             <View style={styles.empty}>
-              <IconBadge name={loadError ? 'alert-circle-outline' : 'calendar-outline'} size={72} tone={loadError ? 'red' : 'blue'} shape="circle" style={{ marginBottom: spacing.md }} />
+              <Text style={styles.emptyIcon}>{loadError ? '⚠️' : '📅'}</Text>
               <Text style={styles.emptyTitle}>{loadError ? 'Failed to load' : 'No Registrations Yet'}</Text>
               <Text style={styles.emptyText}>
                 {loadError ? 'Pull down to retry.' : 'Event registrations will appear here.'}
@@ -646,7 +645,7 @@ const AdminScreen = ({ navigation }) => {
                           {hasPaidEvent ? ` · ${paidCount} paid` : ' · free event'}
                         </Text>
                       </View>
-                      <Icon name={isOpen ? 'chevron-down' : 'chevron-forward'} size={18} color={colors.textTertiary} />
+                      <Text style={styles.eventChevron}>{isOpen ? '˅' : '›'}</Text>
                     </View>
                   </TouchableOpacity>
 
@@ -666,7 +665,7 @@ const AdminScreen = ({ navigation }) => {
                         </View>
                       ))}
                       <TouchableOpacity style={styles.viewBtn} onPress={() => shareAttendeeCsv(group)}>
-                        <IconText name="share-outline" size={18} color={colors.blue} textStyle={styles.viewBtnText} style={{ justifyContent: 'center' }}>Share Attendee List (CSV)</IconText>
+                        <Text style={styles.viewBtnText}>⬆  Share Attendee List (CSV)</Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -681,48 +680,48 @@ const AdminScreen = ({ navigation }) => {
             <Text style={styles.sectionTitle}>Quick Actions</Text>
             {isAdminReviewer && (
               <TouchableOpacity style={styles.actionRow} onPress={() => setActiveTab('Pending')}>
-                <IconBadge name="hourglass-outline" size={38} tone="blue" style={{ marginRight: spacing.md }} />
+                <Text style={styles.actionIcon}>⏳</Text>
                 <View style={styles.actionText}>
                   <Text style={styles.actionLabel}>Pending Approvals</Text>
                   <Text style={styles.actionSub}>{pendingUsers.length} users awaiting approval</Text>
                 </View>
-                <Icon name="chevron-forward" size={18} color={colors.textTertiary} />
+                <Text style={styles.actionArrow}>›</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity style={styles.actionRow} onPress={() => setActiveTab('Payments')}>
-              <IconBadge name="card-outline" size={38} tone="blue" style={{ marginRight: spacing.md }} />
+              <Text style={styles.actionIcon}>💳</Text>
               <View style={styles.actionText}>
                 <Text style={styles.actionLabel}>Proof of Payments</Text>
                 <Text style={styles.actionSub}>{pendingEventPayments.length} payments awaiting review</Text>
               </View>
-              <Icon name="chevron-forward" size={18} color={colors.textTertiary} />
+              <Text style={styles.actionArrow}>›</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionRow} onPress={() => setActiveTab('Merch Orders')}>
-              <IconBadge name="bag-handle-outline" size={38} tone="blue" style={{ marginRight: spacing.md }} />
+              <Text style={styles.actionIcon}>🛍️</Text>
               <View style={styles.actionText}>
                 <Text style={styles.actionLabel}>Merch Orders</Text>
                 <Text style={styles.actionSub}>{pendingMerchOrders.length} orders awaiting review</Text>
               </View>
-              <Icon name="chevron-forward" size={18} color={colors.textTertiary} />
+              <Text style={styles.actionArrow}>›</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionRow} onPress={() => setActiveTab('Events')}>
-              <IconBadge name="calendar-outline" size={38} tone="blue" style={{ marginRight: spacing.md }} />
+              <Text style={styles.actionIcon}>📅</Text>
               <View style={styles.actionText}>
                 <Text style={styles.actionLabel}>Event Registrations</Text>
                 <Text style={styles.actionSub}>
                   {eventGroups.reduce((n, g) => n + g.attendees.length, 0)} registrations across {eventGroups.length} events
                 </Text>
               </View>
-              <Icon name="chevron-forward" size={18} color={colors.textTertiary} />
+              <Text style={styles.actionArrow}>›</Text>
             </TouchableOpacity>
             {isAdminReviewer && (
               <TouchableOpacity style={styles.actionRow} onPress={() => navigation.navigate('AdminMerchItems')}>
-                <IconBadge name="pricetag-outline" size={38} tone="blue" style={{ marginRight: spacing.md }} />
+                <Text style={styles.actionIcon}>🏷️</Text>
                 <View style={styles.actionText}>
                   <Text style={styles.actionLabel}>Manage Merchandise</Text>
                   <Text style={styles.actionSub}>Add or edit store items</Text>
                 </View>
-                <Icon name="chevron-forward" size={18} color={colors.textTertiary} />
+                <Text style={styles.actionArrow}>›</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -741,7 +740,7 @@ const AdminScreen = ({ navigation }) => {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{viewingRegistrationProof?.userName} — Proof of Payment</Text>
               <TouchableOpacity onPress={() => setViewingRegistrationProof(null)} style={styles.modalClose}>
-                <Icon name="close" size={22} color={colors.textSecondary} />
+                <Text style={styles.modalCloseText}>✕</Text>
               </TouchableOpacity>
             </View>
             {viewingRegistrationProof?.fileUrl && (
@@ -811,7 +810,7 @@ const AdminScreen = ({ navigation }) => {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{viewingOrderProof?.userName} — Proof of Payment</Text>
               <TouchableOpacity onPress={() => setViewingOrderProof(null)} style={styles.modalClose}>
-                <Icon name="close" size={22} color={colors.textSecondary} />
+                <Text style={styles.modalCloseText}>✕</Text>
               </TouchableOpacity>
             </View>
             {viewingOrderProof?.fileUrl && (
@@ -974,6 +973,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.huge,
   },
+  emptyIcon: {
+    fontSize: 40,
+    marginBottom: spacing.md,
+  },
   emptyTitle: {
     fontSize: typography.sizes.xl,
     fontWeight: '700',
@@ -992,7 +995,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    ...shadows.sm,
   },
   cardTop: {
     flexDirection: 'row',

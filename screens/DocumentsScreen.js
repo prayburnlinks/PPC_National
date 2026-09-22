@@ -10,21 +10,20 @@ import {
   Alert,
   Image,
 } from 'react-native';
-import { colors, spacing, borderRadius, typography, shadows } from '../constants/theme';
-import Icon, { IconBadge, IconText } from '../components/Icon';
+import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../context/UserContext';
 import { ROLES } from '../constants/config';
 import { getDocuments } from '../services/documentsService';
 
 const FILE_ICONS = {
-  PDF: 'document-text-outline',
-  JPG: 'image-outline',
-  PNG: 'image-outline',
-  DOCX: 'document-outline',
-  DOC: 'document-outline',
-  XLSX: 'grid-outline',
-  XLS: 'grid-outline',
+  PDF: '📄',
+  JPG: '🖼',
+  PNG: '🖼',
+  DOCX: '📝',
+  DOC: '📝',
+  XLSX: '📊',
+  XLS: '📊',
 };
 
 const DocumentsScreen = ({ navigation }) => {
@@ -67,8 +66,8 @@ const DocumentsScreen = ({ navigation }) => {
     <View style={styles.container}>
       {/* Frozen Header */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
-          <Icon name="arrow-back" size={20} color={colors.white} />
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
         <Image source={require('../assets/emblem.jpg')} style={styles.emblem} resizeMode="contain" />
         <Text style={styles.headerTitle}>Documents</Text>
@@ -103,7 +102,7 @@ const DocumentsScreen = ({ navigation }) => {
         </View>
       ) : documents.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <IconBadge name="folder-open-outline" size={72} tone="blue" shape="circle" style={{ marginBottom: spacing.md }} />
+          <Text style={styles.emptyIcon}>📁</Text>
           <Text style={styles.emptyTitle}>No Documents Yet</Text>
           <Text style={styles.emptyText}>
             Documents will appear here once uploaded in the Firebase Console.
@@ -113,11 +112,11 @@ const DocumentsScreen = ({ navigation }) => {
         <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
           {filtered.map(doc => {
             const ext = doc.fileType?.toUpperCase();
-            const icon = FILE_ICONS[ext] || 'attach-outline';
+            const icon = FILE_ICONS[ext] || '📎';
             return (
               <View key={doc.id} style={styles.docCard}>
                 <View style={styles.iconWrap}>
-                  <Icon name={icon} size={22} color={colors.blue} />
+                  <Text style={styles.iconText}>{icon}</Text>
                 </View>
                 <View style={styles.docInfo}>
                   <Text style={styles.docName}>{doc.name}</Text>
@@ -135,8 +134,8 @@ const DocumentsScreen = ({ navigation }) => {
                     )}
                   </View>
                 </View>
-                <TouchableOpacity style={styles.dlBtn} onPress={() => handleDownload(doc)} accessibilityRole="button" accessibilityLabel="Download">
-                  <Icon name="download-outline" size={20} color={colors.white} />
+                <TouchableOpacity style={styles.dlBtn} onPress={() => handleDownload(doc)}>
+                  <Text style={styles.dlBtnIcon}>⬇</Text>
                 </TouchableOpacity>
               </View>
             );
@@ -213,7 +212,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     gap: spacing.md,
-    ...shadows.sm,
   },
   iconWrap: {
     width: 48, height: 48, borderRadius: borderRadius.md,

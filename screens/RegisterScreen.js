@@ -17,8 +17,7 @@ import {
   Modal,
   FlatList,
 } from 'react-native';
-import { colors, spacing, borderRadius, typography, shadows } from '../constants/theme';
-import Icon, { IconBadge, IconText } from '../components/Icon';
+import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { registerUser, logoutUser } from '../services/authService';
 import { ROLES, CONGREGATIONS } from '../constants/config';
 import { useUser } from '../context/UserContext';
@@ -144,8 +143,8 @@ const RegisterScreen = ({ navigation }) => {
       <View style={[styles.content, { paddingBottom: spacing.xxxl + insets.bottom }]}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={handleBack} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
-            <Icon name="arrow-back" size={22} color={colors.textPrimary} />
+          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+            <Text style={styles.backButtonText}>←</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Create Account</Text>
           <Text style={styles.stepIndicator}>Step {step} of 3</Text>
@@ -213,7 +212,9 @@ const RegisterScreen = ({ navigation }) => {
                   onChangeText={setPassword}
                 />
                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                  <Icon name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color={colors.textTertiary} />
+                  <Text style={styles.passwordToggleText}>
+                    {showPassword ? '👁️' : '👁️‍🗨️'}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -231,7 +232,9 @@ const RegisterScreen = ({ navigation }) => {
                   onChangeText={setConfirmPassword}
                 />
                 <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
-                  <Icon name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color={colors.textTertiary} />
+                  <Text style={styles.passwordToggleText}>
+                    {showConfirmPassword ? '👁️' : '👁️‍🗨️'}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -256,7 +259,9 @@ const RegisterScreen = ({ navigation }) => {
                 onPress={() => setRole(r)}
               >
                 <View style={styles.roleCardContent}>
-                  <IconBadge name={r === ROLES.MEMBER ? 'people-outline' : r === ROLES.LEADER ? 'ribbon-outline' : 'shield-checkmark-outline'} size={40} tone="blue" style={styles.roleIcon} />
+                  <Text style={styles.roleIcon}>
+                    {r === ROLES.MEMBER ? '👥' : r === ROLES.LEADER ? '🎯' : '👑'}
+                  </Text>
                   <View style={styles.roleTextContainer}>
                     <Text style={styles.roleName}>
                       {r.charAt(0).toUpperCase() + r.slice(1)}
@@ -280,7 +285,7 @@ const RegisterScreen = ({ navigation }) => {
             ))}
 
             <View style={styles.roleInfoBox}>
-              <IconText name="information-circle-outline" size={16} color={colors.blue} textStyle={styles.roleInfoTitle}>Role Information</IconText>
+              <Text style={styles.roleInfoTitle}>ℹ️ Role Information</Text>
               <Text style={styles.roleInfoText}>
                 {role === ROLES.MEMBER
                   ? 'Members can register for events, give tithes, and access church media.'
@@ -325,7 +330,7 @@ const RegisterScreen = ({ navigation }) => {
               activeOpacity={0.7}
             >
               <View style={[styles.termsCheckbox, termsAccepted && styles.termsCheckboxChecked]}>
-                {termsAccepted && <Icon name="checkmark" size={14} color={colors.white} />}
+                {termsAccepted && <Text style={styles.termsCheckboxTick}>✓</Text>}
               </View>
               <Text style={styles.termsText}>
                 I agree to the Terms of Service and Privacy Policy
@@ -371,7 +376,7 @@ const RegisterScreen = ({ navigation }) => {
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Select Congregation</Text>
                 <TouchableOpacity onPress={() => setShowCongregationModal(false)}>
-                  <Icon name="close" size={22} color={colors.textSecondary} />
+                  <Text style={styles.modalCloseButton}>✕</Text>
                 </TouchableOpacity>
               </View>
               <FlatList
@@ -450,7 +455,6 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
     marginBottom: spacing.lg,
-    ...shadows.sm,
   },
   stepTitle: {
     fontSize: typography.sizes.lg,
@@ -506,7 +510,6 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.md,
     backgroundColor: colors.white,
-    ...shadows.sm,
   },
   roleCardSelected: {
     borderColor: colors.purple,

@@ -18,8 +18,7 @@ import {
   Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { colors, spacing, borderRadius, typography, shadows } from '../constants/theme';
-import Icon, { IconBadge, IconText } from '../components/Icon';
+import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { DISTRICTS, CONGREGATIONS, ROLES } from '../constants/config';
 import { useUser } from '../context/UserContext';
 import {
@@ -241,13 +240,13 @@ const DistrictsScreen = ({ navigation }) => {
           activeOpacity={0.8}
         >
           <View style={styles.boardLeft}>
-            <IconBadge name="people-outline" size={40} tone="glass" />
+            <Text style={styles.boardIcon}>👔</Text>
             <View>
               <Text style={styles.boardTitle}>National Board</Text>
               <Text style={styles.boardSub}>Meet our leadership team</Text>
             </View>
           </View>
-          <Icon name="chevron-forward" size={18} color="rgba(255,255,255,0.7)" />
+          <Text style={styles.boardArrow}>›</Text>
         </TouchableOpacity>
 
         {/* National Women's Board Entry */}
@@ -257,13 +256,13 @@ const DistrictsScreen = ({ navigation }) => {
           activeOpacity={0.8}
         >
           <View style={styles.boardLeft}>
-            <IconBadge name="flower-outline" size={40} tone="glass" />
+            <Text style={styles.boardIcon}>👗</Text>
             <View>
               <Text style={styles.boardTitle}>National Women's Board</Text>
               <Text style={styles.boardSub}>Meet our leadership team</Text>
             </View>
           </View>
-          <Icon name="chevron-forward" size={18} color="rgba(255,255,255,0.7)" />
+          <Text style={styles.boardArrow}>›</Text>
         </TouchableOpacity>
 
         {/* National Youth Board Entry */}
@@ -273,13 +272,13 @@ const DistrictsScreen = ({ navigation }) => {
           activeOpacity={0.8}
         >
           <View style={styles.boardLeft}>
-            <IconBadge name="flash-outline" size={40} tone="glass" />
+            <Text style={styles.boardIcon}>🙌</Text>
             <View>
               <Text style={styles.boardTitle}>National Youth Board</Text>
               <Text style={styles.boardSub}>Meet our leadership team</Text>
             </View>
           </View>
-          <Icon name="chevron-forward" size={18} color="rgba(255,255,255,0.7)" />
+          <Text style={styles.boardArrow}>›</Text>
         </TouchableOpacity>
 
         {/* National Sunday School Board Entry */}
@@ -289,13 +288,13 @@ const DistrictsScreen = ({ navigation }) => {
           activeOpacity={0.8}
         >
           <View style={styles.boardLeft}>
-            <IconBadge name="book-outline" size={40} tone="glass" />
+            <Text style={styles.boardIcon}>📖</Text>
             <View>
               <Text style={styles.boardTitle}>National Sunday School Board</Text>
               <Text style={styles.boardSub}>Meet our leadership team</Text>
             </View>
           </View>
-          <Icon name="chevron-forward" size={18} color="rgba(255,255,255,0.7)" />
+          <Text style={styles.boardArrow}>›</Text>
         </TouchableOpacity>
 
         {DISTRICTS.map((district, idx) => {
@@ -317,19 +316,19 @@ const DistrictsScreen = ({ navigation }) => {
                   </View>
                   <View>
                     <Text style={styles.districtName}>{district.name}</Text>
-                    <IconText name="location-outline" size={13} color={colors.textSecondary} textStyle={styles.districtCong}>
-                      {district.location} · {district.congregations} congregations
-                    </IconText>
+                    <Text style={styles.districtCong}>
+                      📍 {district.location} · {district.congregations} congregations
+                    </Text>
                   </View>
                 </View>
-                <Icon name={isOpen ? 'chevron-down' : 'chevron-forward'} size={18} color={colors.textTertiary} />
+                <Text style={styles.districtArrow}>{isOpen ? '˅' : '›'}</Text>
               </TouchableOpacity>
 
               {isOpen && (
                 <View style={styles.expandedPanel}>
                   {/* District Board */}
                   <Text style={styles.sectionLabel}>DISTRICT BOARD</Text>
-                  <View style={styles.boardGrid} testID="district-board">
+                  <View style={styles.boardGrid}>
                     {BOARD_ROLES.map(({ key, label }) => {
                       const name = board[key];
                       // TBA shows as the placeholder so an admin can type straight over it
@@ -362,51 +361,43 @@ const DistrictsScreen = ({ navigation }) => {
 
                   {/* Congregations */}
                   <Text style={styles.sectionLabel}>CONGREGATIONS</Text>
-                  <View testID="district-congregations">
-                    {congregations.map((c) => {
-                      const key = congregationKey(c.name);
-                      const pastor = pastors[key];
-                      // Same as the board: TBA shows as the placeholder
-                      const pastorInput = draft?.pastors?.[key] ?? (pastor === UNASSIGNED ? '' : pastor);
-                      return (
-                        <View key={c.name} style={styles.congregationItem}>
-                          <View style={styles.congregationRow}>
-                            <Text style={styles.congregationText}>{c.name}</Text>
-                            {c.assemblyName && (
-                              <Text style={styles.assemblyName}>{c.assemblyName}</Text>
-                            )}
-                          </View>
-                          {editing ? (
-                            <View style={styles.pastorEditRow}>
-                              <Icon name="person-outline" size={14} color={colors.textSecondary} />
-                              <TextInput
-                                style={[styles.boardCellInput, styles.pastorInput]}
-                                value={pastorInput}
-                                onChangeText={(text) => setDraftName(district, 'pastors', key, text)}
-                                placeholder={UNASSIGNED}
-                                placeholderTextColor={colors.placeholder}
-                                accessibilityLabel={`${c.name} pastor`}
-                                autoCapitalize="words"
-                                autoCorrect={false}
-                                maxLength={MAX_NAME_LENGTH}
-                                editable={!saving}
-                              />
-                            </View>
-                          ) : (
-                            <IconText
-                              name="person-outline"
-                              size={12}
-                              color={pastor === UNASSIGNED ? colors.placeholder : colors.textSecondary}
-                              textStyle={[styles.pastorText, pastor === UNASSIGNED && styles.unassignedText]}
-                              style={styles.pastorRow}
-                            >
-                              {pastor}
-                            </IconText>
+                  {congregations.map((c) => {
+                    const key = congregationKey(c.name);
+                    const pastor = pastors[key];
+                    // Same as the board: TBA shows as the placeholder
+                    const pastorInput = draft?.pastors?.[key] ?? (pastor === UNASSIGNED ? '' : pastor);
+                    return (
+                      <View key={c.name} style={styles.congregationItem}>
+                        <View style={styles.congregationRow}>
+                          <Text style={styles.congregationText}>{c.name}</Text>
+                          {c.assemblyName && (
+                            <Text style={styles.assemblyName}>{c.assemblyName}</Text>
                           )}
                         </View>
-                      );
-                    })}
-                  </View>
+                        {editing ? (
+                          <View style={styles.pastorEditRow}>
+                            <Text style={styles.pastorText}>🙏</Text>
+                            <TextInput
+                              style={[styles.boardCellInput, styles.pastorInput]}
+                              value={pastorInput}
+                              onChangeText={(text) => setDraftName(district, 'pastors', key, text)}
+                              placeholder={UNASSIGNED}
+                              placeholderTextColor={colors.placeholder}
+                              accessibilityLabel={`${c.name} pastor`}
+                              autoCapitalize="words"
+                              autoCorrect={false}
+                              maxLength={MAX_NAME_LENGTH}
+                              editable={!saving}
+                            />
+                          </View>
+                        ) : (
+                          <Text style={[styles.pastorText, pastor === UNASSIGNED && styles.unassignedText]}>
+                            🙏 {pastor}
+                          </Text>
+                        )}
+                      </View>
+                    );
+                  })}
                 </View>
               )}
             </View>
@@ -527,7 +518,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    ...shadows.sm,
   },
   districtLeft: {
     flexDirection: 'row',
@@ -641,8 +631,6 @@ const styles = StyleSheet.create({
   pastorText: {
     fontSize: typography.sizes.sm,
     color: colors.textSecondary,
-  },
-  pastorRow: {
     marginTop: 2,
   },
   pastorEditRow: {

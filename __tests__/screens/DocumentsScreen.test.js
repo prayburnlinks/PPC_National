@@ -65,10 +65,10 @@ describe('DocumentsScreen', () => {
     jest.spyOn(Linking, 'canOpenURL').mockResolvedValue(true);
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
 
-    const { getByText, getAllByLabelText } = renderScreen();
+    const { getByText, getAllByText } = renderScreen();
     await waitFor(() => getByText('Constitution'));
 
-    fireEvent.press(getAllByLabelText('Download')[0]);
+    fireEvent.press(getAllByText('⬇')[0]);
 
     await waitFor(() => {
       expect(Linking.openURL).toHaveBeenCalledWith(

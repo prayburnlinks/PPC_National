@@ -225,6 +225,6 @@ describe('EventsScreen', () => {
     const { getAllByText, getByText } = renderScreen();
 
     await waitFor(() => getByText('Leaders Retreat'));
-    expect(getAllByText('Registered & Paid')).toHaveLength(1);
+    expect(getAllByText('✅ Registered & Paid')).toHaveLength(1);
   });
 });

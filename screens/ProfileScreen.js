@@ -18,8 +18,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { colors, spacing, borderRadius, typography, shadows } from '../constants/theme';
-import Icon, { IconBadge, IconText } from '../components/Icon';
+import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { logoutUser, getCurrentUser, deleteMyAccount } from '../services/authService';
 import { useUser } from '../context/UserContext';
 import { ROLES } from '../constants/config';
@@ -90,7 +89,7 @@ const ProfileScreen = ({ navigation }) => {
         <Text style={styles.name}>{user?.name || 'Member'}</Text>
         <View style={styles.roleBadge}>
           <Text style={styles.roleBadgeText}>
-            {user?.role || 'Member'} · {user?.status || 'Approved'}
+            ⭐ {user?.role || 'Member'} · {user?.status || 'Approved'}
           </Text>
         </View>
       </View>
@@ -102,14 +101,14 @@ const ProfileScreen = ({ navigation }) => {
         <View style={styles.card}>
           <View style={styles.row}>
             <View style={styles.rowLeft}>
-              <IconBadge name="business-outline" size={34} tone="blue" />
+              <Text style={styles.rowIcon}>🏛</Text>
               <Text style={styles.rowLabel}>Congregation</Text>
             </View>
             <Text style={styles.rowValue}>{user?.congregation || 'N/A'}</Text>
           </View>
           <View style={styles.row}>
             <View style={styles.rowLeft}>
-              <IconBadge name="map-outline" size={34} tone="blue" />
+              <Text style={styles.rowIcon}>🗺</Text>
               <Text style={styles.rowLabel}>District</Text>
             </View>
             <Text style={styles.rowValue}>{user?.district || 'N/A'}</Text>
@@ -122,31 +121,31 @@ const ProfileScreen = ({ navigation }) => {
           <Text style={styles.cardHeader}>Account</Text>
           <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('Notifications')}>
             <View style={styles.rowLeft}>
-              <IconBadge name="notifications-outline" size={34} tone="blue" />
+              <Text style={styles.rowIcon}>🔔</Text>
               <Text style={styles.rowLabel}>Notifications</Text>
             </View>
-            <Icon name="chevron-forward" size={18} color={colors.textTertiary} />
+            <Text style={styles.rowArrow}>›</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('MyPrayerRequests')}>
             <View style={styles.rowLeft}>
-              <IconBadge name="flame-outline" size={34} tone="blue" />
+              <Text style={styles.rowIcon}>🙏</Text>
               <Text style={styles.rowLabel}>Prayer Requests</Text>
             </View>
-            <Icon name="chevron-forward" size={18} color={colors.textTertiary} />
+            <Text style={styles.rowArrow}>›</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('MyEvents')}>
             <View style={styles.rowLeft}>
-              <IconBadge name="calendar-outline" size={34} tone="blue" />
+              <Text style={styles.rowIcon}>📋</Text>
               <Text style={styles.rowLabel}>My Events</Text>
             </View>
-            <Icon name="chevron-forward" size={18} color={colors.textTertiary} />
+            <Text style={styles.rowArrow}>›</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('MyOrders')}>
             <View style={styles.rowLeft}>
-              <IconBadge name="bag-handle-outline" size={34} tone="blue" />
+              <Text style={styles.rowIcon}>🛍️</Text>
               <Text style={styles.rowLabel}>My Orders</Text>
             </View>
-            <Icon name="chevron-forward" size={18} color={colors.textTertiary} />
+            <Text style={styles.rowArrow}>›</Text>
           </TouchableOpacity>
         </View>
 
@@ -164,24 +163,24 @@ const ProfileScreen = ({ navigation }) => {
         {/* Leadership Buttons — Admin and Leader only */}
         {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && (
           <TouchableOpacity style={styles.adminButton} onPress={() => navigation.navigate('Documents')}>
-            <IconText name="folder-open-outline" size={18} color={colors.white} textStyle={styles.adminButtonText} style={{ justifyContent: 'center' }}>Documents</IconText>
+            <Text style={styles.adminButtonText}>📁  Documents</Text>
           </TouchableOpacity>
         )}
         {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && (
           <TouchableOpacity style={[styles.adminButton, { marginTop: spacing.sm }]} onPress={() => navigation.navigate('Admin')}>
-            <IconText name="shield-checkmark-outline" size={18} color={colors.white} textStyle={styles.adminButtonText} style={{ justifyContent: 'center' }}>Admin Panel</IconText>
+            <Text style={styles.adminButtonText}>Admin Panel</Text>
           </TouchableOpacity>
         )}
 
         {/* Logout Button */}
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <IconText name="log-out-outline" size={18} color={colors.red} textStyle={styles.logoutButtonText} style={{ justifyContent: 'center' }}>Sign Out</IconText>
+          <Text style={styles.logoutButtonText}>Sign Out</Text>
         </TouchableOpacity>
 
         {/* Apple's Guideline 5.1.1(v) requires account deletion to be reachable
             from inside the app, not just by emailing the church office. */}
         <TouchableOpacity style={styles.deleteButton} onPress={() => setDeleteVisible(true)}>
-          <IconText name="trash-outline" size={15} color={colors.textTertiary} textStyle={styles.deleteButtonText} style={{ justifyContent: 'center' }}>Delete Account</IconText>
+          <Text style={styles.deleteButtonText}>Delete Account</Text>
         </TouchableOpacity>
 
         <View style={styles.spacer} />
@@ -308,7 +307,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    ...shadows.sm,
   },
   cardHeader: {
     fontSize: typography.sizes.sm,
@@ -409,8 +407,8 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: colors.white,
-    borderTopLeftRadius: borderRadius.xxl,
-    borderTopRightRadius: borderRadius.xxl,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: spacing.lg,

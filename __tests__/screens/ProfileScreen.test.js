@@ -44,7 +44,7 @@ describe('ProfileScreen', () => {
     const { getByText } = renderScreen();
 
     expect(getByText('Alice')).toBeTruthy();
-    expect(getByText('member · approved')).toBeTruthy();
+    expect(getByText('⭐ member · approved')).toBeTruthy();
     expect(getByText('Ceres')).toBeTruthy();
     expect(getByText('Boland')).toBeTruthy();
   });
@@ -71,7 +71,7 @@ describe('ProfileScreen', () => {
   it('hides Documents and Admin Panel from members', () => {
     const { queryByText } = renderScreen();
 
-    expect(queryByText('Documents')).toBeNull();
+    expect(queryByText('📁  Documents')).toBeNull();
     expect(queryByText('Admin Panel')).toBeNull();
   });
 
@@ -79,7 +79,7 @@ describe('ProfileScreen', () => {
   it('shows Documents and Admin Panel to leaders and they navigate correctly', () => {
     const { getByText, navigation } = renderScreen({ ...memberUser, role: 'leader' });
 
-    fireEvent.press(getByText('Documents'));
+    fireEvent.press(getByText('📁  Documents'));
     fireEvent.press(getByText('Admin Panel'));
 
     expect(navigation.navigate).toHaveBeenCalledWith('Documents');
@@ -90,7 +90,7 @@ describe('ProfileScreen', () => {
   it('shows Documents and Admin Panel to admins', () => {
     const { getByText } = renderScreen({ ...memberUser, role: 'admin' });
 
-    expect(getByText('Documents')).toBeTruthy();
+    expect(getByText('📁  Documents')).toBeTruthy();
     expect(getByText('Admin Panel')).toBeTruthy();
   });
 

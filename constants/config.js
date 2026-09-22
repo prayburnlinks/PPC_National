@@ -37,12 +37,12 @@ export const EVENT_CATEGORIES = {
 
 // Giving Funds
 export const GIVING_FUNDS = [
-  { id: 'tithes', name: 'Tithes & Offerings', icon: '📖', iconName: 'book-outline', description: 'Regular tithes and offerings' },
-  { id: 'building', name: 'Building Fund', icon: '🏛', iconName: 'business-outline', description: 'Church building projects' },
-  { id: 'missions', name: 'Missions & Outreach', icon: '🌍', iconName: 'earth-outline', description: 'Local and international missions' },
-  { id: 'convention', name: 'National Convention', icon: '🎟', iconName: 'ticket-outline', description: 'National Convention fund' },
-  { id: 'youth', name: 'Youth Ministry', icon: '⚡', iconName: 'flash-outline', description: 'Youth programs and events' },
-  { id: 'welfare', name: 'Church Welfare', icon: '🤝', iconName: 'people-outline', description: 'Support for church members' },
+  { id: 'tithes', name: 'Tithes & Offerings', icon: '📖', description: 'Regular tithes and offerings' },
+  { id: 'building', name: 'Building Fund', icon: '🏛', description: 'Church building projects' },
+  { id: 'missions', name: 'Missions & Outreach', icon: '🌍', description: 'Local and international missions' },
+  { id: 'convention', name: 'National Convention', icon: '🎟', description: 'National Convention fund' },
+  { id: 'youth', name: 'Youth Ministry', icon: '⚡', description: 'Youth programs and events' },
+  { id: 'welfare', name: 'Church Welfare', icon: '🤝', description: 'Support for church members' },
 ];
 
 // Districts (alphabetical by name)

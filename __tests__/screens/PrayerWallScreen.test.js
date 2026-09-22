@@ -171,7 +171,7 @@ describe('PrayerWallScreen praying', () => {
     const { getByText, getAllByText } = renderPrayerWall();
     await waitFor(() => getByText('Pray for healing'));
 
-    fireEvent.press(getAllByText('Praying')[0]);
+    fireEvent.press(getAllByText('Praying 🙏')[0]);
 
     await waitFor(() => {
       expect(prayForRequest).toHaveBeenCalledWith('req-1', 'uid-1');
@@ -184,7 +184,7 @@ describe('PrayerWallScreen praying', () => {
     const { getByText, getAllByText, findByText } = renderPrayerWall();
     await waitFor(() => getByText('Pray for healing'));
 
-    fireEvent.press(getAllByText('Praying')[0]);
+    fireEvent.press(getAllByText('Praying 🙏')[0]);
 
     // prayCount for req-1 starts at 3, should become 4
     await findByText('4 praying');
@@ -196,7 +196,7 @@ describe('PrayerWallScreen praying', () => {
     const { getByText, getAllByText, findByText } = renderPrayerWall();
     await waitFor(() => getByText('Pray for healing'));
 
-    fireEvent.press(getAllByText('Praying')[0]);
+    fireEvent.press(getAllByText('Praying 🙏')[0]);
 
     // prayCount for req-1 starts at 3, should become 2
     await findByText('2 praying');
@@ -209,7 +209,7 @@ describe('PrayerWallScreen praying', () => {
     const { getByText, getAllByText } = renderPrayerWall();
     await waitFor(() => getByText('Pray for healing'));
 
-    fireEvent.press(getAllByText('Praying')[0]);
+    fireEvent.press(getAllByText('Praying 🙏')[0]);
 
     await waitFor(() => {
       expect(alertSpy).toHaveBeenCalledWith('Error', 'Failed to update prayer count');
@@ -250,8 +250,8 @@ describe('PrayerWallScreen double-submit guards', () => {
     await waitFor(() => getByText('Pray for healing'));
 
     await act(async () => {
-      fireEvent.press(getAllByText('Praying')[0]);
-      fireEvent.press(getAllByText('Praying')[0]);
+      fireEvent.press(getAllByText('Praying 🙏')[0]);
+      fireEvent.press(getAllByText('Praying 🙏')[0]);
     });
 
     expect(prayForRequest).toHaveBeenCalledTimes(1);
