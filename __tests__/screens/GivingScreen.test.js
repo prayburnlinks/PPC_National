@@ -1,6 +1,15 @@
+/**
+ * GivingScreen (Android / web) — the original in-app fund/amount/bank-details
+ * flow. iOS gets a different file (GivingScreen.ios.js, tested separately in
+ * GivingScreen.ios.test.js) per Apple Guideline 3.2.2(iv) — see that file's
+ * header comment. Explicitly importing the .js file (not the extensionless
+ * path) keeps this test pinned to the Android/web version regardless of
+ * which platform the test runner defaults to.
+ */
+
 import React from 'react';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
-import GivingScreen from '../../screens/GivingScreen';
+import GivingScreen from '../../screens/GivingScreen.js';
 import { UserContext } from '../../context/UserContext';
 
 jest.mock('../../services/firestoreService', () => ({
