@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
-import { getUpcomingEvents, getUserNotifications } from '../services/firestoreService';
+import { getUpcomingEvents, getUserNotifications, getLiveStatus } from '../services/firestoreService';
 import { useUser } from '../context/UserContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DISTRICTS, CONGREGATIONS, ROLES } from '../constants/config';
@@ -36,6 +36,7 @@ const HomeScreen = ({ navigation }) => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [hasUnread, setHasUnread] = useState(false);
+  const [liveStatus, setLiveStatus] = useState({ isLive: false, title: '' });
   const isVisitor = user?.role === ROLES.VISITOR;
 
   // Refresh the unread indicator every time Home regains focus, so reading
@@ -43,6 +44,10 @@ const HomeScreen = ({ navigation }) => {
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      // Real live status (same source as the Media tab) — no placeholder stream.
+      getLiveStatus()
+        .then(status => { if (active && status) setLiveStatus(status); })
+        .catch(() => {});
       if (user?.uid) {
         getUserNotifications(user.uid, 20)
           .then(list => { if (active) setHasUnread(list.some(n => !n.read)); })
@@ -130,26 +135,34 @@ const HomeScreen = ({ navigation }) => {
 
         {/* Body Content */}
         <View style={styles.body}>
-        {/* Live Now Section */}
+        {/* Watch / Live section — reflects the real live status */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Live Now</Text>
-            <View style={styles.liveBadge}>
-              <View style={styles.liveDot} />
-              <Text style={styles.liveBadgeText}>LIVE</Text>
-            </View>
+            <Text style={styles.sectionTitle}>{liveStatus.isLive ? 'Live Now' : 'Watch'}</Text>
+            {liveStatus.isLive && (
+              <View style={styles.liveBadge}>
+                <View style={styles.liveDot} />
+                <Text style={styles.liveBadgeText}>LIVE</Text>
+              </View>
+            )}
           </View>
           <TouchableOpacity
             style={styles.liveCard}
             onPress={() => navigation.navigate('Media')}
           >
-            <View style={styles.liveBadgeContainer}>
-              <View style={styles.liveDot} />
-              <Text style={styles.liveBadgeText}>LIVE</Text>
-            </View>
+            {liveStatus.isLive && (
+              <View style={styles.liveBadgeContainer}>
+                <View style={styles.liveDot} />
+                <Text style={styles.liveBadgeText}>LIVE</Text>
+              </View>
+            )}
             <Text style={styles.liveMediaLabel}>Media</Text>
-            <Text style={styles.liveTitle}>Sunday Morning Service</Text>
-            <Text style={styles.liveMeta}>🎤 Ps. George Links · 👁 2.4k watching</Text>
+            <Text style={styles.liveTitle}>
+              {liveStatus.isLive ? (liveStatus.title || 'Live Service') : 'Watch our services'}
+            </Text>
+            <Text style={styles.liveMeta}>
+              {liveStatus.isLive ? 'Tap to watch now' : 'Sermons and livestreams on YouTube and Facebook'}
+            </Text>
             <View style={styles.livePlayButton}>
               <Text style={styles.livePlayIcon}>▶</Text>
             </View>

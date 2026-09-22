@@ -52,20 +52,20 @@ export const typography = {
     bold: 'System',
   },
   
-  // Font sizes
+  // Sizes — floor raised from 8pt to 11pt and body from 12pt to 14pt for readability
   sizes: {
-    xs: 8,
-    sm: 10,
-    base: 12,
-    md: 13,
-    lg: 15,
-    xl: 17,
+    xs: 11,
+    sm: 12,
+    base: 14,
+    md: 15,
+    lg: 16,
+    xl: 18,
     xxl: 20,
-    xxxl: 22,
-    h1: 26,
+    xxxl: 24,
+    h1: 28,
     h2: 20,
-    h3: 15,
-    h4: 13,
+    h3: 16,
+    h4: 14,
   },
   
   // Font weights

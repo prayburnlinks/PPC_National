@@ -130,8 +130,11 @@ service cloud.firestore {
 
     match /prayerRequests/{requestId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated()
-        && request.resource.data.createdBy == request.auth.uid;
+      // Posting goes through the submitPrayerRequest callable so the
+      // profanity filter required by App Store Guideline 1.2 cannot be
+      // skipped by writing straight to Firestore. The Admin SDK the callable
+      // runs under bypasses these rules, so this shuts the client route only.
+      allow create: if false;
       // Praying toggles exactly one step: the caller adds themself (count +1)
       // or removes themself (count -1). Values are validated, not just keys,
       // so a crafted write can't inflate the counter or edit other people's
@@ -154,7 +157,26 @@ service cloud.firestore {
             && !(request.auth.uid in request.resource.data.prayingBy)
           )
         );
+      // Admins take a reported request off the wall without destroying it, so
+      // the moderation queue still has something to show if the author appeals.
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['hidden', 'hiddenReason', 'reviewedBy', 'reviewedAt']);
+
       allow delete: if isAuthenticated() && isOwner(resource.data.createdBy);
+      allow delete: if isAdmin();
+    }
+
+    // Moderation queue for reported prayer requests. Entries are written by
+    // the reportPrayerRequest callable under the Admin SDK, never by a client,
+    // so there is deliberately no create rule — a member cannot forge a report
+    // against someone, and cannot read who reported what.
+    match /contentReports/{reportId} {
+      allow read: if isAdmin();
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'reviewedBy', 'reviewedAt']);
+      allow create, delete: if false;
     }
 
     match /eventRegistrations/{registrationId} {
@@ -164,6 +186,17 @@ service cloud.firestore {
         isLeaderOrAdmin() &&
         resource.data.congregation == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.congregation
       );
+
+      // registerForEvent checks "am I already registered?" with a direct get
+      // on `${uid}_${eventId}` — which, for a first-time registration, reads a
+      // document that does not exist yet. `resource` is null then, so the
+      // ownership clause above cannot be evaluated and every clause fails, and
+      // the member's very first registration for any event died with
+      // "Missing or insufficient permissions". The id is deterministic and a
+      // Firebase uid never contains an underscore, so the uid prefix is what
+      // authorises this read. Scoped to `get`: it must not widen `list`.
+      allow get: if isAuthenticated()
+        && registrationId.split('_')[0] == request.auth.uid;
 
       // Registering — doc id is `${uid}_${eventId}` so a member can't
       // create a registration under another event/user's id, and status
@@ -240,6 +273,17 @@ service cloud.firestore {
     // without signing in — this doc needs to be readable without auth.
     match /config/liveStatus {
       allow read: if true;
+    }
+
+    // Same reasoning: the YouTube/Facebook live links an admin points at a
+    // new stream are used by the Watch/Live buttons visitors tap too.
+    match /config/mediaLinks {
+      allow read: if true;
+    }
+
+    match /featuredVideos/{videoId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
   }
 }

@@ -2,6 +2,8 @@ import {
   getPrayerRequests,
   getUserPrayerRequests,
   submitPrayerRequest,
+  reportPrayerRequest,
+  blockMember,
   prayForRequest,
   getLiveStatus,
   incrementEventAttendeeCount,
@@ -29,6 +31,14 @@ jest.mock('firebase/firestore', () => ({
   arrayRemove: jest.fn((v) => ({ __arrayRemove: v })),
   serverTimestamp: jest.fn(() => new Date('2026-01-01')),
   runTransaction: jest.fn(),
+}));
+
+// Posting now goes through a callable so the profanity filter runs somewhere
+// the member cannot reach — see submitPrayerRequest in functions/index.js.
+const mockCallable = jest.fn();
+jest.mock('firebase/functions', () => ({
+  getFunctions: jest.fn(() => ({})),
+  httpsCallable: jest.fn(() => mockCallable),
 }));
 
 import {
@@ -115,8 +125,8 @@ describe('getUserPrayerRequests', () => {
 });
 
 describe('submitPrayerRequest', () => {
-  it('creates a prayer request with correct payload', async () => {
-    addDoc.mockResolvedValue({ id: 'new-req' });
+  it('posts through the callable and never writes to Firestore directly', async () => {
+    mockCallable.mockResolvedValue({ data: { success: true } });
 
     const result = await submitPrayerRequest('uid-1', {
       title: 'Heal my father',
@@ -124,25 +134,74 @@ describe('submitPrayerRequest', () => {
       scope: 'national',
     });
 
-    expect(addDoc).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        createdBy: 'uid-1',
-        scope: 'national',
-        prayCount: 0,
-        prayingBy: [],
-      })
-    );
+    expect(mockCallable).toHaveBeenCalledWith({
+      title: 'Heal my father',
+      body: 'Please pray',
+      scope: 'national',
+    });
+    // firestore.rules refuses client creates on prayerRequests, so a direct
+    // write here would fail in production even if the test passed.
+    expect(addDoc).not.toHaveBeenCalled();
     expect(result.success).toBe(true);
-    expect(result.id).toBe('new-req');
   });
 
-  it('throws on failure', async () => {
-    addDoc.mockRejectedValue(new Error('Write failed'));
+  it('surfaces the filter rejection wording rather than a generic failure', async () => {
+    mockCallable.mockRejectedValue(
+      new Error('Please rephrase your request — it contains language that is not allowed on the prayer wall.')
+    );
 
     await expect(
       submitPrayerRequest('uid-1', { title: 'T', body: 'B', scope: 'national' })
-    ).rejects.toMatchObject({ message: 'Failed to submit prayer request' });
+    ).rejects.toMatchObject({
+      message: expect.stringContaining('rephrase'),
+    });
+  });
+});
+
+describe('prayer wall moderation', () => {
+  it('reports a request through the callable', async () => {
+    mockCallable.mockResolvedValue({ data: { success: true } });
+
+    const result = await reportPrayerRequest('req-9', 'abusive language');
+
+    expect(mockCallable).toHaveBeenCalledWith({ requestId: 'req-9', reason: 'abusive language' });
+    expect(result.success).toBe(true);
+  });
+
+  it('blocking writes only to the blocker\'s own profile', async () => {
+    updateDoc.mockResolvedValue(undefined);
+
+    await blockMember('uid-1', 'uid-2');
+
+    expect(updateDoc).toHaveBeenCalledWith(
+      expect.objectContaining({ path: 'users/uid-1' }),
+      { blockedUsers: { __arrayUnion: 'uid-2' } }
+    );
+  });
+
+  it('refuses to let a member block themselves', async () => {
+    await expect(blockMember('uid-1', 'uid-1')).rejects.toMatchObject({
+      message: 'Failed to block this member',
+    });
+    expect(updateDoc).not.toHaveBeenCalled();
+  });
+
+  it('hides requests the viewer reported, blocked, or an admin removed', async () => {
+    getDocs.mockResolvedValue(
+      makeQuerySnap([
+        ['keep',      { body: 'visible', createdBy: 'uid-9', createdAt: null }],
+        ['reported',  { body: 'x', createdBy: 'uid-9', reportedBy: ['uid-1'], createdAt: null }],
+        ['blocked',   { body: 'x', createdBy: 'uid-bad', createdAt: null }],
+        ['hidden',    { body: 'x', createdBy: 'uid-9', hidden: true, createdAt: null }],
+      ])
+    );
+
+    const result = await getPrayerRequests('national', null, {
+      uid: 'uid-1',
+      blockedUsers: ['uid-bad'],
+    });
+
+    expect(result.map(r => r.id)).toEqual(['keep']);
   });
 });
 
@@ -301,6 +360,35 @@ describe('updateUserProfile', () => {
     expect(updates).toHaveProperty('name', 'Bob');
     expect(updates).not.toHaveProperty('role');
     expect(updates).not.toHaveProperty('status');
+  });
+
+  it('keeps phoneNormalized in step when the number changes', async () => {
+    updateDoc.mockResolvedValue();
+
+    await updateUserProfile('uid-1', { phone: '073 481 0683' });
+
+    const [, updates] = updateDoc.mock.calls[0];
+    expect(updates).toHaveProperty('phone', '073 481 0683');
+    // Without this, phone sign-in keeps matching the member's old number.
+    expect(updates).toHaveProperty('phoneNormalized', '0734810683');
+  });
+
+  it('records an unusable number as null rather than a stale match', async () => {
+    updateDoc.mockResolvedValue();
+
+    await updateUserProfile('uid-1', { phone: 'not a number' });
+
+    const [, updates] = updateDoc.mock.calls[0];
+    expect(updates.phoneNormalized).toBeNull();
+  });
+
+  it('leaves phoneNormalized alone when the number is not being edited', async () => {
+    updateDoc.mockResolvedValue();
+
+    await updateUserProfile('uid-1', { name: 'Bob' });
+
+    const [, updates] = updateDoc.mock.calls[0];
+    expect(updates).not.toHaveProperty('phoneNormalized');
   });
 });
 

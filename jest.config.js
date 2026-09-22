@@ -5,6 +5,7 @@ module.exports = {
   ],
   moduleNameMapper: {
     '^.*firebase-config$': '<rootDir>/__mocks__/firebase-config.js',
+    '^firebase/functions$': '<rootDir>/__mocks__/firebase-functions.js',
   },
   collectCoverageFrom: [
     'services/**/*.js',

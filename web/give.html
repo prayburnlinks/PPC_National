@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Give — PPC I Love My Church</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #0A1F44;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2.5rem 1.25rem 3rem;
+    }
+    .wrap { width: 100%; max-width: 34rem; }
+    h1 { font-size: 1.7rem; margin-bottom: 0.4rem; text-align: center; }
+    .verse { opacity: 0.75; font-style: italic; font-size: 0.88rem; text-align: center; line-height: 1.5; margin-bottom: 2rem; }
+    h2 { font-size: 1rem; margin: 1.8rem 0 0.8rem; opacity: 0.9; }
+    .funds {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+    }
+    .fund {
+      flex: 1 1 9rem;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 10px;
+      padding: 0.8rem 0.9rem;
+    }
+    .fund .icon { font-size: 1.2rem; }
+    .fund .name { font-weight: 600; font-size: 0.9rem; margin-top: 0.2rem; }
+    .fund .desc { opacity: 0.65; font-size: 0.78rem; margin-top: 0.15rem; line-height: 1.4; }
+    .bank {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 12px;
+      padding: 1.2rem 1.3rem 1.4rem;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.65rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .row:last-child { border-bottom: none; }
+    .row .label { opacity: 0.6; font-size: 0.82rem; }
+    .row .value-group { display: flex; align-items: center; gap: 0.5rem; }
+    .row .value { font-weight: 600; font-size: 0.95rem; }
+    .copy-btn {
+      background: rgba(255, 255, 255, 0.14);
+      border: none;
+      color: #fff;
+      border-radius: 6px;
+      padding: 0.25rem 0.6rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .copy-btn:active { background: rgba(255, 255, 255, 0.28); }
+    .reference {
+      margin-top: 1.1rem;
+      background: rgba(212, 160, 23, 0.14);
+      border: 1px solid rgba(212, 160, 23, 0.4);
+      border-radius: 10px;
+      padding: 0.9rem 1rem;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    .reference strong { display: block; margin-bottom: 0.2rem; }
+    .note {
+      margin-top: 1.5rem;
+      font-size: 0.8rem;
+      opacity: 0.6;
+      line-height: 1.6;
+      text-align: center;
+    }
+    footer { margin-top: 2.5rem; font-size: 0.85rem; opacity: 0.6; text-align: center; }
+    footer a { color: #fff; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Give to God's Work</h1>
+    <p class="verse">"Bring the whole tithe into the storehouse…" — Malachi 3:10</p>
+
+    <h2>Where your giving goes</h2>
+    <div class="funds">
+      <div class="fund"><div class="icon">📖</div><div class="name">Tithes &amp; Offerings</div><div class="desc">Regular tithes and offerings</div></div>
+      <div class="fund"><div class="icon">🏛</div><div class="name">Building Fund</div><div class="desc">Church building projects</div></div>
+      <div class="fund"><div class="icon">🌍</div><div class="name">Missions &amp; Outreach</div><div class="desc">Local and international missions</div></div>
+      <div class="fund"><div class="icon">🎟</div><div class="name">National Convention</div><div class="desc">National Convention fund</div></div>
+      <div class="fund"><div class="icon">⚡</div><div class="name">Youth Ministry</div><div class="desc">Youth programs and events</div></div>
+      <div class="fund"><div class="icon">🤝</div><div class="name">Church Welfare</div><div class="desc">Support for church members</div></div>
+    </div>
+
+    <h2>EFT / bank transfer</h2>
+    <div class="bank">
+      <div class="row"><span class="label">Bank</span><span class="value">Absa</span></div>
+      <div class="row"><span class="label">Account name</span><span class="value">PPK ABC Fonds</span></div>
+      <div class="row">
+        <span class="label">Account number</span>
+        <span class="value-group"><span class="value" id="acc">4056725472</span><button class="copy-btn" onclick="copyField('acc', this)">Copy</button></span>
+      </div>
+      <div class="row">
+        <span class="label">Branch code</span>
+        <span class="value-group"><span class="value" id="branch">632005</span><button class="copy-btn" onclick="copyField('branch', this)">Copy</button></span>
+      </div>
+      <div class="row"><span class="label">Account type</span><span class="value">Cheque / Current</span></div>
+
+      <div class="reference">
+        <strong>Reference to use:</strong>
+        Your name + your congregation (e.g. "J Adams · Ceres"), so your church treasurer can record it correctly.
+      </div>
+    </div>
+
+    <p class="note">
+      Giving is made directly through your own banking app — this page only shows where to send it.
+      No payment is collected on this site.
+    </p>
+
+    <footer>
+      <a href="/privacy-policy.html">Privacy Policy</a>
+    </footer>
+  </div>
+
+  <script>
+    function copyField(id, btn) {
+      const text = document.getElementById(id).textContent;
+      const done = () => {
+        const original = btn.textContent;
+        btn.textContent = 'Copied';
+        setTimeout(() => { btn.textContent = original; }, 1500);
+      };
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(done).catch(done);
+      } else {
+        done();
+      }
+    }
+  </script>
+</body>
+</html>
