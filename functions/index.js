@@ -14,6 +14,7 @@
  */
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const admin = require('firebase-admin');
 
 admin.initializeApp();
@@ -448,5 +449,127 @@ exports.reportPrayerRequest = onCall(
     });
 
     return { success: true };
+  }
+);
+
+/**
+ * Daily reminders — nudges members about money they still owe and events
+ * they're signed up for, through the same users/{uid}/notifications feed the
+ * Notifications screen already reads (createUserNotification in
+ * services/firestoreService.js writes the identical shape from the client).
+ *
+ * Each reminder fires once per registration/order, tracked with a flag on
+ * that doc. Without it, a payment stuck in awaiting_payment or an event
+ * sitting inside the reminder window would renotify the member every single
+ * day this job runs.
+ */
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const PAYMENT_REMINDER_AFTER_DAYS = 3;
+const EVENT_REMINDER_WINDOW_DAYS = 7;
+
+const toMillis = (raw) => {
+  if (!raw) return null;
+  if (typeof raw.toMillis === 'function') return raw.toMillis();
+  if (raw.seconds != null) return raw.seconds * 1000;
+  const ms = new Date(raw).getTime();
+  return Number.isNaN(ms) ? null : ms;
+};
+
+// Fire-and-forget, same as createUserNotification: a notification failing to
+// write must never take the whole scheduled run down.
+const notify = (db, userId, notification) =>
+  db.collection('users').doc(userId).collection('notifications').add({
+    ...notification,
+    read: false,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  }).catch((err) => console.error(`Failed to notify user ${userId}:`, err));
+
+/**
+ * Reminds members whose registration/order has sat in awaiting_payment for
+ * at least PAYMENT_REMINDER_AFTER_DAYS. One reminder per doc —
+ * paymentReminderSent marks it done so the next run skips it.
+ */
+const remindPendingPayments = async (db, now, collectionName, { createdAtField, buildBody }) => {
+  const snap = await db.collection(collectionName).where('status', '==', 'awaiting_payment').get();
+  const batch = db.batch();
+  let pending = 0;
+
+  for (const docSnap of snap.docs) {
+    const data = docSnap.data();
+    if (data.paymentReminderSent) continue;
+
+    const createdMs = toMillis(data[createdAtField]);
+    if (!createdMs || now - createdMs < PAYMENT_REMINDER_AFTER_DAYS * DAY_MS) continue;
+
+    await notify(db, data.userId, {
+      type: 'payment_reminder',
+      title: 'Payment Pending',
+      body: buildBody(data),
+    });
+    batch.update(docSnap.ref, { paymentReminderSent: true });
+    pending++;
+  }
+
+  if (pending > 0) await batch.commit();
+};
+
+/**
+ * Reminds registered members once an event falls within
+ * EVENT_REMINDER_WINDOW_DAYS. One reminder per registration — reminderSent
+ * marks it done. Rejected registrations are skipped; every other status
+ * (including still-awaiting-payment) gets the nudge, since it doubles as a
+ * prompt to finish paying before the event.
+ */
+const remindUpcomingEvents = async (db, now) => {
+  const eventsSnap = await db.collection('events').get();
+
+  for (const eventDoc of eventsSnap.docs) {
+    const event = eventDoc.data();
+    const eventMs = toMillis(event.eventDate);
+    if (!eventMs) continue;
+    const daysUntil = (eventMs - now) / DAY_MS;
+    if (daysUntil < 0 || daysUntil > EVENT_REMINDER_WINDOW_DAYS) continue;
+
+    const regsSnap = await db.collection('eventRegistrations').where('eventId', '==', eventDoc.id).get();
+    const batch = db.batch();
+    let pending = 0;
+
+    for (const regSnap of regsSnap.docs) {
+      const reg = regSnap.data();
+      if (reg.reminderSent || reg.status === 'rejected') continue;
+
+      await notify(db, reg.userId, {
+        type: 'event_reminder',
+        title: 'Upcoming Event',
+        body: `${event.name} is coming up on ${new Date(eventMs).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long' })}. We look forward to seeing you there!`,
+      });
+      batch.update(regSnap.ref, { reminderSent: true });
+      pending++;
+    }
+
+    if (pending > 0) await batch.commit();
+  }
+};
+
+exports.sendReminders = onSchedule(
+  { schedule: '0 8 * * *', timeZone: 'Africa/Johannesburg', region: 'us-central1' },
+  async () => {
+    const db = admin.firestore();
+    const now = Date.now();
+
+    await remindPendingPayments(db, now, 'eventRegistrations', {
+      createdAtField: 'registeredAt',
+      buildBody: (data) =>
+        `Your registration for ${data.eventName || 'an event'} is still awaiting payment. Please complete your EFT and upload proof of payment.`,
+    });
+
+    await remindPendingPayments(db, now, 'merchOrders', {
+      createdAtField: 'createdAt',
+      buildBody: (data) =>
+        `Your order for ${data.itemName || 'merchandise'} is still awaiting payment. Please complete your EFT and upload proof of payment.`,
+    });
+
+    await remindUpcomingEvents(db, now);
   }
 );
