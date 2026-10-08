@@ -6,6 +6,11 @@ import { UserContext } from '../../context/UserContext';
 
 jest.mock('../../services/documentsService', () => ({
   getDocuments: jest.fn(),
+  uploadDocument: jest.fn(),
+}));
+
+jest.mock('expo-document-picker', () => ({
+  getDocumentAsync: jest.fn(),
 }));
 
 import { getDocuments } from '../../services/documentsService';
@@ -94,8 +99,42 @@ describe('DocumentsScreen', () => {
     await waitFor(() => {
       expect(getByText('No Documents Yet')).toBeTruthy();
       expect(
-        getByText('Documents will appear here once uploaded in the Firebase Console.')
+        getByText('Documents uploaded by an admin will appear here.')
       ).toBeTruthy();
     });
+  });
+
+  // DOC-06
+  it('lets an admin upload a new document', async () => {
+    const DocumentPicker = require('expo-document-picker');
+    jest.spyOn(DocumentPicker, 'getDocumentAsync').mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file:///policy.pdf', name: 'policy.pdf', mimeType: 'application/pdf', size: 2048 }],
+    });
+    const { uploadDocument } = require('../../services/documentsService');
+    uploadDocument.mockResolvedValue({ success: true, documentId: 'doc-new' });
+
+    const adminUser = { uid: 'admin-1', name: 'Nadia', role: 'admin' };
+    const { getByText, getAllByText, getByPlaceholderText } = renderScreen(adminUser);
+
+    await waitFor(() => getByText('+ Upload Document'));
+    fireEvent.press(getByText('+ Upload Document'));
+
+    fireEvent.press(getByText('📎 Choose File (PDF, image, Word or Excel)'));
+    await waitFor(() => expect(DocumentPicker.getDocumentAsync).toHaveBeenCalled());
+
+    fireEvent.changeText(getByPlaceholderText('e.g. Church Constitution'), 'Church Policy');
+    fireEvent.press(getAllByText('Upload Document').slice(-1)[0]);
+
+    await waitFor(() => {
+      expect(uploadDocument).toHaveBeenCalledWith(
+        adminUser,
+        expect.objectContaining({
+          name: 'Church Policy',
+          file: expect.objectContaining({ uri: 'file:///policy.pdf' }),
+        })
+      );
+    });
+    await waitFor(() => getByText('+ Upload Document'));
   });
 });

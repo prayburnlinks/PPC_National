@@ -13,7 +13,13 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { useUser } from '../context/UserContext';
-import { getPrayerRequests, submitPrayerRequest, prayForRequest } from '../services/firestoreService';
+import {
+  getPrayerRequests,
+  submitPrayerRequest,
+  prayForRequest,
+  reportPrayerRequest,
+  blockMember,
+} from '../services/firestoreService';
 
 const PrayerWallScreen = () => {
   const insets = useSafeAreaInsets();
@@ -38,7 +44,12 @@ const PrayerWallScreen = () => {
 
   const loadRequests = async () => {
     setLoading(true);
-    const list = await getPrayerRequests(scope, user?.district);
+    // The viewer decides what this member is not shown — anything they
+    // reported, and anything by someone they blocked.
+    const list = await getPrayerRequests(scope, user?.district, {
+      uid: user?.uid,
+      blockedUsers: user?.blockedUsers,
+    });
     setRequests(list);
     setLoading(false);
   };
@@ -53,12 +64,14 @@ const PrayerWallScreen = () => {
     setSubmitting(true);
     try {
       Keyboard.dismiss();
-      await submitPrayerRequest(user.uid, { title: title.trim() || 'Prayer Request', body: body.trim(), scope, district: user?.district });
+      await submitPrayerRequest(user.uid, { title: title.trim() || 'Prayer Request', body: body.trim(), scope });
       setTitle('');
       setBody('');
       await loadRequests();
     } catch (e) {
-      Alert.alert('Error', 'Failed to submit prayer request');
+      // The filter's rejection tells the member to rephrase, which is the
+      // whole point of it — show that rather than a generic failure.
+      Alert.alert('Could Not Post', e?.message || 'Failed to submit prayer request');
     } finally {
       submittingRef.current = false;
       setSubmitting(false);
@@ -85,8 +98,63 @@ const PrayerWallScreen = () => {
     }
   };
 
+  // Drop the request from this member's wall straight away. The server has
+  // already recorded it; re-fetching would only make them watch it vanish.
+  const removeLocally = (id) => setRequests(prev => prev.filter(r => r.id !== id));
+
+  const handleReport = (item) => {
+    if (!user) return Alert.alert('Sign in to report a request');
+    Alert.alert(
+      'Report this request?',
+      'It will be hidden from your prayer wall and sent to the church administrators to review.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Report',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await reportPrayerRequest(item.id);
+              removeLocally(item.id);
+              Alert.alert('Reported', 'Thank you. The administrators will review this request.');
+            } catch (e) {
+              Alert.alert('Error', e?.message || 'Failed to report this request');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleBlock = (item) => {
+    if (!user) return Alert.alert('Sign in to block a member');
+    if (item.createdBy === user.uid) return;
+    Alert.alert(
+      'Block this member?',
+      'You will no longer see anything they post on the prayer wall. They are not told, and their requests stay visible to everyone else.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await blockMember(user.uid, item.createdBy);
+              // Take everything of theirs off the wall, not just this one.
+              setRequests(prev => prev.filter(r => r.createdBy !== item.createdBy));
+              Alert.alert('Blocked', 'You will no longer see requests from this member.');
+            } catch (e) {
+              Alert.alert('Error', e?.message || 'Failed to block this member');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const renderItem = ({ item }) => {
     const isPraying = prayingIds.includes(item.id);
+    const isOwn = item.createdBy && user?.uid === item.createdBy;
     return (
       <View style={styles.requestCard}>
         <View style={styles.requestHeader}>
@@ -104,6 +172,20 @@ const PrayerWallScreen = () => {
             <Text style={styles.prayText}>Praying 🙏</Text>
           </TouchableOpacity>
         </View>
+        {/* App Store Guideline 1.2 — members need a way to report content and
+            block its author. Hidden on your own requests, where neither
+            applies. */}
+        {!isOwn && (
+          <View style={styles.moderationRow}>
+            <TouchableOpacity onPress={() => handleReport(item)} accessibilityRole="button">
+              <Text style={styles.moderationText}>Report</Text>
+            </TouchableOpacity>
+            <Text style={styles.moderationDivider}>·</Text>
+            <TouchableOpacity onPress={() => handleBlock(item)} accessibilityRole="button">
+              <Text style={styles.moderationText}>Block member</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     );
   };
@@ -204,6 +286,18 @@ const styles = StyleSheet.create({
   prayButtonDisabled: { opacity: 0.5 },
   prayText: { color: colors.darkBlue, fontWeight: '700' },
   empty: { padding: spacing.lg, color: colors.textSecondary },
+  // Deliberately quiet: these are safety controls, not calls to action, and
+  // should not compete with Praying on a wall of people's burdens.
+  moderationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  moderationText: { color: colors.textTertiary, fontSize: typography.sizes.xs, fontWeight: '600' },
+  moderationDivider: { color: colors.textTertiary, fontSize: typography.sizes.xs, marginHorizontal: spacing.sm },
 });
 
 export default PrayerWallScreen;

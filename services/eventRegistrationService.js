@@ -256,3 +256,16 @@ export const rejectEventRegistration = async (registrationId, userId, reviewerUi
     throw { message: 'Failed to reject payment.' };
   }
 };
+
+// Used by AdminEventsScreen to warn before deleting an event that people
+// have already registered for.
+export const getEventRegistrationCount = async (eventId) => {
+  try {
+    const q = query(collection(db, 'eventRegistrations'), where('eventId', '==', eventId));
+    const snap = await getDocs(q);
+    return snap.docs.length;
+  } catch (error) {
+    console.error('Error counting event registrations:', error);
+    return 0;
+  }
+};

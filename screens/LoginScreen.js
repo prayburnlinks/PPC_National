@@ -46,7 +46,13 @@ const LoginScreen = ({ navigation }) => {
       await sendResetEmail(resetEmail.trim());
       setResetLoading(false);
       setShowResetModal(false);
-      Alert.alert('Email Sent', 'Check your inbox for the password reset link.');
+      // Wording mirrors the modal subtitle: it must not confirm whether an
+      // account exists. The spam hint is deliberate — Firebase's default
+      // sender (noreply@<project>.firebaseapp.com) is routinely filtered.
+      Alert.alert(
+        'Check Your Email',
+        'If an account exists for that address, a password reset link is on its way. It can take a few minutes — please check your spam folder too.'
+      );
     } catch (error) {
       setResetLoading(false);
       Alert.alert('Error', error.message || 'Failed to send reset email');
@@ -120,13 +126,15 @@ const LoginScreen = ({ navigation }) => {
           <Text style={styles.formSub}>Sign in to your account</Text>
 
           <View style={styles.inputWrapper}>
-            <Text style={styles.label}>Email Address</Text>
+            <Text style={styles.label}>Email or Mobile Number</Text>
             <TextInput
               style={styles.input}
-              placeholder="your@email.com"
+              placeholder="your@email.com or 082 123 4567"
               placeholderTextColor={colors.placeholder}
-              keyboardType="email-address"
+              // Not "email-address": that keyboard hides the digits half of
+              // members will now be typing. The default keyboard offers both.
               autoCapitalize="none"
+              autoCorrect={false}
               editable={!loading}
               value={email}
               onChangeText={setEmail}
@@ -211,7 +219,7 @@ const LoginScreen = ({ navigation }) => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Reset Password</Text>
-            <Text style={styles.modalSubtitle}>If an account with this email exists, you'll receive a reset link.</Text>
+            <Text style={styles.modalSubtitle}>Enter your email address — reset links can only be sent by email, not SMS. If an account exists, you'll receive one.</Text>
             <TextInput
               style={styles.modalInput}
               placeholder="your@email.com"

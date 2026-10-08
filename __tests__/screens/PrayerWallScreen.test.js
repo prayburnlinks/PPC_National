@@ -7,12 +7,16 @@ jest.mock('../../services/firestoreService', () => ({
   getPrayerRequests: jest.fn(),
   submitPrayerRequest: jest.fn(),
   prayForRequest: jest.fn(),
+  reportPrayerRequest: jest.fn(),
+  blockMember: jest.fn(),
 }));
 
 import {
   getPrayerRequests,
   submitPrayerRequest,
   prayForRequest,
+  reportPrayerRequest,
+  blockMember,
 } from '../../services/firestoreService';
 
 const mockMember = {
@@ -23,9 +27,15 @@ const mockMember = {
 };
 
 const mockRequests = [
-  { id: 'req-1', title: 'Pray for healing', body: 'My father is ill', prayCount: 3, createdAt: new Date() },
-  { id: 'req-2', title: 'Job request', body: 'Looking for work', prayCount: 7, createdAt: new Date() },
+  { id: 'req-1', title: 'Pray for healing', body: 'My father is ill', prayCount: 3, createdBy: 'uid-9', createdAt: new Date() },
+  { id: 'req-2', title: 'Job request', body: 'Looking for work', prayCount: 7, createdBy: 'uid-9', createdAt: new Date() },
 ];
+
+// Fire the destructive choice on the most recent Alert.alert call.
+const pressAlertButton = (alertSpy, label) => {
+  const buttons = alertSpy.mock.calls[alertSpy.mock.calls.length - 1][2];
+  return buttons.find(b => b.text === label).onPress();
+};
 
 const renderPrayerWall = (user = mockMember) => {
   return render(
@@ -77,7 +87,10 @@ describe('PrayerWallScreen scope toggle', () => {
   it('calls getPrayerRequests with national scope by default', async () => {
     renderPrayerWall();
     await waitFor(() => {
-      expect(getPrayerRequests).toHaveBeenCalledWith('national', 'Southern Cape');
+      expect(getPrayerRequests).toHaveBeenCalledWith('national', 'Southern Cape', {
+        uid: 'uid-1',
+        blockedUsers: undefined,
+      });
     });
   });
 
@@ -90,7 +103,10 @@ describe('PrayerWallScreen scope toggle', () => {
     });
 
     await waitFor(() => {
-      expect(getPrayerRequests).toHaveBeenCalledWith('district', 'Southern Cape');
+      expect(getPrayerRequests).toHaveBeenCalledWith('district', 'Southern Cape', {
+        uid: 'uid-1',
+        blockedUsers: undefined,
+      });
     });
   });
 });
@@ -243,5 +259,54 @@ describe('PrayerWallScreen double-submit guards', () => {
     await act(async () => {
       resolvePray({ success: true, action: 'added' });
     });
+  });
+});
+
+// App Store Guideline 1.2 — an app carrying user-generated content needs a way
+// to report it and a way to block its author.
+describe('PrayerWallScreen moderation', () => {
+  it('reports a request and takes it off this member\'s wall', async () => {
+    const alertSpy = jest.spyOn(require('react-native').Alert, 'alert').mockImplementation(() => {});
+    reportPrayerRequest.mockResolvedValue({ success: true });
+    const { getAllByText, queryByText } = renderPrayerWall();
+
+    await waitFor(() => expect(getAllByText('Report').length).toBe(2));
+
+    await act(async () => { fireEvent.press(getAllByText('Report')[0]); });
+    await act(async () => { await pressAlertButton(alertSpy, 'Report'); });
+
+    expect(reportPrayerRequest).toHaveBeenCalledWith('req-1');
+    await waitFor(() => expect(queryByText('Pray for healing')).toBeNull());
+    // The other member's request is untouched.
+    expect(queryByText('Job request')).toBeTruthy();
+  });
+
+  it('blocking a member clears every request they wrote', async () => {
+    const alertSpy = jest.spyOn(require('react-native').Alert, 'alert').mockImplementation(() => {});
+    blockMember.mockResolvedValue({ success: true });
+    const { getAllByText, queryByText } = renderPrayerWall();
+
+    await waitFor(() => expect(getAllByText('Block member').length).toBe(2));
+
+    await act(async () => { fireEvent.press(getAllByText('Block member')[0]); });
+    await act(async () => { await pressAlertButton(alertSpy, 'Block'); });
+
+    expect(blockMember).toHaveBeenCalledWith('uid-1', 'uid-9');
+    // Both requests share an author, so both go.
+    await waitFor(() => {
+      expect(queryByText('Pray for healing')).toBeNull();
+      expect(queryByText('Job request')).toBeNull();
+    });
+  });
+
+  it('offers neither control on your own request', async () => {
+    getPrayerRequests.mockResolvedValue([
+      { id: 'mine', title: 'My own request', body: 'x', prayCount: 0, createdBy: 'uid-1', createdAt: new Date() },
+    ]);
+    const { queryByText } = renderPrayerWall();
+
+    await waitFor(() => expect(queryByText('My own request')).toBeTruthy());
+    expect(queryByText('Report')).toBeNull();
+    expect(queryByText('Block member')).toBeNull();
   });
 });

@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 10.0.0"
+    "version": ">= 10.0.0",
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
@@ -20,6 +21,13 @@
         "buildType": "app-bundle"
       },
       "channel": "production"
+    },
+    "production-apk": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "channel": "production"
     }
   },
   "submit": {
@@ -27,6 +35,11 @@
       "android": {
         "serviceAccountKeyPath": "./google-service-account.json",
         "track": "production"
+      },
+      "ios": {
+        "appleId": "prayburnl@gmail.com",
+        "ascAppId": "6808796512",
+        "appleTeamId": "H3DL3FH9XG"
       }
     }
   }

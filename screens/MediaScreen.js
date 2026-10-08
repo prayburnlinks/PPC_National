@@ -5,25 +5,45 @@ import {
   StyleSheet,
   TouchableOpacity,
   Text,
+  TextInput,
   Image,
   Linking,
   Animated,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useUser } from '../context/UserContext';
+import { ROLES } from '../constants/config';
 import { getLiveStatus } from '../services/firestoreService';
+import {
+  getMediaLinks,
+  saveMediaLinks,
+  getFeaturedVideos,
+  addFeaturedVideo,
+  removeFeaturedVideo,
+} from '../services/mediaService';
 
 // How often to re-check live status while the Media tab is focused. Tab
 // screens stay mounted when you switch away, so a plain one-time fetch on
 // mount would leave the LIVE badge stuck stale for the rest of the session.
 const LIVE_STATUS_POLL_MS = 60 * 1000;
 
-// Update these with the real channel/page URLs
+// Evergreen channel/page links — these rarely change, so they stay fixed.
+// The actual "what's live right now" links are admin-editable (see
+// mediaService) since a new stream needs a new URL every time.
 const YOUTUBE_CHANNEL_URL = 'https://www.youtube.com/@PPCNationalChurch';
-const YOUTUBE_LIVE_URL    = 'https://www.youtube.com/@PPCNationalChurch/live';
 const FACEBOOK_PAGE_URL   = 'https://www.facebook.com/PPCNationalChurch';
-const FACEBOOK_REEL_URL   = 'https://www.facebook.com/reel/1572688079823036';
+
+// Fallbacks used until an admin has ever set a live link, so the Watch/Live
+// button always opens somewhere sensible.
+const DEFAULT_YOUTUBE_LIVE_URL = `${YOUTUBE_CHANNEL_URL}/live`;
+const DEFAULT_FACEBOOK_LIVE_URL = FACEBOOK_PAGE_URL;
+
+const MAX_URL_LENGTH = 300;
+const MAX_LABEL_LENGTH = 60;
 
 const openURL = (url) => Linking.openURL(url).catch(() => {});
 
@@ -113,9 +133,27 @@ const ScriptureBoard = () => {
   );
 };
 
+const emptyNewVideo = { platform: 'youtube', url: '', assembly: '', district: '' };
+
 const MediaScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const { user } = useUser();
+  const canEdit = user?.role === ROLES.ADMIN;
   const [liveStatus, setLiveStatus] = useState({ isLive: false, title: '' });
+
+  // Admin-editable live links, and the admin-curated featured video list.
+  // `linksLoaded` gates the Edit button so an admin can't save on top of
+  // saved links they haven't seen yet.
+  const [mediaLinks, setMediaLinks] = useState({});
+  const [linksLoaded, setLinksLoaded] = useState(false);
+  const [featuredVideos, setFeaturedVideos] = useState([]);
+  const [editing, setEditing] = useState(false);
+  const [linkDrafts, setLinkDrafts] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newVideo, setNewVideo] = useState(emptyNewVideo);
+  const [addingVideo, setAddingVideo] = useState(false);
+  const [removingId, setRemovingId] = useState(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -123,12 +161,88 @@ const MediaScreen = ({ navigation }) => {
       const refresh = () => getLiveStatus().then((status) => { if (isActive) setLiveStatus(status); });
       refresh();
       const interval = setInterval(refresh, LIVE_STATUS_POLL_MS);
+
+      getMediaLinks().then(links => { if (isActive) { setMediaLinks(links); setLinksLoaded(true); } }).catch(() => {});
+      getFeaturedVideos().then(list => { if (isActive) setFeaturedVideos(list); });
+
       return () => {
         isActive = false;
         clearInterval(interval);
       };
     }, [])
   );
+
+  const youtubeLiveUrl = mediaLinks.youtubeLiveUrl || DEFAULT_YOUTUBE_LIVE_URL;
+  const facebookLiveUrl = mediaLinks.facebookLiveUrl || DEFAULT_FACEBOOK_LIVE_URL;
+
+  const stopEditing = () => {
+    setEditing(false);
+    setLinkDrafts({});
+    setShowAddForm(false);
+    setNewVideo(emptyNewVideo);
+  };
+
+  const handleSaveLinks = async () => {
+    const changes = Object.fromEntries(
+      Object.entries(linkDrafts)
+        .map(([key, text]) => [key, text.trim()])
+        .filter(([key, text]) => text !== (mediaLinks[key] || (key === 'youtubeLiveUrl' ? DEFAULT_YOUTUBE_LIVE_URL : DEFAULT_FACEBOOK_LIVE_URL)))
+    );
+    if (Object.keys(changes).length === 0) {
+      stopEditing();
+      return;
+    }
+    setSaving(true);
+    try {
+      await saveMediaLinks(user, changes);
+      setMediaLinks(prev => ({ ...prev, ...changes }));
+      stopEditing();
+    } catch (error) {
+      Alert.alert('Could not save', error.message || 'Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAddVideo = async () => {
+    const url = newVideo.url.trim();
+    if (!url) {
+      Alert.alert('Missing Info', 'Please enter a video or reel link.');
+      return;
+    }
+    setAddingVideo(true);
+    try {
+      const { id } = await addFeaturedVideo(user, { ...newVideo, url });
+      setFeaturedVideos(prev => [{ id, ...newVideo, url }, ...prev]);
+      setShowAddForm(false);
+      setNewVideo(emptyNewVideo);
+    } catch (error) {
+      Alert.alert('Could not add video', error.message || 'Please try again.');
+    } finally {
+      setAddingVideo(false);
+    }
+  };
+
+  const handleRemoveVideo = (video) => {
+    Alert.alert('Remove this video?', 'This removes it from the Media tab for everyone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          setRemovingId(video.id);
+          try {
+            await removeFeaturedVideo(video.id);
+            setFeaturedVideos(prev => prev.filter(v => v.id !== video.id));
+          } catch (error) {
+            Alert.alert('Could not remove video', error.message || 'Please try again.');
+          } finally {
+            setRemovingId(null);
+          }
+        },
+      },
+    ]);
+  };
 
   return (
     <View style={styles.container}>
@@ -142,18 +256,72 @@ const MediaScreen = ({ navigation }) => {
             <Text style={styles.liveHeaderText}>LIVE</Text>
           </View>
         )}
+        {canEdit && linksLoaded && (
+          editing ? (
+            <View style={styles.editActions}>
+              <TouchableOpacity style={styles.heroButton} onPress={stopEditing} disabled={saving}>
+                <Text style={styles.heroButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.heroButton, styles.saveButton]} onPress={handleSaveLinks} disabled={saving}>
+                {saving
+                  ? <ActivityIndicator size="small" color={colors.darkBlue} />
+                  : <Text style={[styles.heroButtonText, styles.saveButtonText]}>Save</Text>}
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.heroButton} onPress={() => setEditing(true)}>
+              <Text style={styles.heroButtonText}>Edit</Text>
+            </TouchableOpacity>
+          )
+        )}
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.content}>
+
+          {editing && (
+            <View style={styles.editBanner}>
+              <Text style={styles.editBannerText}>
+                Editing. Point the live links at a new stream, or add/remove featured videos below — everyone will see the update once you tap Save or Add.
+              </Text>
+              <Text style={styles.linkLabel}>YouTube Live URL</Text>
+              <TextInput
+                style={styles.linkInput}
+                value={linkDrafts.youtubeLiveUrl ?? youtubeLiveUrl}
+                onChangeText={(text) => setLinkDrafts(prev => ({ ...prev, youtubeLiveUrl: text }))}
+                placeholder={DEFAULT_YOUTUBE_LIVE_URL}
+                placeholderTextColor={colors.placeholder}
+                accessibilityLabel="YouTube Live URL"
+                autoCapitalize="none"
+                autoCorrect={false}
+                maxLength={MAX_URL_LENGTH}
+                editable={!saving}
+              />
+              <Text style={styles.linkLabel}>Facebook Live URL</Text>
+              <TextInput
+                style={styles.linkInput}
+                value={linkDrafts.facebookLiveUrl ?? facebookLiveUrl}
+                onChangeText={(text) => setLinkDrafts(prev => ({ ...prev, facebookLiveUrl: text }))}
+                placeholder={DEFAULT_FACEBOOK_LIVE_URL}
+                placeholderTextColor={colors.placeholder}
+                accessibilityLabel="Facebook Live URL"
+                autoCapitalize="none"
+                autoCorrect={false}
+                maxLength={MAX_URL_LENGTH}
+                editable={!saving}
+              />
+            </View>
+          )}
 
           {/* Live Banner — shown only when isLive */}
           {liveStatus.isLive && (
             <TouchableOpacity
               style={styles.liveBanner}
-              onPress={() => openURL(
-                liveStatus.platform === 'facebook' ? FACEBOOK_PAGE_URL : YOUTUBE_LIVE_URL
-              )}
+              onPress={() => openURL(liveStatus.platform === 'facebook' ? facebookLiveUrl : youtubeLiveUrl)}
               activeOpacity={0.85}
             >
               <View style={styles.liveBadge}>
@@ -208,42 +376,120 @@ const MediaScreen = ({ navigation }) => {
           {/* Daily Scripture Board */}
           <ScriptureBoard />
 
-          {/* Featured Video */}
-          <TouchableOpacity
-            style={styles.featuredCard}
-            onPress={() => openURL('https://www.youtube.com/watch?v=2U8i81b-p1s')}
-            activeOpacity={0.85}
-          >
-            <View style={styles.featuredThumb}>
-              <Text style={styles.featuredPlay}>▶</Text>
-            </View>
-            <View style={styles.featuredInfo}>
-              <Text style={styles.featuredLabel}>FEATURED</Text>
-              <Text style={styles.featuredSub}>Tap to open video</Text>
-            </View>
-            <View style={styles.featuredRight}>
-              <Text style={styles.featuredAssembly}>Ebenezer Assembly</Text>
-              <Text style={styles.featuredDistrict}>Southern Cape District</Text>
-            </View>
-          </TouchableOpacity>
+          {/* Featured Videos — admin-curated, newest first */}
+          {(featuredVideos.length > 0 || editing) && (
+            <Text style={styles.sectionTitle}>Featured</Text>
+          )}
 
-          {/* Featured Facebook Reel */}
-          <TouchableOpacity
-            style={styles.featuredCard}
-            onPress={() => openURL(FACEBOOK_REEL_URL)}
-            activeOpacity={0.85}
-          >
-            <View style={[styles.featuredThumb, styles.featuredThumbFacebook]}>
-              <Text style={styles.featuredPlay}>f</Text>
+          {featuredVideos.map((video) => {
+            const isFacebook = video.platform === 'facebook';
+            return (
+              <TouchableOpacity
+                key={video.id}
+                style={styles.featuredCard}
+                onPress={() => openURL(video.url)}
+                activeOpacity={0.85}
+                disabled={editing}
+              >
+                <View style={[styles.featuredThumb, isFacebook && styles.featuredThumbFacebook]}>
+                  <Text style={styles.featuredPlay}>{isFacebook ? 'f' : '▶'}</Text>
+                </View>
+                <View style={styles.featuredInfo}>
+                  <Text style={[styles.featuredLabel, isFacebook && styles.featuredLabelFacebook]}>
+                    {isFacebook ? 'FACEBOOK' : 'FEATURED'}
+                  </Text>
+                  <Text style={styles.featuredSub}>{isFacebook ? 'Tap to open reel' : 'Tap to open video'}</Text>
+                </View>
+                <View style={styles.featuredRight}>
+                  {!!video.assembly && <Text style={styles.featuredAssembly}>{video.assembly}</Text>}
+                  {!!video.district && <Text style={styles.featuredDistrict}>{video.district}</Text>}
+                </View>
+                {editing && (
+                  <TouchableOpacity
+                    style={styles.removeVideoButton}
+                    onPress={() => handleRemoveVideo(video)}
+                    disabled={removingId === video.id}
+                    accessibilityLabel={`Remove ${video.assembly || (isFacebook ? 'Facebook' : 'YouTube')} video`}
+                  >
+                    {removingId === video.id
+                      ? <ActivityIndicator size="small" color={colors.red} />
+                      : <Text style={styles.removeVideoText}>✕</Text>}
+                  </TouchableOpacity>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+
+          {editing && !showAddForm && (
+            <TouchableOpacity style={styles.addVideoButton} onPress={() => setShowAddForm(true)}>
+              <Text style={styles.addVideoButtonText}>+ Add Featured Video</Text>
+            </TouchableOpacity>
+          )}
+
+          {editing && showAddForm && (
+            <View style={styles.addVideoForm}>
+              <View style={styles.platformToggleRow}>
+                {['youtube', 'facebook'].map((platform) => (
+                  <TouchableOpacity
+                    key={platform}
+                    style={[styles.platformToggle, newVideo.platform === platform && styles.platformToggleActive]}
+                    onPress={() => setNewVideo(prev => ({ ...prev, platform }))}
+                    accessibilityLabel={`Platform: ${platform === 'youtube' ? 'YouTube' : 'Facebook'}`}
+                  >
+                    <Text style={[styles.platformToggleText, newVideo.platform === platform && styles.platformToggleTextActive]}>
+                      {platform === 'youtube' ? 'YouTube' : 'Facebook'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput
+                style={styles.linkInput}
+                value={newVideo.url}
+                onChangeText={(text) => setNewVideo(prev => ({ ...prev, url: text }))}
+                placeholder="Video or reel link"
+                placeholderTextColor={colors.placeholder}
+                accessibilityLabel="New featured video link"
+                autoCapitalize="none"
+                autoCorrect={false}
+                maxLength={MAX_URL_LENGTH}
+                editable={!addingVideo}
+              />
+              <TextInput
+                style={styles.linkInput}
+                value={newVideo.assembly}
+                onChangeText={(text) => setNewVideo(prev => ({ ...prev, assembly: text }))}
+                placeholder="Assembly (optional)"
+                placeholderTextColor={colors.placeholder}
+                accessibilityLabel="New featured video assembly"
+                maxLength={MAX_LABEL_LENGTH}
+                editable={!addingVideo}
+              />
+              <TextInput
+                style={styles.linkInput}
+                value={newVideo.district}
+                onChangeText={(text) => setNewVideo(prev => ({ ...prev, district: text }))}
+                placeholder="District (optional)"
+                placeholderTextColor={colors.placeholder}
+                accessibilityLabel="New featured video district"
+                maxLength={MAX_LABEL_LENGTH}
+                editable={!addingVideo}
+              />
+              <View style={styles.addVideoActions}>
+                <TouchableOpacity
+                  style={styles.heroButtonLight}
+                  onPress={() => { setShowAddForm(false); setNewVideo(emptyNewVideo); }}
+                  disabled={addingVideo}
+                >
+                  <Text style={styles.heroButtonLightText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.heroButtonLight, styles.saveButton]} onPress={handleAddVideo} disabled={addingVideo}>
+                  {addingVideo
+                    ? <ActivityIndicator size="small" color={colors.darkBlue} />
+                    : <Text style={[styles.heroButtonLightText, styles.saveButtonText]}>Add</Text>}
+                </TouchableOpacity>
+              </View>
             </View>
-            <View style={styles.featuredInfo}>
-              <Text style={[styles.featuredLabel, styles.featuredLabelFacebook]}>FACEBOOK</Text>
-              <Text style={styles.featuredSub}>Tap to open reel</Text>
-            </View>
-            <View style={styles.featuredRight}>
-              <Text style={styles.featuredAssembly}>Ebenezer Assembly</Text>
-            </View>
-          </TouchableOpacity>
+          )}
 
           <View style={styles.spacer} />
         </View>
@@ -256,6 +502,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  scroll: {
+    flex: 1,
   },
   hero: {
     backgroundColor: colors.darkBlue,
@@ -291,6 +540,63 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.xs,
     fontWeight: '700',
     letterSpacing: 1,
+  },
+  editActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  heroButton: {
+    minWidth: 60,
+    height: 32,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroButtonText: {
+    color: colors.white,
+    fontSize: typography.sizes.md,
+    fontWeight: '700',
+  },
+  saveButton: {
+    backgroundColor: colors.gold,
+    borderColor: colors.gold,
+  },
+  saveButtonText: {
+    color: colors.darkBlue,
+  },
+  editBanner: {
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  editBannerText: {
+    color: colors.textPrimary,
+    fontSize: typography.sizes.base,
+    lineHeight: 18,
+    marginBottom: spacing.md,
+  },
+  linkLabel: {
+    fontSize: typography.sizes.sm,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  linkInput: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: typography.sizes.base,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
   },
   content: {
     paddingHorizontal: spacing.lg,
@@ -469,6 +775,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
+    position: 'relative',
   },
   featuredThumb: {
     width: 64,
@@ -520,6 +827,91 @@ const styles = StyleSheet.create({
   featuredSub: {
     fontSize: typography.sizes.xs,
     color: colors.textSecondary,
+  },
+  removeVideoButton: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    width: 26,
+    height: 26,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.red,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeVideoText: {
+    color: colors.red,
+    fontSize: typography.sizes.sm,
+    fontWeight: '700',
+  },
+  addVideoButton: {
+    borderWidth: 1,
+    borderColor: colors.blue,
+    borderStyle: 'dashed',
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  addVideoButtonText: {
+    color: colors.blue,
+    fontWeight: '700',
+    fontSize: typography.sizes.base,
+  },
+  addVideoForm: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  platformToggleRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  platformToggle: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  platformToggleActive: {
+    backgroundColor: colors.blue,
+    borderColor: colors.blue,
+  },
+  platformToggleText: {
+    fontSize: typography.sizes.base,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  platformToggleTextActive: {
+    color: colors.white,
+  },
+  addVideoActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+  },
+  heroButtonLight: {
+    minWidth: 68,
+    height: 36,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroButtonLightText: {
+    color: colors.textPrimary,
+    fontSize: typography.sizes.md,
+    fontWeight: '700',
   },
   spacer: {
     height: spacing.xxxl,

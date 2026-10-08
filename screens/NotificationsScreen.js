@@ -16,6 +16,7 @@ import { getUserNotifications, markNotificationAsRead } from '../services/firest
 const TYPE_ICONS = {
   approval_status: '👤',
   pop_status: '💳',
+  payment_reminder: '⏰',
   event_reminder: '📅',
   giving_receipt: '💝',
   merch_order_status: '🛍️',
