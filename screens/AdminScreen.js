@@ -724,6 +724,26 @@ const AdminScreen = ({ navigation }) => {
                 <Text style={styles.actionArrow}>›</Text>
               </TouchableOpacity>
             )}
+            {isAdminReviewer && (
+              <TouchableOpacity style={styles.actionRow} onPress={() => navigation.navigate('AdminEvents')}>
+                <Text style={styles.actionIcon}>🗓️</Text>
+                <View style={styles.actionText}>
+                  <Text style={styles.actionLabel}>Manage Events</Text>
+                  <Text style={styles.actionSub}>Add new events</Text>
+                </View>
+                <Text style={styles.actionArrow}>›</Text>
+              </TouchableOpacity>
+            )}
+            {isAdminReviewer && (
+              <TouchableOpacity style={styles.actionRow} onPress={() => navigation.navigate('Documents')}>
+                <Text style={styles.actionIcon}>📁</Text>
+                <View style={styles.actionText}>
+                  <Text style={styles.actionLabel}>Manage Documents</Text>
+                  <Text style={styles.actionSub}>Upload documents for leaders and admins</Text>
+                </View>
+                <Text style={styles.actionArrow}>›</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </ScrollView>
       )}

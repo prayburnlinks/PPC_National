@@ -11,6 +11,9 @@ import {
   getUserProfile,
   updateUserProfile,
   createUserNotification,
+  createEvent,
+  updateEvent,
+  deleteEvent,
 } from '../../services/firestoreService';
 
 jest.mock('firebase/firestore', () => ({
@@ -22,6 +25,7 @@ jest.mock('firebase/firestore', () => ({
   addDoc: jest.fn(),
   setDoc: jest.fn(),
   updateDoc: jest.fn(),
+  deleteDoc: jest.fn(),
   query: jest.fn((...args) => args),
   where: jest.fn(),
   orderBy: jest.fn(),
@@ -31,6 +35,7 @@ jest.mock('firebase/firestore', () => ({
   arrayRemove: jest.fn((v) => ({ __arrayRemove: v })),
   serverTimestamp: jest.fn(() => new Date('2026-01-01')),
   runTransaction: jest.fn(),
+  Timestamp: { fromDate: jest.fn((d) => ({ __timestamp: d.toISOString() })) },
 }));
 
 // Posting now goes through a callable so the profanity filter runs somewhere
@@ -47,6 +52,7 @@ import {
   getDocsFromServer,
   addDoc,
   updateDoc,
+  deleteDoc,
   runTransaction,
 } from 'firebase/firestore';
 
@@ -424,5 +430,126 @@ describe('createUserNotification', () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe('createEvent', () => {
+  const adminUser = { uid: 'admin-1' };
+
+  it('writes an event doc with the expected shape', async () => {
+    addDoc.mockResolvedValue({ id: 'event-1' });
+
+    const result = await createEvent(adminUser, {
+      name: 'Youth Rally',
+      description: 'A night of worship',
+      category: 'Youth',
+      venue: 'Durban City Hall',
+      eventDate: new Date('2026-08-01T08:00:00'),
+      requiresPayment: false,
+    });
+
+    expect(addDoc).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        name: 'Youth Rally',
+        venue: 'Durban City Hall',
+        attendeeCount: 0,
+        requiresPayment: false,
+        registrationFee: 0,
+        createdBy: 'admin-1',
+      })
+    );
+    expect(result).toEqual({ success: true, eventId: 'event-1' });
+  });
+
+  it('carries the registration fee and reference only when payment is required', async () => {
+    addDoc.mockResolvedValue({ id: 'event-2' });
+
+    await createEvent(adminUser, {
+      name: 'Sisters Conference',
+      category: 'Women',
+      venue: 'Cape Town City Hall',
+      eventDate: new Date('2026-09-01T08:00:00'),
+      requiresPayment: true,
+      registrationFee: 100,
+      paymentReference: 'Sisters2026',
+    });
+
+    expect(addDoc).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        requiresPayment: true,
+        registrationFee: 100,
+        paymentReference: 'Sisters2026',
+      })
+    );
+  });
+
+  it('throws a friendly error when the write fails', async () => {
+    addDoc.mockRejectedValue(new Error('Permission denied'));
+
+    await expect(
+      createEvent(adminUser, {
+        name: 'Youth Rally',
+        category: 'Youth',
+        venue: 'Durban City Hall',
+        eventDate: new Date('2026-08-01T08:00:00'),
+      })
+    ).rejects.toEqual({ message: 'Permission denied' });
+  });
+});
+
+describe('updateEvent', () => {
+  it('writes the updated fields to the event doc', async () => {
+    updateDoc.mockResolvedValue();
+
+    const result = await updateEvent('event-1', {
+      name: 'Youth Rally (Updated)',
+      category: 'Youth',
+      venue: 'Durban City Hall',
+      eventDate: new Date('2026-08-01T08:00:00'),
+      requiresPayment: false,
+    });
+
+    expect(updateDoc).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        name: 'Youth Rally (Updated)',
+        venue: 'Durban City Hall',
+        requiresPayment: false,
+        registrationFee: 0,
+      })
+    );
+    expect(result).toEqual({ success: true });
+  });
+
+  it('throws a friendly error when the write fails', async () => {
+    updateDoc.mockRejectedValue(new Error('Permission denied'));
+
+    await expect(
+      updateEvent('event-1', {
+        name: 'Youth Rally',
+        category: 'Youth',
+        venue: 'Durban City Hall',
+        eventDate: new Date('2026-08-01T08:00:00'),
+      })
+    ).rejects.toEqual({ message: 'Permission denied' });
+  });
+});
+
+describe('deleteEvent', () => {
+  it('deletes the event doc', async () => {
+    deleteDoc.mockResolvedValue();
+
+    const result = await deleteEvent('event-1');
+
+    expect(deleteDoc).toHaveBeenCalledWith(expect.anything());
+    expect(result).toEqual({ success: true });
+  });
+
+  it('throws a friendly error when the delete fails', async () => {
+    deleteDoc.mockRejectedValue(new Error('Permission denied'));
+
+    await expect(deleteEvent('event-1')).rejects.toEqual({ message: 'Permission denied' });
   });
 });

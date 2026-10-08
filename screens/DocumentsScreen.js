@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
   Text,
+  TextInput,
   ActivityIndicator,
   Linking,
   Alert,
@@ -14,7 +15,10 @@ import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../context/UserContext';
 import { ROLES } from '../constants/config';
-import { getDocuments } from '../services/documentsService';
+import { getDocuments, uploadDocument } from '../services/documentsService';
+import * as DocumentPicker from 'expo-document-picker';
+
+const emptyUploadForm = { name: '', description: '', category: '', file: null };
 
 const FILE_ICONS = {
   PDF: '📄',
@@ -29,20 +33,69 @@ const FILE_ICONS = {
 const DocumentsScreen = ({ navigation }) => {
   const { user } = useUser();
   const insets = useSafeAreaInsets();
+  const isAdmin = user?.role === ROLES.ADMIN;
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('All');
+  const [showUploadForm, setShowUploadForm] = useState(false);
+  const [uploadForm, setUploadForm] = useState(emptyUploadForm);
+  const [uploading, setUploading] = useState(false);
+
+  const loadDocuments = useCallback(() => {
+    return getDocuments()
+      .then(docs => setDocuments(docs))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
 
   useEffect(() => {
     if (user?.role !== ROLES.ADMIN && user?.role !== ROLES.LEADER) {
       navigation.goBack();
       return;
     }
-    getDocuments()
-      .then(docs => setDocuments(docs))
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    loadDocuments();
   }, []);
+
+  const handlePickFile = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: [
+        'application/pdf',
+        'image/jpeg',
+        'image/png',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      ],
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled) return;
+    setUploadForm(f => ({ ...f, file: result.assets[0] }));
+  };
+
+  const handleUpload = async () => {
+    if (!uploadForm.name.trim() || !uploadForm.file) {
+      Alert.alert('Missing Info', 'Please choose a file and give it a name before uploading.');
+      return;
+    }
+    setUploading(true);
+    try {
+      await uploadDocument(user, {
+        name: uploadForm.name.trim(),
+        description: uploadForm.description.trim(),
+        category: uploadForm.category.trim(),
+        file: uploadForm.file,
+      });
+      setShowUploadForm(false);
+      setUploadForm(emptyUploadForm);
+      setLoading(true);
+      loadDocuments();
+    } catch (error) {
+      Alert.alert('Error', error.message || 'Failed to upload document.');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleDownload = async (doc) => {
     try {
@@ -66,13 +119,63 @@ const DocumentsScreen = ({ navigation }) => {
     <View style={styles.container}>
       {/* Frozen Header */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => (showUploadForm ? setShowUploadForm(false) : navigation.goBack())}
+          style={styles.backButton}
+        >
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
         <Image source={require('../assets/emblem.jpg')} style={styles.emblem} resizeMode="contain" />
-        <Text style={styles.headerTitle}>Documents</Text>
+        <Text style={styles.headerTitle}>{showUploadForm ? 'Upload Document' : 'Documents'}</Text>
       </View>
 
+      {showUploadForm ? (
+        <ScrollView
+          contentContainerStyle={[styles.formContent, { paddingBottom: spacing.xxxl + insets.bottom }]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+        >
+          <TouchableOpacity style={styles.filePicker} onPress={handlePickFile}>
+            <Text style={styles.filePickerText}>
+              {uploadForm.file ? `📎 ${uploadForm.file.name}` : '📎 Choose File (PDF, image, Word or Excel)'}
+            </Text>
+          </TouchableOpacity>
+
+          <Text style={styles.label}>Name</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g. Church Constitution"
+            placeholderTextColor={colors.placeholder}
+            value={uploadForm.name}
+            onChangeText={(v) => setUploadForm(f => ({ ...f, name: v }))}
+          />
+
+          <Text style={styles.label}>Description</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            placeholder="Describe the document (optional)"
+            placeholderTextColor={colors.placeholder}
+            value={uploadForm.description}
+            onChangeText={(v) => setUploadForm(f => ({ ...f, description: v }))}
+            multiline
+          />
+
+          <Text style={styles.label}>Category</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g. Policies (optional)"
+            placeholderTextColor={colors.placeholder}
+            value={uploadForm.category}
+            onChangeText={(v) => setUploadForm(f => ({ ...f, category: v }))}
+          />
+
+          <TouchableOpacity style={[styles.saveButton, uploading && styles.buttonDisabled]} onPress={handleUpload} disabled={uploading}>
+            {uploading ? <ActivityIndicator color={colors.white} /> : <Text style={styles.saveButtonText}>Upload Document</Text>}
+          </TouchableOpacity>
+        </ScrollView>
+      ) : (
+        <>
       {/* Category Filter */}
       {!loading && documents.length > 0 && (
         <ScrollView
@@ -105,11 +208,23 @@ const DocumentsScreen = ({ navigation }) => {
           <Text style={styles.emptyIcon}>📁</Text>
           <Text style={styles.emptyTitle}>No Documents Yet</Text>
           <Text style={styles.emptyText}>
-            Documents will appear here once uploaded in the Firebase Console.
+            {isAdmin
+              ? "Tap \"+ Upload Document\" below to add the first one."
+              : 'Documents uploaded by an admin will appear here.'}
           </Text>
+          {isAdmin && (
+            <TouchableOpacity style={styles.addButton} onPress={() => setShowUploadForm(true)}>
+              <Text style={styles.addButtonText}>+ Upload Document</Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+          {isAdmin && (
+            <TouchableOpacity style={styles.addButton} onPress={() => setShowUploadForm(true)}>
+              <Text style={styles.addButtonText}>+ Upload Document</Text>
+            </TouchableOpacity>
+          )}
           {filtered.map(doc => {
             const ext = doc.fileType?.toUpperCase();
             const icon = FILE_ICONS[ext] || '📎';
@@ -143,6 +258,8 @@ const DocumentsScreen = ({ navigation }) => {
           <View style={{ height: spacing.xxxl + insets.bottom }} />
         </ScrollView>
       )}
+      </>
+      )}
     </View>
   );
 };
@@ -164,6 +281,34 @@ const styles = StyleSheet.create({
   backButtonText: { color: colors.white, fontSize: typography.sizes.lg },
   emblem: { width: 32, height: 32, borderRadius: 16, marginRight: spacing.sm },
   headerTitle: { color: colors.white, fontSize: typography.sizes.lg, fontWeight: '700' },
+  addButton: {
+    backgroundColor: colors.blue, borderRadius: borderRadius.md,
+    paddingVertical: spacing.md, paddingHorizontal: spacing.xl,
+    alignItems: 'center', marginBottom: spacing.lg, marginTop: spacing.lg,
+  },
+  addButtonText: { color: colors.white, fontSize: typography.sizes.sm, fontWeight: '700' },
+  // Upload form
+  formContent: { padding: spacing.lg },
+  filePicker: {
+    borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.lg,
+    backgroundColor: colors.surfaceLight, paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.md, alignItems: 'center', marginBottom: spacing.lg,
+  },
+  filePickerText: { color: colors.textSecondary, fontSize: typography.sizes.sm, fontWeight: '600', textAlign: 'center' },
+  label: { fontSize: typography.sizes.xs, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.5, marginBottom: spacing.sm },
+  input: {
+    borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.md,
+    fontSize: typography.sizes.sm, color: colors.textPrimary,
+    marginBottom: spacing.lg, backgroundColor: colors.white,
+  },
+  textArea: { minHeight: 80, textAlignVertical: 'top' },
+  saveButton: {
+    backgroundColor: colors.blue, borderRadius: borderRadius.md,
+    paddingVertical: spacing.md, alignItems: 'center', marginTop: spacing.md,
+  },
+  buttonDisabled: { opacity: 0.6 },
+  saveButtonText: { color: colors.white, fontSize: typography.sizes.md, fontWeight: '700' },
   filterBar: {
     backgroundColor: colors.white,
     borderBottomWidth: 1,

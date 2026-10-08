@@ -11,6 +11,7 @@ import {
   getDocsFromServer,
   addDoc,
   updateDoc,
+  deleteDoc,
   increment,
   arrayUnion,
   arrayRemove,
@@ -20,6 +21,7 @@ import {
   where,
   orderBy,
   limit,
+  Timestamp,
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app, db } from '../firebase-config';
@@ -140,6 +142,108 @@ export const getEventsByCategory = async (category) => {
   } catch (error) {
     console.error('Error fetching events by category:', error);
     return [];
+  }
+};
+
+/**
+ * Get every event, including ones that have already ended — for the admin
+ * management list, which (unlike the member-facing screens) needs to show
+ * past events too.
+ */
+export const getAllEventsForAdmin = async () => {
+  try {
+    const docs = await fetchEvents();
+    return [...docs].sort((a, b) => b.eventDate - a.eventDate);
+  } catch (error) {
+    console.error('Error fetching events for admin:', error);
+    return [];
+  }
+};
+
+// Shared by createEvent/updateEvent so the two can't drift on how
+// requiresPayment gates registrationFee/paymentReference.
+const buildEventFields = ({
+  name,
+  description,
+  category,
+  venue,
+  eventDate,
+  endDate,
+  organizer,
+  capacity,
+  requiresPayment,
+  registrationFee,
+  paymentReference,
+}) => ({
+  name,
+  description: description || '',
+  category,
+  venue,
+  eventDate: Timestamp.fromDate(eventDate),
+  endDate: endDate ? Timestamp.fromDate(endDate) : null,
+  organizer: organizer || null,
+  capacity: capacity || null,
+  currency: 'ZAR',
+  requiresPayment: !!requiresPayment,
+  registrationFee: requiresPayment ? registrationFee : 0,
+  paymentReference: requiresPayment ? (paymentReference || null) : null,
+});
+
+/**
+ * Create a new event (admin only — enforced by firestore.rules).
+ */
+export const createEvent = async (adminUser, eventData) => {
+  try {
+    const ref_ = await addDoc(collection(db, 'events'), {
+      ...buildEventFields(eventData),
+      attendeeCount: 0,
+      createdBy: adminUser.uid,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    eventsCache = null;
+    return { success: true, eventId: ref_.id };
+  } catch (error) {
+    console.error('Create event error:', error);
+    throw { message: error.message || 'Failed to create event.' };
+  }
+};
+
+/**
+ * Update an existing event (admin only — enforced by firestore.rules).
+ * Registration docs keep their own snapshot of eventName/eventDate, so
+ * editing an event does not retroactively change past registrations.
+ */
+export const updateEvent = async (eventId, eventData) => {
+  try {
+    await updateDoc(doc(db, 'events', eventId), {
+      ...buildEventFields(eventData),
+      updatedAt: serverTimestamp(),
+    });
+    eventsCache = null;
+    return { success: true };
+  } catch (error) {
+    console.error('Update event error:', error);
+    throw { message: error.message || 'Failed to update event.' };
+  }
+};
+
+/**
+ * Delete an event (admin only — enforced by firestore.rules). Existing
+ * eventRegistrations docs are left in place — they keep their own snapshot
+ * of the event's name/date, but MyEventsScreen joins them back to the live
+ * event via getEventById, so a deleted event silently drops out of a
+ * member's registration history. AdminEventsScreen warns about this before
+ * calling deleteEvent so the admin can make an informed call.
+ */
+export const deleteEvent = async (eventId) => {
+  try {
+    await deleteDoc(doc(db, 'events', eventId));
+    eventsCache = null;
+    return { success: true };
+  } catch (error) {
+    console.error('Delete event error:', error);
+    throw { message: error.message || 'Failed to delete event.' };
   }
 };
 
@@ -496,9 +600,13 @@ export default {
   // Events
   getUpcomingEvents,
   getAllEvents,
+  getAllEventsForAdmin,
   getEventById,
   getEventsByCategory,
-  
+  createEvent,
+  updateEvent,
+  deleteEvent,
+
   // Event Registration
   incrementEventAttendeeCount,
 

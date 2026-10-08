@@ -7,6 +7,7 @@ import {
   approveEventRegistration,
   rejectEventRegistration,
   getEventRegistrationsByEvent,
+  getEventRegistrationCount,
 } from '../../services/eventRegistrationService';
 
 jest.mock('firebase/firestore', () => ({
@@ -302,5 +303,29 @@ describe('rejectEventRegistration', () => {
     await expect(rejectEventRegistration('uid-1_event-1', 'uid-1', 'reviewer')).rejects.toMatchObject({
       message: 'Failed to reject payment.',
     });
+  });
+});
+
+describe('getEventRegistrationCount', () => {
+  it('counts how many registrations exist for the event', async () => {
+    getDocs.mockResolvedValue({
+      docs: [
+        { id: 'a_event-1', data: () => ({ eventId: 'event-1' }) },
+        { id: 'b_event-1', data: () => ({ eventId: 'event-1' }) },
+        { id: 'c_event-1', data: () => ({ eventId: 'event-1' }) },
+      ],
+    });
+
+    const count = await getEventRegistrationCount('event-1');
+
+    expect(count).toBe(3);
+  });
+
+  it('returns 0 instead of throwing when the query fails', async () => {
+    getDocs.mockRejectedValue(new Error('Network error'));
+
+    const count = await getEventRegistrationCount('event-1');
+
+    expect(count).toBe(0);
   });
 });
