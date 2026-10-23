@@ -7,6 +7,7 @@ import { DISTRICTS, CONGREGATIONS } from '../../constants/config';
 jest.mock('../../services/firestoreService', () => ({
   getUpcomingEvents: jest.fn(),
   getUserNotifications: jest.fn(),
+  getLiveStatus: jest.fn(),
 }));
 
 jest.mock('@react-navigation/native', () => ({
@@ -15,7 +16,7 @@ jest.mock('@react-navigation/native', () => ({
   useFocusEffect: (cb) => require('react').useEffect(cb, [cb]),
 }));
 
-import { getUpcomingEvents, getUserNotifications } from '../../services/firestoreService';
+import { getUpcomingEvents, getUserNotifications, getLiveStatus } from '../../services/firestoreService';
 
 const mockUser = {
   uid: 'uid-1',
@@ -37,6 +38,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   getUpcomingEvents.mockResolvedValue([]);
   getUserNotifications.mockResolvedValue([]);
+  getLiveStatus.mockResolvedValue({ isLive: false, title: '' });
 });
 
 describe('HomeScreen rendering', () => {
@@ -67,6 +69,23 @@ describe('HomeScreen rendering', () => {
     await waitFor(() => {
       expect(getByText(/Current release/i)).toBeTruthy();
     });
+  });
+});
+
+describe('HomeScreen live status', () => {
+  it('shows Watch and no LIVE badge when nothing is live', async () => {
+    const { getByText, queryByText } = renderHome();
+    await waitFor(() => expect(getByText('Watch')).toBeTruthy());
+    expect(getByText('Watch our services')).toBeTruthy();
+    expect(queryByText('LIVE')).toBeNull();
+  });
+
+  it('shows Live Now and the stream title when actually live', async () => {
+    getLiveStatus.mockResolvedValue({ isLive: true, title: 'Sunday Morning Service' });
+    const { getByText, getAllByText } = renderHome();
+    await waitFor(() => expect(getByText('Live Now')).toBeTruthy());
+    expect(getByText('Sunday Morning Service')).toBeTruthy();
+    expect(getAllByText('LIVE').length).toBeGreaterThan(0);
   });
 });
 

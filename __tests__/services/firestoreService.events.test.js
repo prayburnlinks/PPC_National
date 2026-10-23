@@ -22,6 +22,7 @@ jest.mock('firebase/firestore', () => ({
   arrayRemove: jest.fn((v) => ({ __arrayRemove: v })),
   serverTimestamp: jest.fn(() => new Date('2026-01-01')),
   runTransaction: jest.fn(),
+  Timestamp: { fromDate: jest.fn((d) => ({ __timestamp: d.toISOString() })) },
 }));
 
 const DAY = 86400000;

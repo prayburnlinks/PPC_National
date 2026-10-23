@@ -22,9 +22,15 @@ import {
   where,
   getDocs,
 } from 'firebase/firestore';
-import { auth, db } from '../firebase-config';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { app, auth, db } from '../firebase-config';
 import { ROLES, USER_STATUS } from '../constants/config';
 import { createUserNotification } from './firestoreService';
+import { normalizePhone, identifierKind } from '../utils/phone';
+
+// Must match the region declared in functions/index.js, or the callables
+// resolve to URLs that don't exist.
+const FUNCTIONS_REGION = 'us-central1';
 
 /**
  * Register a new user
@@ -56,6 +62,10 @@ export const registerUser = async (userData) => {
       email,
       name,
       phone,
+      // Canonical form of `phone`, used to look the member up when they sign
+      // in by number. Kept alongside the raw value so the profile still shows
+      // the number the way they typed it.
+      phoneNormalized: normalizePhone(phone),
       congregation,
       district,
       role,
@@ -98,10 +108,28 @@ export const registerUser = async (userData) => {
 };
 
 /**
- * Login user
+ * Turn whatever the member typed into the email address Firebase Auth needs.
+ *
+ * Anything containing "@" (or unrecognisable) is passed straight through so
+ * Firebase gives its usual verdict. A valid SA mobile number goes to the
+ * resolvePhoneSignIn function, which checks the password before handing back
+ * the matching email — see functions/index.js for why that ordering matters.
  */
-export const loginUser = async (email, password) => {
+const resolveIdentifierToEmail = async (identifier, password) => {
+  const value = String(identifier ?? '').trim();
+  if (identifierKind(value) !== 'phone') return value;
+
+  const callable = httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'resolvePhoneSignIn');
+  const { data } = await callable({ phone: normalizePhone(value), password });
+  return data.email;
+};
+
+/**
+ * Login user. `identifier` may be an email address or an SA mobile number.
+ */
+export const loginUser = async (identifier, password) => {
   try {
+    const email = await resolveIdentifierToEmail(identifier, password);
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
 
@@ -151,7 +179,7 @@ export const loginUser = async (email, password) => {
     console.error('Login error:', error);
     throw {
       code: error.code,
-      message: getErrorMessage(error.code || error.message),
+      message: getErrorMessage(error.code || error.message, error.message),
     };
   }
 };
@@ -222,6 +250,24 @@ export const getPendingRegistrations = async () => {
 };
 
 /**
+ * All approved users (admin/leader read per firestore.rules) — for the
+ * admin Users tab and its per-role counts.
+ */
+export const getApprovedUsers = async () => {
+  try {
+    const q = query(
+      collection(db, 'users'),
+      where('status', '==', USER_STATUS.APPROVED)
+    );
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id }));
+  } catch (error) {
+    console.error('Get approved users error:', error);
+    throw { message: 'Failed to load users' };
+  }
+};
+
+/**
  * Approve a pending user (admin only)
  */
 export const approveUser = async (uid) => {
@@ -278,6 +324,36 @@ export const rejectUser = async (uid, reason = '') => {
 };
 
 /**
+ * Change an approved user's role (admin only). firestore.rules lets admins
+ * update any user field, including role.
+ */
+export const updateUserRole = async (uid, role) => {
+  if (![ROLES.ADMIN, ROLES.LEADER, ROLES.MEMBER].includes(role)) {
+    throw { message: 'Invalid role' };
+  }
+  try {
+    await updateDoc(doc(db, 'users', uid), {
+      role,
+      updatedAt: new Date(),
+    });
+
+    createUserNotification(uid, {
+      type: 'role_changed',
+      title: 'Role Updated',
+      body: `Your role has been changed to ${role}.`,
+    });
+
+    return { success: true, message: 'Role updated' };
+  } catch (error) {
+    console.error('Update user role error:', error);
+    if (error.code === 'permission-denied') {
+      throw { message: 'Unauthorized: Admin access required to change roles' };
+    }
+    throw { message: 'Failed to update role' };
+  }
+};
+
+/**
  * Notify admin of new registration
  * (In production, this would be a Cloud Function call)
  */
@@ -299,9 +375,47 @@ const notifyAdminOfNewRegistration = async (uid, userData) => {
 };
 
 /**
+ * Delete the signed-in member's own account, permanently.
+ *
+ * The password is re-entered here and verified server-side; deleteMyAccount in
+ * functions/index.js explains why that matters on a shared handset, and spells
+ * out what is erased versus what is anonymised and kept.
+ */
+export const deleteMyAccount = async (password) => {
+  try {
+    const callable = httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'deleteMyAccount');
+    await callable({ password });
+
+    // The Auth record is already gone by the time this resolves. Signing out
+    // just clears the local session so the app returns to the login screen
+    // instead of sitting on a user that no longer exists.
+    await signOut(auth).catch(() => {});
+    return { success: true };
+  } catch (error) {
+    console.error('Delete account error:', error);
+    throw {
+      code: error.code,
+      message: getErrorMessage(error.code, error.message),
+    };
+  }
+};
+
+/**
  * Map Firebase error codes to user-friendly messages
  */
-const getErrorMessage = (code) => {
+const getErrorMessage = (code, fallbackMessage) => {
+  // Errors raised by resolvePhoneSignIn already carry member-facing wording
+  // (wrong details, shared number, rate limited), so pass those straight
+  // through rather than flattening them to the generic message below.
+  const callableMessages = [
+    'functions/unauthenticated',
+    'functions/invalid-argument',
+    'functions/failed-precondition',
+    'functions/resource-exhausted',
+    'functions/unavailable',
+  ];
+  if (callableMessages.includes(code) && fallbackMessage) return fallbackMessage;
+
   const errorMessages = {
     'auth/invalid-email': 'Invalid email address',
     'auth/user-disabled': 'This account has been disabled',
@@ -330,6 +444,8 @@ export default {
   getCurrentUser,
   sendResetEmail,
   getPendingRegistrations,
+  getApprovedUsers,
   approveUser,
   rejectUser,
+  deleteMyAccount,
 };

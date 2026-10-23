@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, Image, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -29,6 +29,7 @@ import NotificationsScreen from './screens/NotificationsScreen';
 import StoreScreen from './screens/StoreScreen';
 import MyOrdersScreen from './screens/MyOrdersScreen';
 import AdminMerchItemsScreen from './screens/AdminMerchItemsScreen';
+import AdminEventsScreen from './screens/AdminEventsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -39,7 +40,7 @@ const tabBarScreenOptions = (insets) => ({ route }) => ({
   headerShown: false,
   tabBarActiveTintColor: colors.blue,
   tabBarInactiveTintColor: colors.textSecondary,
-  tabBarLabelStyle: { fontSize: 10, fontWeight: '700' },
+  tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
   tabBarStyle: {
     borderTopWidth: 1,
     borderTopColor: colors.border,
@@ -74,15 +75,15 @@ const SignInPromptScreen = ({ navigation }) => {
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background, padding: 32 }}>
       <Text style={{ fontSize: 40, marginBottom: 16 }}>🔑</Text>
-      <Text style={{ fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 8, textAlign: 'center' }}>Sign In for Full Access</Text>
-      <Text style={{ fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginBottom: 32 }}>
+      <Text style={{ fontSize: 20, fontWeight: '700', color: colors.textPrimary, marginBottom: 8, textAlign: 'center' }}>Sign In for Full Access</Text>
+      <Text style={{ fontSize: 14, lineHeight: 20, color: colors.textSecondary, textAlign: 'center', marginBottom: 32 }}>
         Create an account or sign in to access the Prayer Wall, Districts, and your Profile.
       </Text>
       <TouchableOpacity
         onPress={() => onLogout()}
         style={{ backgroundColor: colors.blue, borderRadius: 8, paddingVertical: 14, paddingHorizontal: 40, marginBottom: 12 }}
       >
-        <Text style={{ color: colors.white, fontWeight: '700', fontSize: 14 }}>Sign In</Text>
+        <Text style={{ color: colors.white, fontWeight: '700', fontSize: 15 }}>Sign In</Text>
       </TouchableOpacity>
     </View>
   );
@@ -136,7 +137,8 @@ export default function App() {
   if (loading) {
     return (
       <View style={styles.splash}>
-        <ActivityIndicator size="large" color={colors.blue} />
+        <Image source={require('./assets/splash.png')} style={styles.splashCoin} resizeMode="contain" accessibilityLabel="PPC emblem" />
+        <ActivityIndicator size="small" color={colors.white} style={{ marginTop: -24 }} />
       </View>
     );
   }
@@ -158,6 +160,7 @@ export default function App() {
             {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && <Stack.Screen name="Admin" component={AdminScreen} />}
             {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && <Stack.Screen name="Documents" component={DocumentsScreen} />}
             {user?.role === ROLES.ADMIN && <Stack.Screen name="AdminMerchItems" component={AdminMerchItemsScreen} />}
+            {user?.role === ROLES.ADMIN && <Stack.Screen name="AdminEvents" component={AdminEventsScreen} />}
             {user && <Stack.Screen name="NationalBoard" component={NationalBoardScreen} />}
             {user && (
               <Stack.Screen
@@ -197,6 +200,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: colors.darkBlue,
   },
+  splashCoin: { width: 320, height: 320 },
 });

@@ -22,7 +22,7 @@ import * as DocumentPicker from 'expo-document-picker';
 
 const ALL_SIZES = ['S', 'M', 'L', 'XL', 'XXL'];
 
-const emptyForm = { name: '', description: '', price: '', sizes: [...ALL_SIZES], imageFile: null };
+const emptyForm = { name: '', description: '', price: '', hasSizes: true, sizes: [...ALL_SIZES], imageFile: null };
 
 const AdminMerchItemsScreen = ({ navigation }) => {
   const { user } = useUser();
@@ -50,7 +50,15 @@ const AdminMerchItemsScreen = ({ navigation }) => {
 
   const openEditForm = (item) => {
     setEditingItem(item);
-    setForm({ name: item.name, description: item.description || '', price: String(item.price), sizes: item.sizes || [], imageFile: null });
+    const sizes = item.sizes || [];
+    setForm({
+      name: item.name,
+      description: item.description || '',
+      price: String(item.price),
+      hasSizes: sizes.length > 0,
+      sizes: sizes.length > 0 ? sizes : [...ALL_SIZES],
+      imageFile: null,
+    });
     setShowForm(true);
   };
 
@@ -78,12 +86,13 @@ const AdminMerchItemsScreen = ({ navigation }) => {
     setSaving(true);
     try {
       const price = parseFloat(form.price);
+      const sizes = form.hasSizes ? form.sizes : [];
       if (editingItem) {
         await updateMerchItem(editingItem.id, {
           name: form.name.trim(),
           description: form.description.trim(),
           price,
-          sizes: form.sizes,
+          sizes,
           ...(form.imageFile ? { imageFile: form.imageFile } : {}),
         });
       } else {
@@ -92,7 +101,7 @@ const AdminMerchItemsScreen = ({ navigation }) => {
           description: form.description.trim(),
           price,
           currency: 'ZAR',
-          sizes: form.sizes,
+          sizes,
           imageFile: form.imageFile,
         });
       }
@@ -127,6 +136,8 @@ const AdminMerchItemsScreen = ({ navigation }) => {
         <ScrollView
           contentContainerStyle={[styles.formContent, { paddingBottom: spacing.xxxl + insets.bottom }]}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
         >
           <TouchableOpacity style={styles.imagePicker} onPress={handlePickImage}>
             {form.imageFile ? (
@@ -167,20 +178,34 @@ const AdminMerchItemsScreen = ({ navigation }) => {
             onChangeText={(v) => setForm(f => ({ ...f, price: v }))}
           />
 
-          <Text style={styles.label}>Available Sizes</Text>
-          <View style={styles.sizeRow}>
-            {ALL_SIZES.map((size) => (
-              <TouchableOpacity
-                key={size}
-                style={[styles.sizeChip, form.sizes.includes(size) && styles.sizeChipSelected]}
-                onPress={() => toggleSize(size)}
-              >
-                <Text style={[styles.sizeChipText, form.sizes.includes(size) && styles.sizeChipTextSelected]}>
-                  {size}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <TouchableOpacity
+            style={styles.checkboxRow}
+            onPress={() => setForm(f => ({ ...f, hasSizes: !f.hasSizes }))}
+          >
+            <View style={[styles.checkbox, form.hasSizes && styles.checkboxChecked]}>
+              {form.hasSizes && <Text style={styles.checkboxTick}>✓</Text>}
+            </View>
+            <Text style={styles.checkboxLabel}>This item has sizes</Text>
+          </TouchableOpacity>
+
+          {form.hasSizes && (
+            <>
+              <Text style={styles.label}>Available Sizes</Text>
+              <View style={styles.sizeRow}>
+                {ALL_SIZES.map((size) => (
+                  <TouchableOpacity
+                    key={size}
+                    style={[styles.sizeChip, form.sizes.includes(size) && styles.sizeChipSelected]}
+                    onPress={() => toggleSize(size)}
+                  >
+                    <Text style={[styles.sizeChipText, form.sizes.includes(size) && styles.sizeChipTextSelected]}>
+                      {size}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
 
           <TouchableOpacity style={[styles.saveButton, saving && styles.buttonDisabled]} onPress={handleSave} disabled={saving}>
             {saving ? <ActivityIndicator color={colors.white} /> : <Text style={styles.saveButtonText}>Save Item</Text>}
@@ -290,6 +315,15 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg, backgroundColor: colors.white,
   },
   textArea: { minHeight: 80, textAlignVertical: 'top' },
+  checkboxRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg, gap: spacing.sm },
+  checkbox: {
+    width: 22, height: 22, borderRadius: borderRadius.sm,
+    borderWidth: 1, borderColor: colors.border,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white,
+  },
+  checkboxChecked: { backgroundColor: colors.blue, borderColor: colors.blue },
+  checkboxTick: { color: colors.white, fontSize: typography.sizes.sm, fontWeight: '700' },
+  checkboxLabel: { fontSize: typography.sizes.sm, fontWeight: '600', color: colors.textPrimary },
   sizeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
   sizeChip: {
     borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.full,

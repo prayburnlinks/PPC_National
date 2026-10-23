@@ -7,6 +7,8 @@ jest.mock('../../services/authService', () => ({
   getPendingRegistrations: jest.fn(),
   approveUser: jest.fn(),
   rejectUser: jest.fn(),
+  getApprovedUsers: jest.fn(),
+  updateUserRole: jest.fn(),
 }));
 
 jest.mock('../../services/eventRegistrationService', () => ({
@@ -22,10 +24,20 @@ jest.mock('../../services/merchService', () => ({
   rejectMerchOrder: jest.fn(),
 }));
 
+// The Reported tab reads the moderation queue. Without this mock the real
+// module drags in firebase's ESM build, which jest cannot parse.
+jest.mock('../../services/firestoreService', () => ({
+  getOpenContentReports: jest.fn(() => Promise.resolve([])),
+  hidePrayerRequest: jest.fn(),
+  resolveContentReport: jest.fn(),
+}));
+
 import {
   getPendingRegistrations,
+  getApprovedUsers,
   approveUser,
   rejectUser,
+  updateUserRole,
 } from '../../services/authService';
 
 import { getPendingEventRegistrations, getEventRegistrationsByEvent } from '../../services/eventRegistrationService';
@@ -71,6 +83,7 @@ const renderAdmin = (user = mockAdmin) => {
 beforeEach(() => {
   jest.clearAllMocks();
   getPendingRegistrations.mockResolvedValue(mockPendingUsers);
+  getApprovedUsers.mockResolvedValue([]);
   getPendingEventRegistrations.mockResolvedValue([]);
   getPendingMerchOrders.mockResolvedValue([]);
   getEventRegistrationsByEvent.mockResolvedValue([]);
@@ -376,5 +389,71 @@ describe('AdminScreen Events tab', () => {
     await waitFor(() => getByText('Events'));
 
     expect(getEventRegistrationsByEvent).toHaveBeenCalledWith('leader', 'Ebenezer');
+  });
+});
+
+describe('AdminScreen change role', () => {
+  const mockMember = {
+    uid: 'm1',
+    name: 'Nigel Scott',
+    email: 'nigel@church.com',
+    role: 'leader',
+    status: 'approved',
+  };
+
+  const openUsersTab = async (users = [mockMember]) => {
+    getApprovedUsers.mockResolvedValue(users);
+    const utils = renderAdmin();
+    await waitFor(() => utils.getByText('Users'));
+    await act(async () => {
+      fireEvent.press(utils.getByText('Users'));
+    });
+    return utils;
+  };
+
+  const confirmAlerts = () =>
+    jest.spyOn(require('react-native').Alert, 'alert').mockImplementation(
+      (title, msg, buttons) => buttons?.find((b) => b.text === 'Change')?.onPress()
+    );
+
+  it('changes a user role through the Change Role modal', async () => {
+    updateUserRole.mockResolvedValue({ success: true });
+    confirmAlerts();
+    const { getByText, getAllByText } = await openUsersTab();
+
+    await act(async () => {
+      fireEvent.press(getByText('Change Role'));
+    });
+    await act(async () => {
+      fireEvent.press(getByText('Member'));
+    });
+
+    await waitFor(() => {
+      expect(updateUserRole).toHaveBeenCalledWith('m1', 'member');
+      // The card's pill now reads Member; the chip filters are labelled "Members".
+      expect(getAllByText('Member').length).toBeGreaterThan(0);
+    });
+  });
+
+  it('shows an error and keeps the old role when the update fails', async () => {
+    updateUserRole.mockRejectedValue({ message: 'Unauthorized: Admin access required to change roles' });
+    const alertSpy = confirmAlerts();
+    const { getByText } = await openUsersTab();
+
+    await act(async () => {
+      fireEvent.press(getByText('Change Role'));
+    });
+    await act(async () => {
+      fireEvent.press(getByText('Member'));
+    });
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith('Error', 'Unauthorized: Admin access required to change roles');
+    });
+  });
+
+  it('does not offer Change Role on the admin\'s own card', async () => {
+    const { queryByText } = await openUsersTab([{ ...mockAdmin, email: 'a@church.com' }]);
+    expect(queryByText('Change Role')).toBeNull();
   });
 });

@@ -1,6 +1,13 @@
 /**
  * Giving Screen
- * Tithe and offering donation interface
+ * Tithe and offering donation interface.
+ *
+ * Android and web only (this plain .js file — React Native/Metro resolve
+ * an iOS build straight to GivingScreen.ios.js instead, no import change
+ * needed here or in App.js). That file exists because Apple Guideline
+ * 3.2.2(iv) forbids in-app donation collection for an org that isn't an
+ * approved Benevity/Candid nonprofit; Google Play has no equivalent rule,
+ * so this original in-app fund/amount/bank-details flow stays as-is here.
  */
 
 import React, { useState } from 'react';

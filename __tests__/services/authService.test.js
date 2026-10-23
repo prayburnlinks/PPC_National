@@ -5,6 +5,7 @@ import {
   getCurrentUser,
   approveUser,
   rejectUser,
+  updateUserRole,
   getPendingRegistrations,
   sendResetEmail,
 } from '../../services/authService';
@@ -247,6 +248,47 @@ describe('rejectUser', () => {
     updateDoc.mockRejectedValue({ code: 'permission-denied' });
 
     await expect(rejectUser('uid-123')).rejects.toMatchObject({
+      message: expect.stringContaining('Admin access required'),
+    });
+  });
+});
+
+describe('updateUserRole', () => {
+  it('updates only the role (plus updatedAt) on the user doc', async () => {
+    updateDoc.mockResolvedValue();
+    addDoc.mockResolvedValue({ id: 'notif-1' });
+
+    const result = await updateUserRole('uid-123', 'member');
+
+    expect(updateDoc).toHaveBeenCalledWith(
+      { path: 'users/uid-123' },
+      expect.objectContaining({ role: 'member', updatedAt: expect.any(Date) })
+    );
+    expect(Object.keys(updateDoc.mock.calls[0][1]).sort()).toEqual(['role', 'updatedAt']);
+    expect(result.success).toBe(true);
+  });
+
+  it('notifies the user of the new role', async () => {
+    updateDoc.mockResolvedValue();
+    addDoc.mockResolvedValue({ id: 'notif-1' });
+
+    await updateUserRole('uid-123', 'leader');
+
+    expect(addDoc).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ type: 'role_changed', body: expect.stringContaining('leader') })
+    );
+  });
+
+  it('rejects an unknown role without touching Firestore', async () => {
+    await expect(updateUserRole('uid-123', 'superuser')).rejects.toMatchObject({ message: 'Invalid role' });
+    expect(updateDoc).not.toHaveBeenCalled();
+  });
+
+  it('throws friendly message on permission-denied', async () => {
+    updateDoc.mockRejectedValue({ code: 'permission-denied' });
+
+    await expect(updateUserRole('uid-123', 'member')).rejects.toMatchObject({
       message: expect.stringContaining('Admin access required'),
     });
   });

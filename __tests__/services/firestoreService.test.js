@@ -2,6 +2,8 @@ import {
   getPrayerRequests,
   getUserPrayerRequests,
   submitPrayerRequest,
+  reportPrayerRequest,
+  blockMember,
   prayForRequest,
   getLiveStatus,
   incrementEventAttendeeCount,
@@ -9,6 +11,9 @@ import {
   getUserProfile,
   updateUserProfile,
   createUserNotification,
+  createEvent,
+  updateEvent,
+  deleteEvent,
 } from '../../services/firestoreService';
 
 jest.mock('firebase/firestore', () => ({
@@ -20,6 +25,7 @@ jest.mock('firebase/firestore', () => ({
   addDoc: jest.fn(),
   setDoc: jest.fn(),
   updateDoc: jest.fn(),
+  deleteDoc: jest.fn(),
   query: jest.fn((...args) => args),
   where: jest.fn(),
   orderBy: jest.fn(),
@@ -29,6 +35,15 @@ jest.mock('firebase/firestore', () => ({
   arrayRemove: jest.fn((v) => ({ __arrayRemove: v })),
   serverTimestamp: jest.fn(() => new Date('2026-01-01')),
   runTransaction: jest.fn(),
+  Timestamp: { fromDate: jest.fn((d) => ({ __timestamp: d.toISOString() })) },
+}));
+
+// Posting now goes through a callable so the profanity filter runs somewhere
+// the member cannot reach — see submitPrayerRequest in functions/index.js.
+const mockCallable = jest.fn();
+jest.mock('firebase/functions', () => ({
+  getFunctions: jest.fn(() => ({})),
+  httpsCallable: jest.fn(() => mockCallable),
 }));
 
 import {
@@ -37,6 +52,7 @@ import {
   getDocsFromServer,
   addDoc,
   updateDoc,
+  deleteDoc,
   runTransaction,
 } from 'firebase/firestore';
 
@@ -115,8 +131,8 @@ describe('getUserPrayerRequests', () => {
 });
 
 describe('submitPrayerRequest', () => {
-  it('creates a prayer request with correct payload', async () => {
-    addDoc.mockResolvedValue({ id: 'new-req' });
+  it('posts through the callable and never writes to Firestore directly', async () => {
+    mockCallable.mockResolvedValue({ data: { success: true } });
 
     const result = await submitPrayerRequest('uid-1', {
       title: 'Heal my father',
@@ -124,25 +140,74 @@ describe('submitPrayerRequest', () => {
       scope: 'national',
     });
 
-    expect(addDoc).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        createdBy: 'uid-1',
-        scope: 'national',
-        prayCount: 0,
-        prayingBy: [],
-      })
-    );
+    expect(mockCallable).toHaveBeenCalledWith({
+      title: 'Heal my father',
+      body: 'Please pray',
+      scope: 'national',
+    });
+    // firestore.rules refuses client creates on prayerRequests, so a direct
+    // write here would fail in production even if the test passed.
+    expect(addDoc).not.toHaveBeenCalled();
     expect(result.success).toBe(true);
-    expect(result.id).toBe('new-req');
   });
 
-  it('throws on failure', async () => {
-    addDoc.mockRejectedValue(new Error('Write failed'));
+  it('surfaces the filter rejection wording rather than a generic failure', async () => {
+    mockCallable.mockRejectedValue(
+      new Error('Please rephrase your request — it contains language that is not allowed on the prayer wall.')
+    );
 
     await expect(
       submitPrayerRequest('uid-1', { title: 'T', body: 'B', scope: 'national' })
-    ).rejects.toMatchObject({ message: 'Failed to submit prayer request' });
+    ).rejects.toMatchObject({
+      message: expect.stringContaining('rephrase'),
+    });
+  });
+});
+
+describe('prayer wall moderation', () => {
+  it('reports a request through the callable', async () => {
+    mockCallable.mockResolvedValue({ data: { success: true } });
+
+    const result = await reportPrayerRequest('req-9', 'abusive language');
+
+    expect(mockCallable).toHaveBeenCalledWith({ requestId: 'req-9', reason: 'abusive language' });
+    expect(result.success).toBe(true);
+  });
+
+  it('blocking writes only to the blocker\'s own profile', async () => {
+    updateDoc.mockResolvedValue(undefined);
+
+    await blockMember('uid-1', 'uid-2');
+
+    expect(updateDoc).toHaveBeenCalledWith(
+      expect.objectContaining({ path: 'users/uid-1' }),
+      { blockedUsers: { __arrayUnion: 'uid-2' } }
+    );
+  });
+
+  it('refuses to let a member block themselves', async () => {
+    await expect(blockMember('uid-1', 'uid-1')).rejects.toMatchObject({
+      message: 'Failed to block this member',
+    });
+    expect(updateDoc).not.toHaveBeenCalled();
+  });
+
+  it('hides requests the viewer reported, blocked, or an admin removed', async () => {
+    getDocs.mockResolvedValue(
+      makeQuerySnap([
+        ['keep',      { body: 'visible', createdBy: 'uid-9', createdAt: null }],
+        ['reported',  { body: 'x', createdBy: 'uid-9', reportedBy: ['uid-1'], createdAt: null }],
+        ['blocked',   { body: 'x', createdBy: 'uid-bad', createdAt: null }],
+        ['hidden',    { body: 'x', createdBy: 'uid-9', hidden: true, createdAt: null }],
+      ])
+    );
+
+    const result = await getPrayerRequests('national', null, {
+      uid: 'uid-1',
+      blockedUsers: ['uid-bad'],
+    });
+
+    expect(result.map(r => r.id)).toEqual(['keep']);
   });
 });
 
@@ -302,6 +367,35 @@ describe('updateUserProfile', () => {
     expect(updates).not.toHaveProperty('role');
     expect(updates).not.toHaveProperty('status');
   });
+
+  it('keeps phoneNormalized in step when the number changes', async () => {
+    updateDoc.mockResolvedValue();
+
+    await updateUserProfile('uid-1', { phone: '073 481 0683' });
+
+    const [, updates] = updateDoc.mock.calls[0];
+    expect(updates).toHaveProperty('phone', '073 481 0683');
+    // Without this, phone sign-in keeps matching the member's old number.
+    expect(updates).toHaveProperty('phoneNormalized', '0734810683');
+  });
+
+  it('records an unusable number as null rather than a stale match', async () => {
+    updateDoc.mockResolvedValue();
+
+    await updateUserProfile('uid-1', { phone: 'not a number' });
+
+    const [, updates] = updateDoc.mock.calls[0];
+    expect(updates.phoneNormalized).toBeNull();
+  });
+
+  it('leaves phoneNormalized alone when the number is not being edited', async () => {
+    updateDoc.mockResolvedValue();
+
+    await updateUserProfile('uid-1', { name: 'Bob' });
+
+    const [, updates] = updateDoc.mock.calls[0];
+    expect(updates).not.toHaveProperty('phoneNormalized');
+  });
 });
 
 describe('createUserNotification', () => {
@@ -336,5 +430,126 @@ describe('createUserNotification', () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe('createEvent', () => {
+  const adminUser = { uid: 'admin-1' };
+
+  it('writes an event doc with the expected shape', async () => {
+    addDoc.mockResolvedValue({ id: 'event-1' });
+
+    const result = await createEvent(adminUser, {
+      name: 'Youth Rally',
+      description: 'A night of worship',
+      category: 'Youth',
+      venue: 'Durban City Hall',
+      eventDate: new Date('2026-08-01T08:00:00'),
+      requiresPayment: false,
+    });
+
+    expect(addDoc).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        name: 'Youth Rally',
+        venue: 'Durban City Hall',
+        attendeeCount: 0,
+        requiresPayment: false,
+        registrationFee: 0,
+        createdBy: 'admin-1',
+      })
+    );
+    expect(result).toEqual({ success: true, eventId: 'event-1' });
+  });
+
+  it('carries the registration fee and reference only when payment is required', async () => {
+    addDoc.mockResolvedValue({ id: 'event-2' });
+
+    await createEvent(adminUser, {
+      name: 'Sisters Conference',
+      category: 'Women',
+      venue: 'Cape Town City Hall',
+      eventDate: new Date('2026-09-01T08:00:00'),
+      requiresPayment: true,
+      registrationFee: 100,
+      paymentReference: 'Sisters2026',
+    });
+
+    expect(addDoc).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        requiresPayment: true,
+        registrationFee: 100,
+        paymentReference: 'Sisters2026',
+      })
+    );
+  });
+
+  it('throws a friendly error when the write fails', async () => {
+    addDoc.mockRejectedValue(new Error('Permission denied'));
+
+    await expect(
+      createEvent(adminUser, {
+        name: 'Youth Rally',
+        category: 'Youth',
+        venue: 'Durban City Hall',
+        eventDate: new Date('2026-08-01T08:00:00'),
+      })
+    ).rejects.toEqual({ message: 'Permission denied' });
+  });
+});
+
+describe('updateEvent', () => {
+  it('writes the updated fields to the event doc', async () => {
+    updateDoc.mockResolvedValue();
+
+    const result = await updateEvent('event-1', {
+      name: 'Youth Rally (Updated)',
+      category: 'Youth',
+      venue: 'Durban City Hall',
+      eventDate: new Date('2026-08-01T08:00:00'),
+      requiresPayment: false,
+    });
+
+    expect(updateDoc).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        name: 'Youth Rally (Updated)',
+        venue: 'Durban City Hall',
+        requiresPayment: false,
+        registrationFee: 0,
+      })
+    );
+    expect(result).toEqual({ success: true });
+  });
+
+  it('throws a friendly error when the write fails', async () => {
+    updateDoc.mockRejectedValue(new Error('Permission denied'));
+
+    await expect(
+      updateEvent('event-1', {
+        name: 'Youth Rally',
+        category: 'Youth',
+        venue: 'Durban City Hall',
+        eventDate: new Date('2026-08-01T08:00:00'),
+      })
+    ).rejects.toEqual({ message: 'Permission denied' });
+  });
+});
+
+describe('deleteEvent', () => {
+  it('deletes the event doc', async () => {
+    deleteDoc.mockResolvedValue();
+
+    const result = await deleteEvent('event-1');
+
+    expect(deleteDoc).toHaveBeenCalledWith(expect.anything());
+    expect(result).toEqual({ success: true });
+  });
+
+  it('throws a friendly error when the delete fails', async () => {
+    deleteDoc.mockRejectedValue(new Error('Permission denied'));
+
+    await expect(deleteEvent('event-1')).rejects.toEqual({ message: 'Permission denied' });
   });
 });
