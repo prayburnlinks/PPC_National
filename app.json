@@ -3,14 +3,8 @@
     "name": "PPC I Love My Church",
     "slug": "ppc-national-church",
     "version": "1.0.0",
-    "sdkVersion": "54.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0A1F44"
-    },
     "updates": {
       "fallbackToCacheTimeout": 0,
       "url": "https://u.expo.dev/4159b7fe-4875-4e33-a6e7-ab4b38b2b314"
@@ -41,6 +35,14 @@
     },
     "plugins": [
       "expo-notifications",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0A1F44"
+        }
+      ],
       [
         "expo-build-properties",
         {
