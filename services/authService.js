@@ -250,6 +250,24 @@ export const getPendingRegistrations = async () => {
 };
 
 /**
+ * All approved users (admin/leader read per firestore.rules) — for the
+ * admin Users tab and its per-role counts.
+ */
+export const getApprovedUsers = async () => {
+  try {
+    const q = query(
+      collection(db, 'users'),
+      where('status', '==', USER_STATUS.APPROVED)
+    );
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id }));
+  } catch (error) {
+    console.error('Get approved users error:', error);
+    throw { message: 'Failed to load users' };
+  }
+};
+
+/**
  * Approve a pending user (admin only)
  */
 export const approveUser = async (uid) => {
@@ -302,6 +320,36 @@ export const rejectUser = async (uid, reason = '') => {
       throw { message: 'Unauthorized: Admin access required to reject users' };
     }
     throw { message: 'Failed to reject user' };
+  }
+};
+
+/**
+ * Change an approved user's role (admin only). firestore.rules lets admins
+ * update any user field, including role.
+ */
+export const updateUserRole = async (uid, role) => {
+  if (![ROLES.ADMIN, ROLES.LEADER, ROLES.MEMBER].includes(role)) {
+    throw { message: 'Invalid role' };
+  }
+  try {
+    await updateDoc(doc(db, 'users', uid), {
+      role,
+      updatedAt: new Date(),
+    });
+
+    createUserNotification(uid, {
+      type: 'role_changed',
+      title: 'Role Updated',
+      body: `Your role has been changed to ${role}.`,
+    });
+
+    return { success: true, message: 'Role updated' };
+  } catch (error) {
+    console.error('Update user role error:', error);
+    if (error.code === 'permission-denied') {
+      throw { message: 'Unauthorized: Admin access required to change roles' };
+    }
+    throw { message: 'Failed to update role' };
   }
 };
 
@@ -396,6 +444,7 @@ export default {
   getCurrentUser,
   sendResetEmail,
   getPendingRegistrations,
+  getApprovedUsers,
   approveUser,
   rejectUser,
   deleteMyAccount,

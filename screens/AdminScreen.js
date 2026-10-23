@@ -17,7 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { ROLES } from '../constants/config';
-import { getPendingRegistrations, approveUser, rejectUser } from '../services/authService';
+import { getPendingRegistrations, getApprovedUsers, approveUser, rejectUser, updateUserRole } from '../services/authService';
 import { getPendingEventRegistrations, approveEventRegistration, rejectEventRegistration, getEventRegistrationsByEvent } from '../services/eventRegistrationService';
 import { getPendingMerchOrders, approveMerchOrder, rejectMerchOrder } from '../services/merchService';
 import { getOpenContentReports, hidePrayerRequest, resolveContentReport } from '../services/firestoreService';
@@ -32,9 +32,12 @@ const AdminScreen = ({ navigation }) => {
   // Reported content is admins only — firestore.rules restricts contentReports
   // to isAdmin(), so showing a leader the tab would only ever load nothing.
   const TABS = isAdminReviewer
-    ? ['Pending', 'Payments', 'Merch Orders', 'Reported', 'Events', 'Actions']
+    ? ['Pending', 'Payments', 'Merch Orders', 'Reported', 'Users', 'Events', 'Actions']
     : ['Payments', 'Merch Orders', 'Events', 'Actions'];
   const [pendingUsers, setPendingUsers] = useState([]);
+  const [approvedUsers, setApprovedUsers] = useState([]);
+  const [userSearch, setUserSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
   const [pendingEventPayments, setPendingEventPayments] = useState([]);
   const [pendingMerchOrders, setPendingMerchOrders] = useState([]);
   const [eventGroups, setEventGroups] = useState([]);
@@ -54,24 +57,28 @@ const AdminScreen = ({ navigation }) => {
   const [loadError, setLoadError] = useState(false);
   const [contentReports, setContentReports] = useState([]);
   const [processingReportIds, setProcessingReportIds] = useState([]);
+  const [roleTarget, setRoleTarget] = useState(null); // approved user whose role is being changed
+  const [roleSubmitting, setRoleSubmitting] = useState(false);
   const [rejectTarget, setRejectTarget] = useState(null); // { kind: 'user'|'payment'|'order', item }
   const [rejectReason, setRejectReason] = useState('');
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
 
   const loadAll = useCallback(async () => {
     try {
-      const [users, registrations, orders, groups, reports] = await Promise.all([
+      const [users, registrations, orders, groups, reports, approved] = await Promise.all([
         isAdminReviewer ? getPendingRegistrations() : Promise.resolve([]),
         getPendingEventRegistrations(reviewer?.role, reviewer?.congregation),
         getPendingMerchOrders(reviewer?.role, reviewer?.congregation),
         getEventRegistrationsByEvent(reviewer?.role, reviewer?.congregation),
         isAdminReviewer ? getOpenContentReports() : Promise.resolve([]),
+        isAdminReviewer ? getApprovedUsers() : Promise.resolve([]),
       ]);
       setPendingUsers(users);
       setPendingEventPayments(registrations);
       setPendingMerchOrders(orders);
       setEventGroups(groups);
       setContentReports(reports);
+      setApprovedUsers(approved);
       setLoadError(false);
     } catch {
       setLoadError(true);
@@ -119,6 +126,35 @@ const AdminScreen = ({ navigation }) => {
   };
 
   const handleDismissReport = (report) => finishReport(report, { hide: false });
+
+  const saveRole = async (user, role) => {
+    setRoleSubmitting(true);
+    try {
+      await updateUserRole(user.uid, role);
+      setApprovedUsers(prev => prev.map(u => (u.uid === user.uid ? { ...u, role } : u)));
+      setRoleTarget(null);
+    } catch (e) {
+      Alert.alert('Error', e?.message || 'Failed to update role. Please try again.');
+    } finally {
+      setRoleSubmitting(false);
+    }
+  };
+
+  const handleSelectRole = (user, role) => {
+    if (role === user.role) {
+      setRoleTarget(null);
+      return;
+    }
+    const label = role.charAt(0).toUpperCase() + role.slice(1);
+    Alert.alert(
+      'Change Role',
+      `Change ${user.name} from ${user.role} to ${label}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Change', onPress: () => saveRole(user, role) },
+      ]
+    );
+  };
 
   const handleApprove = (user) => {
     Alert.alert(
@@ -612,6 +648,96 @@ const AdminScreen = ({ navigation }) => {
             })
           )}
         </ScrollView>
+      ) : activeTab === 'Users' ? (
+        <ScrollView
+          contentContainerStyle={[styles.list, { paddingBottom: spacing.xxxl + insets.bottom }]}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.blue]} />}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.roleCounts}>
+            {[
+              { key: 'all', label: 'All', color: colors.textPrimary, count: approvedUsers.length },
+              ...[ROLES.ADMIN, ROLES.LEADER, ROLES.MEMBER].map(role => ({
+                key: role,
+                label: `${role.charAt(0).toUpperCase() + role.slice(1)}s`,
+                color: roleColor(role),
+                count: approvedUsers.filter(u => u.role === role).length,
+              })),
+            ].map(chip => (
+              <TouchableOpacity
+                key={chip.key}
+                style={[
+                  styles.roleCountChip,
+                  { borderColor: chip.color },
+                  roleFilter === chip.key && { backgroundColor: chip.color },
+                ]}
+                onPress={() => setRoleFilter(chip.key)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: roleFilter === chip.key }}
+              >
+                <Text style={[styles.roleCountNumber, { color: roleFilter === chip.key ? colors.white : chip.color }]}>
+                  {chip.count}
+                </Text>
+                <Text style={[styles.roleCountLabel, roleFilter === chip.key && { color: colors.white }]}>
+                  {chip.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TextInput
+            style={styles.userSearch}
+            value={userSearch}
+            onChangeText={setUserSearch}
+            placeholder="Search by name or email"
+            placeholderTextColor={colors.textSecondary}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {(() => {
+            const term = userSearch.trim().toLowerCase();
+            const shown = approvedUsers
+              .filter(u => roleFilter === 'all' || u.role === roleFilter)
+              .filter(u => !term || u.name?.toLowerCase().includes(term) || u.email?.toLowerCase().includes(term))
+              .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            if (shown.length === 0) {
+              return (
+                <View style={styles.empty}>
+                  <Text style={styles.emptyIcon}>{loadError ? '⚠️' : '👥'}</Text>
+                  <Text style={styles.emptyTitle}>{loadError ? 'Failed to load' : 'No users found'}</Text>
+                </View>
+              );
+            }
+            return shown.map(user => (
+              <View key={user.uid} style={styles.card}>
+                <View style={styles.cardTop}>
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{user.name?.[0]?.toUpperCase() || '?'}</Text>
+                  </View>
+                  <View style={styles.cardInfo}>
+                    <Text style={styles.userName}>{user.name}</Text>
+                    <Text style={styles.userEmail}>{user.email}</Text>
+                    <View style={[styles.rolePill, { borderColor: roleColor(user.role) }]}>
+                      <Text style={[styles.rolePillText, { color: roleColor(user.role) }]}>
+                        {user.role?.charAt(0).toUpperCase() + user.role?.slice(1)}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                {user.uid !== reviewer?.uid && (
+                  <TouchableOpacity
+                    style={styles.changeRoleBtn}
+                    onPress={() => setRoleTarget(user)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Change role for ${user.name}`}
+                  >
+                    <Text style={styles.changeRoleBtnText}>Change Role</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ));
+          })()}
+        </ScrollView>
       ) : activeTab === 'Events' ? (
         <ScrollView
           contentContainerStyle={[styles.list, { paddingBottom: spacing.xxxl + insets.bottom }]}
@@ -774,6 +900,45 @@ const AdminScreen = ({ navigation }) => {
         </View>
       </Modal>
 
+      {/* Change Role Modal */}
+      <Modal
+        visible={!!roleTarget}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !roleSubmitting && setRoleTarget(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.rejectModalBox}>
+            <Text style={styles.rejectModalTitle}>Change role for {roleTarget?.name}</Text>
+            {[ROLES.MEMBER, ROLES.LEADER, ROLES.ADMIN].map(role => {
+              const selected = roleTarget?.role === role;
+              return (
+                <TouchableOpacity
+                  key={role}
+                  style={[
+                    styles.roleOption,
+                    { borderColor: roleColor(role) },
+                    selected && { backgroundColor: roleColor(role) },
+                  ]}
+                  onPress={() => handleSelectRole(roleTarget, role)}
+                  disabled={roleSubmitting}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                >
+                  <Text style={[styles.roleOptionText, { color: selected ? colors.white : roleColor(role) }]}>
+                    {role.charAt(0).toUpperCase() + role.slice(1)}{selected ? ' (current)' : ''}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+            {roleSubmitting && <ActivityIndicator color={colors.blue} style={{ marginBottom: spacing.md }} />}
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => setRoleTarget(null)} disabled={roleSubmitting}>
+              <Text style={styles.cancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Reject Reason Modal */}
       <Modal
         visible={!!rejectTarget}
@@ -848,6 +1013,25 @@ const AdminScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
+  roleCounts: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.md },
+  roleCountChip: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderRadius: borderRadius.md,
+  },
+  roleCountNumber: { fontSize: 22, fontWeight: '700' },
+  roleCountLabel: { fontSize: 12, color: colors.textSecondary },
+  userSearch: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+    color: colors.textPrimary,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -1106,6 +1290,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.lg,
+  },
+  changeRoleBtn: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.blue,
+    alignItems: 'center',
+  },
+  changeRoleBtnText: {
+    fontSize: typography.sizes.sm,
+    fontWeight: '700',
+    color: colors.blue,
+  },
+  roleOption: {
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  roleOptionText: {
+    fontSize: typography.sizes.sm,
+    fontWeight: '700',
   },
   rejectModalBox: {
     backgroundColor: colors.white,
