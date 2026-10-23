@@ -717,6 +717,7 @@ const AdminScreen = ({ navigation }) => {
                   <View style={styles.cardInfo}>
                     <Text style={styles.userName}>{user.name}</Text>
                     <Text style={styles.userEmail}>{user.email}</Text>
+                    <Text style={styles.userCongregation}>{user.congregation || 'No congregation'}</Text>
                     <View style={[styles.rolePill, { borderColor: roleColor(user.role) }]}>
                       <Text style={[styles.rolePillText, { color: roleColor(user.role) }]}>
                         {user.role?.charAt(0).toUpperCase() + user.role?.slice(1)}
@@ -1233,6 +1234,12 @@ const styles = StyleSheet.create({
   userEmail: {
     fontSize: typography.sizes.sm,
     color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  userCongregation: {
+    fontSize: typography.sizes.sm,
+    fontWeight: '600',
+    color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
   rolePill: {
