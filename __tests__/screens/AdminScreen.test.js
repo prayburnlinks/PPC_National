@@ -452,6 +452,15 @@ describe('AdminScreen change role', () => {
     });
   });
 
+  it('shows each user\'s congregation on their card', async () => {
+    const { getByText } = await openUsersTab([
+      { ...mockMember, congregation: 'Ebenhaeser' },
+      { ...mockMember, uid: 'm2', name: 'No Cong', email: 'x@church.com' },
+    ]);
+    expect(getByText('Ebenhaeser')).toBeTruthy();
+    expect(getByText('No congregation')).toBeTruthy();
+  });
+
   it('does not offer Change Role on the admin\'s own card', async () => {
     const { queryByText } = await openUsersTab([{ ...mockAdmin, email: 'a@church.com' }]);
     expect(queryByText('Change Role')).toBeNull();
