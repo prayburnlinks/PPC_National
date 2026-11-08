@@ -25,6 +25,15 @@ service cloud.firestore {
         .hasAny(['role', 'status', 'approvedAt']);
     }
 
+    // The leader or admin who registered someone for an event on their behalf,
+    // or null for a registration a member made for themselves. Only the
+    // registerEventAttendee function writes the field (the create rule below
+    // keeps clients from forging it), and a missing field reads as null rather
+    // than as an error, so the checks that use this stay plain true/false.
+    function registrarOf(registration) {
+      return 'registeredBy' in registration ? registration.registeredBy : null;
+    }
+
     // Shared shape check for a giving/tithe transaction doc — used by both
     // the per-user givingHistory subcollection and the global
     // givingTransactions collection so a client can't write a negative,
@@ -201,33 +210,47 @@ service cloud.firestore {
       // Registering — doc id is `${uid}_${eventId}` so a member can't
       // create a registration under another event/user's id, and status
       // must match whether the event actually requires payment.
+      //
+      // This is only for a member's own registration. One made on behalf of
+      // someone without the app is created by the registerEventAttendee
+      // function (Admin SDK) — so a client may not claim to be that kind, which
+      // is what the last two lines are for.
       allow create: if isAuthenticated()
         && request.resource.data.userId == request.auth.uid
         && registrationId == request.auth.uid + '_' + request.resource.data.eventId
         && (
           (request.resource.data.requiresPayment == true  && request.resource.data.status == 'awaiting_payment') ||
           (request.resource.data.requiresPayment == false && request.resource.data.status == 'confirmed')
-        );
+        )
+        && !('registeredBy' in request.resource.data)
+        && !('onBehalf' in request.resource.data);
 
       // Owner submits or resubmits payment proof after a rejection
-      // (mirrored by merchOrders below).
-      allow update: if isAuthenticated() && isOwner(resource.data.userId)
+      // (mirrored by merchOrders below). For someone registered on their
+      // behalf, the leader who registered them does it — they have no account.
+      allow update: if isAuthenticated()
+        && (isOwner(resource.data.userId) || registrarOf(resource.data) == request.auth.uid)
         && resource.data.status in ['awaiting_payment', 'rejected']
         && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['fileUrl', 'fileName', 'mimeType', 'status', 'paymentSubmittedAt', 'rejectionReason'])
         && request.resource.data.status == 'payment_submitted';
 
-      // Admin/leader reviews
+      // Admin/leader reviews — but never the person who registered them: whoever
+      // submitted the proof of payment can't also be the one who accepts it.
       allow update: if (
           isAdmin() ||
           (isLeaderOrAdmin() &&
             resource.data.congregation == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.congregation)
         )
+        && registrarOf(resource.data) != request.auth.uid
         && resource.data.status == 'payment_submitted'
         && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['status', 'reviewedBy', 'reviewedAt', 'rejectionReason'])
         && request.resource.data.status in ['approved', 'rejected'];
 
+      // Nobody deletes from the app. A registration made on someone's behalf is
+      // cancelled by the cancelEventAttendee function, which also gives the
+      // place back to the event.
       allow delete: if false;
     }
 

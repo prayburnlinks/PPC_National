@@ -11,8 +11,19 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../firebase-config';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { app, db, storage } from '../firebase-config';
 import { createUserNotification, getEventById, incrementEventAttendeeCount } from './firestoreService';
+
+// Must match the region declared in functions/index.js, or the callables
+// resolve to URLs that don't exist.
+const FUNCTIONS_REGION = 'us-central1';
+
+const toMs = (raw) => {
+  if (raw?.toDate) return raw.toDate().getTime();
+  if (raw?.seconds) return raw.seconds * 1000;
+  return raw ? new Date(raw).getTime() : 0;
+};
 
 // storage.rules only allows these — must always send one, since an
 // undefined contentType fails the rule's regex match outright.
@@ -199,11 +210,6 @@ export const getEventRegistrationsByEvent = async (reviewerRole, reviewerCongreg
       groups.get(reg.eventId).attendees.push(reg);
     });
 
-    const toMs = (raw) => {
-      if (raw?.toDate) return raw.toDate().getTime();
-      if (raw?.seconds) return raw.seconds * 1000;
-      return raw ? new Date(raw).getTime() : 0;
-    };
     return [...groups.values()]
       .map(g => ({
         ...g,
@@ -216,7 +222,10 @@ export const getEventRegistrationsByEvent = async (reviewerRole, reviewerCongreg
   }
 };
 
-export const approveEventRegistration = async (registrationId, userId, reviewerUid) => {
+// `attendeeName` is only for a registration made on someone's behalf: it has no
+// userId, so `userId` is the leader who registered them and the notice names the
+// person it is about.
+export const approveEventRegistration = async (registrationId, userId, reviewerUid, attendeeName) => {
   try {
     await updateDoc(doc(db, 'eventRegistrations', registrationId), {
       status: 'approved',
@@ -226,7 +235,9 @@ export const approveEventRegistration = async (registrationId, userId, reviewerU
     createUserNotification(userId, {
       type: 'event_payment_status',
       title: 'Payment Approved',
-      body: 'Your event payment has been approved. You are registered & paid!',
+      body: attendeeName
+        ? `${attendeeName}'s event payment has been approved. They are registered & paid!`
+        : 'Your event payment has been approved. You are registered & paid!',
     });
     return { success: true };
   } catch (error) {
@@ -235,7 +246,7 @@ export const approveEventRegistration = async (registrationId, userId, reviewerU
   }
 };
 
-export const rejectEventRegistration = async (registrationId, userId, reviewerUid, reason = '') => {
+export const rejectEventRegistration = async (registrationId, userId, reviewerUid, reason = '', attendeeName) => {
   try {
     await updateDoc(doc(db, 'eventRegistrations', registrationId), {
       status: 'rejected',
@@ -243,12 +254,13 @@ export const rejectEventRegistration = async (registrationId, userId, reviewerUi
       reviewedAt: new Date(),
       rejectionReason: reason,
     });
+    const subject = attendeeName ? `${attendeeName}'s event payment` : 'Your event payment';
     createUserNotification(userId, {
       type: 'event_payment_status',
       title: 'Payment Not Approved',
       body: reason
-        ? `Your event payment was rejected: ${reason}`
-        : 'Your event payment was not approved. Please resubmit or contact the church office.',
+        ? `${subject} was rejected: ${reason}`
+        : `${subject} was not approved. Please resubmit${attendeeName ? ' their proof of payment' : ''} or contact the church office.`,
     });
     return { success: true };
   } catch (error) {
@@ -267,5 +279,71 @@ export const getEventRegistrationCount = async (eventId) => {
   } catch (error) {
     console.error('Error counting event registrations:', error);
     return 0;
+  }
+};
+
+/**
+ * Register someone who doesn't use the app. Leaders can only do this for their
+ * own congregation and admins for any; the function decides, and it is where
+ * the capacity check and the attendee counter live (functions/registrations.js).
+ * Resolves with { registrationId, status, requiresPayment, registrationFee,
+ * currency, paymentReference }.
+ *
+ * The function's own wording ("This event is full", "…is already registered")
+ * is meant to be read, so it is passed on, along with the code so the screen can
+ * tell a possible double entry apart and offer to go ahead anyway.
+ */
+export const registerAttendee = async (event, { name, phone, congregation, district, allowDuplicate }) => {
+  try {
+    const callable = httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'registerEventAttendee');
+    const { data } = await callable({
+      eventId: event.id,
+      attendeeName: name,
+      attendeePhone: phone,
+      congregation,
+      district,
+      allowDuplicate,
+    });
+    return { success: true, ...data };
+  } catch (error) {
+    console.error('Error registering attendee:', error);
+    throw { code: error?.code, message: error?.message || 'Failed to register this person.' };
+  }
+};
+
+/**
+ * Cancel a registration made on someone's behalf, while nothing has been paid or
+ * sent for review. Frees the place for someone else.
+ */
+export const cancelAttendee = async (registrationId) => {
+  try {
+    const callable = httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'cancelEventAttendee');
+    await callable({ registrationId });
+    return { success: true };
+  } catch (error) {
+    console.error('Error cancelling attendee registration:', error);
+    throw { message: error?.message || 'Failed to cancel this registration.' };
+  }
+};
+
+/**
+ * The people a leader or admin registered on their behalf, soonest event first.
+ * A leader's query is also scoped to their congregation: firestore.rules lets
+ * leaders read their own congregation's registrations, and a query has to be
+ * provably allowed by the rules, which filtering on `registeredBy` alone is not.
+ */
+export const getAttendeesRegisteredBy = async (registrar) => {
+  try {
+    const constraints = [where('registeredBy', '==', registrar.uid)];
+    if (registrar.role !== 'admin') {
+      constraints.push(where('congregation', '==', registrar.congregation));
+    }
+    const snap = await getDocs(query(collection(db, 'eventRegistrations'), ...constraints));
+    return snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => toMs(a.eventDate) - toMs(b.eventDate) || (a.userName || '').localeCompare(b.userName || ''));
+  } catch (error) {
+    console.error('Error fetching registered attendees:', error);
+    return [];
   }
 };
