@@ -239,3 +239,111 @@ describe('RegisterScreen', () => {
     expect(utils.getByText('Step 1 of 3')).toBeTruthy();
   });
 });
+
+describe('RegisterScreen congregation search', () => {
+  const SEARCH_PLACEHOLDER = 'Search by congregation or district';
+
+  // Step 3 with the congregation picker open.
+  const openPicker = () => {
+    const utils = renderScreen();
+    goToStep3(utils);
+    fireEvent.press(utils.getByText('Select your congregation'));
+    return utils;
+  };
+
+  const search = (utils, text) =>
+    fireEvent.changeText(utils.getByPlaceholderText(SEARCH_PLACEHOLDER), text);
+
+  it('narrows the list as the member types', () => {
+    const utils = openPicker();
+    expect(utils.getByText('Botrivier')).toBeTruthy();
+
+    search(utils, 'cer');
+
+    expect(utils.getByText('Ceres')).toBeTruthy();
+    expect(utils.queryByText('Botrivier')).toBeNull();
+  });
+
+  it('finds a congregation far down the list without scrolling to it', () => {
+    const utils = openPicker();
+    expect(utils.queryByText('Despatch')).toBeNull();
+
+    search(utils, 'despatch');
+
+    expect(utils.getByText('Despatch')).toBeTruthy();
+  });
+
+  it('is not thrown by the punctuation in a name', () => {
+    const utils = openPicker();
+
+    search(utils, 'graaff reinet');
+
+    expect(utils.getByText('Graaff-Reinet')).toBeTruthy();
+  });
+
+  it('also finds congregations by their district', () => {
+    const utils = openPicker();
+
+    search(utils, 'eastern cape');
+
+    expect(utils.getByText('Despatch')).toBeTruthy();
+    expect(utils.queryByText('Ceres')).toBeNull();
+  });
+
+  it('says so when nothing matches', () => {
+    const utils = openPicker();
+
+    search(utils, 'zzzz');
+
+    expect(utils.getByText(/No congregation matches/)).toBeTruthy();
+    expect(utils.queryByText('Ceres')).toBeNull();
+  });
+
+  it('fills in the congregation and its district from a search result, and closes the picker', () => {
+    const utils = openPicker();
+    search(utils, 'ceres');
+
+    fireEvent.press(utils.getByText('Ceres'));
+
+    expect(utils.queryByPlaceholderText(SEARCH_PLACEHOLDER)).toBeNull();
+    expect(utils.getByText('Ceres')).toBeTruthy();
+    expect(utils.getByText('Boland')).toBeTruthy();
+  });
+
+  it('starts from the full list again the next time the picker opens', () => {
+    const utils = openPicker();
+    search(utils, 'ceres');
+    fireEvent.press(utils.getByText('Ceres'));
+
+    fireEvent.press(utils.getByText('Ceres')); // reopen from the field
+
+    expect(utils.getByPlaceholderText(SEARCH_PLACEHOLDER).props.value).toBe('');
+    expect(utils.getByText('Botrivier')).toBeTruthy();
+  });
+
+  it('forgets the search when the picker is closed without choosing', () => {
+    const utils = openPicker();
+    search(utils, 'cer');
+
+    fireEvent.press(utils.getByText('✕'));
+    fireEvent.press(utils.getByText('Select your congregation'));
+
+    expect(utils.getByPlaceholderText(SEARCH_PLACEHOLDER).props.value).toBe('');
+  });
+
+  it('registers with exactly the congregation and district that was picked from the search', async () => {
+    registerUser.mockResolvedValue({ uid: 'uid-new', status: 'approved', message: 'Welcome!' });
+    const utils = openPicker();
+    search(utils, 'oos london');
+
+    fireEvent.press(utils.getByText('Oos-London'));
+    acceptTerms(utils);
+    pressCreateAccount(utils);
+
+    await waitFor(() => {
+      expect(registerUser).toHaveBeenCalledWith(
+        expect.objectContaining({ congregation: 'Oos-London', district: 'Eastern Cape' })
+      );
+    });
+  });
+});
