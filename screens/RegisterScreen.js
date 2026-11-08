@@ -3,7 +3,7 @@
  * User registration with role selection and approval logic
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   ScrollView,
@@ -16,10 +16,12 @@ import {
   Platform,
   Modal,
   FlatList,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { registerUser, logoutUser } from '../services/authService';
 import { ROLES, CONGREGATIONS } from '../constants/config';
+import { searchCongregations } from '../utils/congregationSearch';
 import { useUser } from '../context/UserContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -39,6 +41,7 @@ const RegisterScreen = ({ navigation }) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showCongregationModal, setShowCongregationModal] = useState(false);
+  const [congregationQuery, setCongregationQuery] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
 
   const handleNext = () => {
@@ -131,10 +134,21 @@ const RegisterScreen = ({ navigation }) => {
     }
   };
 
+  const matchingCongregations = useMemo(
+    () => searchCongregations(CONGREGATIONS, congregationQuery),
+    [congregationQuery]
+  );
+
+  // Closing always clears the search, so the picker opens on the full list.
+  const closeCongregationModal = () => {
+    setShowCongregationModal(false);
+    setCongregationQuery('');
+  };
+
   const selectCongregation = (cong) => {
     setCongregation(cong.name);
     setDistrict(cong.district);
-    setShowCongregationModal(false);
+    closeCongregationModal();
   };
 
   return (
@@ -369,20 +383,50 @@ const RegisterScreen = ({ navigation }) => {
           visible={showCongregationModal}
           transparent
           animationType="slide"
-          onRequestClose={() => setShowCongregationModal(false)}
+          onRequestClose={closeCongregationModal}
         >
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView
+            style={styles.modalOverlay}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Select Congregation</Text>
-                <TouchableOpacity onPress={() => setShowCongregationModal(false)}>
+                <TouchableOpacity onPress={closeCongregationModal}>
                   <Text style={styles.modalCloseButton}>✕</Text>
                 </TouchableOpacity>
               </View>
+              <View style={styles.searchBox}>
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search by congregation or district"
+                  placeholderTextColor={colors.placeholder}
+                  value={congregationQuery}
+                  onChangeText={setCongregationQuery}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  clearButtonMode="while-editing"
+                  returnKeyType="search"
+                />
+              </View>
               <FlatList
-                data={CONGREGATIONS}
+                data={matchingCongregations}
                 contentContainerStyle={{ paddingBottom: insets.bottom }}
                 keyExtractor={(item) => item.name}
+                // With the keyboard up, the first tap on a result would
+                // otherwise only dismiss the keyboard.
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                ListEmptyComponent={(
+                  <View style={styles.noResults}>
+                    <Text style={styles.noResultsTitle}>
+                      No congregation matches “{congregationQuery.trim()}”
+                    </Text>
+                    <Text style={styles.noResultsText}>
+                      Check the spelling, or try searching by district.
+                    </Text>
+                  </View>
+                )}
                 renderItem={({ item }) => (
                   <TouchableOpacity
                     style={styles.congregationItem}
@@ -394,7 +438,7 @@ const RegisterScreen = ({ navigation }) => {
                 )}
               />
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
       </View>
     </ScrollView>
@@ -689,6 +733,37 @@ const styles = StyleSheet.create({
   modalCloseButton: {
     fontSize: typography.sizes.xl,
     color: colors.textSecondary,
+  },
+  searchBox: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  searchInput: {
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: Platform.OS === 'ios' ? spacing.md : spacing.sm,
+    fontSize: typography.sizes.base,
+    color: colors.textPrimary,
+  },
+  noResults: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xl,
+    alignItems: 'center',
+  },
+  noResultsTitle: {
+    fontSize: typography.sizes.base,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
+  noResultsText: {
+    fontSize: typography.sizes.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: spacing.xs,
   },
   congregationItem: {
     paddingHorizontal: spacing.lg,
