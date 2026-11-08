@@ -16,6 +16,7 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const admin = require('firebase-admin');
+const { getRegistrar, registerAttendee, cancelAttendee } = require('./registrations');
 
 admin.initializeApp();
 
@@ -255,6 +256,17 @@ exports.deleteMyAccount = onCall(
     const adminAlerts = await db.collection('notifications').where('userId', '==', uid).get();
     await commitInBatches(db, adminAlerts.docs, (batch, snapshot) => batch.delete(snapshot.ref));
 
+    // Leaders register people who don't use the app. Those registrations carry
+    // money and the attendee's own details, so they stay — but the leader's name
+    // comes off them, as it does everywhere else.
+    const registeredForOthers = await db
+      .collection('eventRegistrations')
+      .where('registeredBy', '==', uid)
+      .get();
+    await commitInBatches(db, registeredForOthers.docs, (batch, snapshot) =>
+      batch.update(snapshot.ref, { registeredByName: ANONYMISED_NAME })
+    );
+
     // recursiveDelete takes the profile's notifications and givingHistory
     // subcollections with it; a plain delete would orphan them.
     await db.recursiveDelete(profileRef);
@@ -453,6 +465,39 @@ exports.reportPrayerRequest = onCall(
 );
 
 /**
+ * Registering for events on behalf of people who don't use the app. A leader
+ * can do this for their own congregation, an admin for any; the rules are in
+ * registrations.js. Both run here rather than in the app so the capacity check
+ * and the attendee counter are a single transaction, and so firestore.rules can
+ * keep refusing client-side creates of anything but a member's own registration.
+ */
+exports.registerEventAttendee = onCall(
+  { region: 'us-central1', cors: true, maxInstances: 5 },
+  async (request) => {
+    const db = admin.firestore();
+    const registrar = await getRegistrar(db, request.auth?.uid);
+    return registerAttendee(db, {
+      FieldValue: admin.firestore.FieldValue,
+      registrar,
+      data: request.data,
+    });
+  }
+);
+
+exports.cancelEventAttendee = onCall(
+  { region: 'us-central1', cors: true, maxInstances: 5 },
+  async (request) => {
+    const db = admin.firestore();
+    const registrar = await getRegistrar(db, request.auth?.uid);
+    return cancelAttendee(db, {
+      FieldValue: admin.firestore.FieldValue,
+      registrar,
+      data: request.data,
+    });
+  }
+);
+
+/**
  * Daily reminders — nudges members about money they still owe and events
  * they're signed up for, through the same users/{uid}/notifications feed the
  * Notifications screen already reads (createUserNotification in
@@ -485,15 +530,33 @@ const notify = (db, userId, notification) =>
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   }).catch((err) => console.error(`Failed to notify user ${userId}:`, err));
 
+// A leader registering a busload for one event shouldn't get a notification per
+// person, so the names are listed in one.
+const MAX_NAMES_LISTED = 5;
+
+const listNames = (names) => {
+  const shown = names.slice(0, MAX_NAMES_LISTED).join(', ');
+  return names.length > MAX_NAMES_LISTED ? `${shown} and ${names.length - MAX_NAMES_LISTED} more` : shown;
+};
+
+const onBehalfPaymentBody = ({ names, eventName }) =>
+  names.length === 1
+    ? `${names[0]}'s registration for ${eventName || 'an event'} is still awaiting payment. Please arrange their EFT and upload their proof of payment.`
+    : `${names.length} people you registered for ${eventName || 'an event'} are still awaiting payment: ${listNames(names)}. Please arrange their EFT and upload each proof of payment.`;
+
 /**
  * Reminds members whose registration/order has sat in awaiting_payment for
  * at least PAYMENT_REMINDER_AFTER_DAYS. One reminder per doc —
  * paymentReminderSent marks it done so the next run skips it.
+ *
+ * A registration a leader made for someone without the app has no userId. Its
+ * reminder goes to that leader instead, once per event rather than per person.
  */
 const remindPendingPayments = async (db, now, collectionName, { createdAtField, buildBody }) => {
   const snap = await db.collection(collectionName).where('status', '==', 'awaiting_payment').get();
   const batch = db.batch();
   let pending = 0;
+  const onBehalf = new Map();
 
   for (const docSnap of snap.docs) {
     const data = docSnap.data();
@@ -502,6 +565,18 @@ const remindPendingPayments = async (db, now, collectionName, { createdAtField, 
     const createdMs = toMillis(data[createdAtField]);
     if (!createdMs || now - createdMs < PAYMENT_REMINDER_AFTER_DAYS * DAY_MS) continue;
 
+    if (!data.userId) {
+      if (data.registeredBy) {
+        const key = `${data.registeredBy}/${data.eventId}`;
+        if (!onBehalf.has(key)) {
+          onBehalf.set(key, { leaderUid: data.registeredBy, eventName: data.eventName, names: [], refs: [] });
+        }
+        onBehalf.get(key).names.push(data.userName);
+        onBehalf.get(key).refs.push(docSnap.ref);
+      }
+      continue;
+    }
+
     await notify(db, data.userId, {
       type: 'payment_reminder',
       title: 'Payment Pending',
@@ -509,6 +584,16 @@ const remindPendingPayments = async (db, now, collectionName, { createdAtField, 
     });
     batch.update(docSnap.ref, { paymentReminderSent: true });
     pending++;
+  }
+
+  for (const group of onBehalf.values()) {
+    await notify(db, group.leaderUid, {
+      type: 'payment_reminder',
+      title: 'Payment Pending',
+      body: onBehalfPaymentBody(group),
+    });
+    group.refs.forEach((ref) => batch.update(ref, { paymentReminderSent: true }));
+    pending += group.refs.length;
   }
 
   if (pending > 0) await batch.commit();
@@ -538,6 +623,10 @@ const remindUpcomingEvents = async (db, now) => {
     for (const regSnap of regsSnap.docs) {
       const reg = regSnap.data();
       if (reg.reminderSent || reg.status === 'rejected') continue;
+      // Registered on behalf of someone without the app: there is nobody to
+      // send this to, and the leader who registered them knows the date. (Left
+      // alone, notify() would throw on the missing userId and end the whole run.)
+      if (!reg.userId) continue;
 
       await notify(db, reg.userId, {
         type: 'event_reminder',

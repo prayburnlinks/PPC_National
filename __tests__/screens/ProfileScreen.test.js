@@ -49,6 +49,22 @@ describe('ProfileScreen', () => {
     expect(getByText('Boland')).toBeTruthy();
   });
 
+  describe('People I\'ve Registered', () => {
+    it.each(['leader', 'admin'])('is a row for a %s, and opens the list', (role) => {
+      const { getByText, navigation } = renderScreen({ ...memberUser, role });
+
+      fireEvent.press(getByText("People I've Registered"));
+
+      expect(navigation.navigate).toHaveBeenCalledWith('MyAttendees');
+    });
+
+    it('is not shown to a member, who registers themselves', () => {
+      const { queryByText } = renderScreen();
+
+      expect(queryByText("People I've Registered")).toBeNull();
+    });
+  });
+
   // PROF-02
   it('navigates to each Account row target', () => {
     const { getByText, queryByText, navigation } = renderScreen();

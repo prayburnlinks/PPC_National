@@ -8,6 +8,9 @@ import {
   rejectEventRegistration,
   getEventRegistrationsByEvent,
   getEventRegistrationCount,
+  registerAttendee,
+  cancelAttendee,
+  getAttendeesRegisteredBy,
 } from '../../services/eventRegistrationService';
 
 jest.mock('firebase/firestore', () => ({
@@ -18,9 +21,14 @@ jest.mock('firebase/firestore', () => ({
   setDoc: jest.fn(),
   updateDoc: jest.fn(),
   query: jest.fn((...args) => args),
-  where: jest.fn(),
+  where: jest.fn((...args) => ({ where: args })),
   orderBy: jest.fn(),
   serverTimestamp: jest.fn(() => new Date('2026-01-01')),
+}));
+
+jest.mock('firebase/functions', () => ({
+  getFunctions: jest.fn(() => ({})),
+  httpsCallable: jest.fn(),
 }));
 
 jest.mock('firebase/storage', () => ({
@@ -35,7 +43,8 @@ jest.mock('../../services/firestoreService', () => ({
   incrementEventAttendeeCount: jest.fn(),
 }));
 
-import { getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
+import { getDoc, getDocs, setDoc, updateDoc, where } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { createUserNotification, getEventById, incrementEventAttendeeCount } from '../../services/firestoreService';
 
@@ -271,6 +280,18 @@ describe('approveEventRegistration', () => {
     expect(result.success).toBe(true);
   });
 
+  it('tells the leader who registered someone, naming the person, rather than speaking to them', async () => {
+    updateDoc.mockResolvedValue();
+
+    await approveEventRegistration('reg-1', 'leader-1', 'reviewer-uid', 'Alice Adams');
+
+    expect(createUserNotification).toHaveBeenCalledWith('leader-1', {
+      type: 'event_payment_status',
+      title: 'Payment Approved',
+      body: "Alice Adams's event payment has been approved. They are registered & paid!",
+    });
+  });
+
   it('throws on failure', async () => {
     updateDoc.mockRejectedValue(new Error('Permission denied'));
 
@@ -295,6 +316,38 @@ describe('rejectEventRegistration', () => {
       body: expect.stringContaining('Wrong reference'),
     }));
     expect(result.success).toBe(true);
+  });
+
+  it('tells the leader who registered someone, naming the person and the reason', async () => {
+    updateDoc.mockResolvedValue();
+
+    await rejectEventRegistration('reg-1', 'leader-1', 'reviewer-uid', 'Wrong reference', 'Alice Adams');
+
+    expect(createUserNotification).toHaveBeenCalledWith('leader-1', {
+      type: 'event_payment_status',
+      title: 'Payment Not Approved',
+      body: "Alice Adams's event payment was rejected: Wrong reference",
+    });
+  });
+
+  it('asks the leader to resubmit the person’s proof when no reason is given', async () => {
+    updateDoc.mockResolvedValue();
+
+    await rejectEventRegistration('reg-1', 'leader-1', 'reviewer-uid', '', 'Alice Adams');
+
+    expect(createUserNotification).toHaveBeenCalledWith('leader-1', expect.objectContaining({
+      body: "Alice Adams's event payment was not approved. Please resubmit their proof of payment or contact the church office.",
+    }));
+  });
+
+  it('keeps the wording for a member’s own registration', async () => {
+    updateDoc.mockResolvedValue();
+
+    await rejectEventRegistration('uid-1_event-1', 'uid-1', 'reviewer-uid');
+
+    expect(createUserNotification).toHaveBeenCalledWith('uid-1', expect.objectContaining({
+      body: 'Your event payment was not approved. Please resubmit or contact the church office.',
+    }));
   });
 
   it('throws on failure', async () => {
@@ -327,5 +380,146 @@ describe('getEventRegistrationCount', () => {
     const count = await getEventRegistrationCount('event-1');
 
     expect(count).toBe(0);
+  });
+});
+
+describe('registerAttendee', () => {
+  const attendee = { name: 'Alice Adams', phone: '082 123 4567' };
+
+  it('asks the function to register them and passes on what it says happens next', async () => {
+    const callable = jest.fn().mockResolvedValue({
+      data: { registrationId: 'reg-1', status: 'awaiting_payment', requiresPayment: true, registrationFee: 250 },
+    });
+    httpsCallable.mockReturnValue(callable);
+
+    const result = await registerAttendee(mockPaidEvent, attendee);
+
+    expect(httpsCallable).toHaveBeenCalledWith(expect.anything(), 'registerEventAttendee');
+    expect(callable).toHaveBeenCalledWith({
+      eventId: 'event-1',
+      attendeeName: 'Alice Adams',
+      attendeePhone: '082 123 4567',
+      congregation: undefined,
+      district: undefined,
+      allowDuplicate: undefined,
+    });
+    expect(result).toEqual({
+      success: true,
+      registrationId: 'reg-1',
+      status: 'awaiting_payment',
+      requiresPayment: true,
+      registrationFee: 250,
+    });
+  });
+
+  it('passes an admin’s choice of congregation, and a confirmation to go ahead anyway', async () => {
+    const callable = jest.fn().mockResolvedValue({ data: {} });
+    httpsCallable.mockReturnValue(callable);
+
+    await registerAttendee(mockPaidEvent, {
+      ...attendee,
+      congregation: 'Despatch',
+      district: 'Eastern Cape',
+      allowDuplicate: true,
+    });
+
+    expect(callable).toHaveBeenCalledWith(
+      expect.objectContaining({ congregation: 'Despatch', district: 'Eastern Cape', allowDuplicate: true })
+    );
+  });
+
+  it('passes on the function’s own wording and its code', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    httpsCallable.mockReturnValue(
+      jest.fn().mockRejectedValue({ code: 'functions/already-exists', message: 'Alice Adams is already registered for this event.' })
+    );
+
+    await expect(registerAttendee(mockPaidEvent, attendee)).rejects.toEqual({
+      code: 'functions/already-exists',
+      message: 'Alice Adams is already registered for this event.',
+    });
+    consoleError.mockRestore();
+  });
+
+  it('falls back to a generic message', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    httpsCallable.mockReturnValue(jest.fn().mockRejectedValue(new Error('')));
+
+    await expect(registerAttendee(mockPaidEvent, attendee)).rejects.toMatchObject({
+      message: 'Failed to register this person.',
+    });
+    consoleError.mockRestore();
+  });
+});
+
+describe('cancelAttendee', () => {
+  it('asks the function to cancel the registration', async () => {
+    const callable = jest.fn().mockResolvedValue({ data: { success: true } });
+    httpsCallable.mockReturnValue(callable);
+
+    await expect(cancelAttendee('reg-1')).resolves.toEqual({ success: true });
+
+    expect(httpsCallable).toHaveBeenCalledWith(expect.anything(), 'cancelEventAttendee');
+    expect(callable).toHaveBeenCalledWith({ registrationId: 'reg-1' });
+  });
+
+  it('passes on why it could not', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    httpsCallable.mockReturnValue(
+      jest.fn().mockRejectedValue({ message: "A payment has already been submitted for this registration, so it can't be cancelled here." })
+    );
+
+    await expect(cancelAttendee('reg-1')).rejects.toEqual({
+      message: "A payment has already been submitted for this registration, so it can't be cancelled here.",
+    });
+    consoleError.mockRestore();
+  });
+});
+
+describe('getAttendeesRegisteredBy', () => {
+  const docs = [
+    { id: 'r3', data: () => ({ userName: 'Zed Zulu', eventDate: new Date('2026-09-01') }) },
+    { id: 'r1', data: () => ({ userName: 'Bob Brown', eventDate: new Date('2026-08-01') }) },
+    { id: 'r2', data: () => ({ userName: 'Alice Adams', eventDate: new Date('2026-09-01') }) },
+  ];
+
+  it('lists a leader’s guests for their congregation, soonest event first and then by name', async () => {
+    getDocs.mockResolvedValue({ docs });
+
+    const result = await getAttendeesRegisteredBy({ uid: 'leader-1', role: 'leader', congregation: 'Ceres' });
+
+    expect(result.map(r => r.id)).toEqual(['r1', 'r2', 'r3']);
+    expect(where).toHaveBeenCalledWith('registeredBy', '==', 'leader-1');
+    expect(where).toHaveBeenCalledWith('congregation', '==', 'Ceres');
+  });
+
+  it('is not limited to one congregation for an admin', async () => {
+    getDocs.mockResolvedValue({ docs: [] });
+
+    await getAttendeesRegisteredBy({ uid: 'admin-1', role: 'admin', congregation: 'Paarl' });
+
+    expect(where).toHaveBeenCalledWith('registeredBy', '==', 'admin-1');
+    expect(where).not.toHaveBeenCalledWith('congregation', '==', expect.anything());
+  });
+
+  it('copes with dates that are Firestore Timestamps', async () => {
+    getDocs.mockResolvedValue({
+      docs: [
+        { id: 'late', data: () => ({ userName: 'A', eventDate: { toDate: () => new Date('2026-10-01') } }) },
+        { id: 'early', data: () => ({ userName: 'B', eventDate: { seconds: new Date('2026-09-01').getTime() / 1000 } }) },
+      ],
+    });
+
+    const result = await getAttendeesRegisteredBy({ uid: 'leader-1', role: 'leader', congregation: 'Ceres' });
+
+    expect(result.map(r => r.id)).toEqual(['early', 'late']);
+  });
+
+  it('returns an empty list instead of throwing when the read fails', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    getDocs.mockRejectedValue(new Error('permission-denied'));
+
+    await expect(getAttendeesRegisteredBy({ uid: 'leader-1', role: 'leader', congregation: 'Ceres' })).resolves.toEqual([]);
+    consoleError.mockRestore();
   });
 });
