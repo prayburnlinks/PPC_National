@@ -30,6 +30,8 @@ import StoreScreen from './screens/StoreScreen';
 import MyOrdersScreen from './screens/MyOrdersScreen';
 import AdminMerchItemsScreen from './screens/AdminMerchItemsScreen';
 import AdminEventsScreen from './screens/AdminEventsScreen';
+import RegisterAttendeeScreen from './screens/RegisterAttendeeScreen';
+import MyAttendeesScreen from './screens/MyAttendeesScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -161,6 +163,8 @@ export default function App() {
             {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && <Stack.Screen name="Documents" component={DocumentsScreen} />}
             {user?.role === ROLES.ADMIN && <Stack.Screen name="AdminMerchItems" component={AdminMerchItemsScreen} />}
             {user?.role === ROLES.ADMIN && <Stack.Screen name="AdminEvents" component={AdminEventsScreen} />}
+            {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && <Stack.Screen name="RegisterAttendee" component={RegisterAttendeeScreen} />}
+            {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && <Stack.Screen name="MyAttendees" component={MyAttendeesScreen} />}
             {user && <Stack.Screen name="NationalBoard" component={NationalBoardScreen} />}
             {user && (
               <Stack.Screen

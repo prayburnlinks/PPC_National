@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
-import { BANK_DETAILS } from '../constants/config';
+import { BANK_DETAILS, ROLES } from '../constants/config';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../context/UserContext';
 import { getAllEvents } from '../services/firestoreService';
@@ -96,6 +96,14 @@ const EventsScreen = ({ navigation }) => {
       registeringRef.current = false;
       setRegistering(false);
     }
+  };
+
+  // For people who don't use the app. A screen of its own, rather than a second
+  // sheet on top of this one.
+  const handleRegisterSomeoneElse = () => {
+    const eventId = selectedEvent.id;
+    setSelectedEvent(null);
+    navigation.navigate('RegisterAttendee', { eventId });
   };
 
   const CATEGORY_COLORS = {
@@ -313,6 +321,12 @@ const EventsScreen = ({ navigation }) => {
                 </TouchableOpacity>
               )}
 
+              {(user?.role === ROLES.LEADER || user?.role === ROLES.ADMIN) && (
+                <TouchableOpacity style={styles.secondaryButton} onPress={handleRegisterSomeoneElse}>
+                  <Text style={styles.secondaryButtonText}>Register Someone Else</Text>
+                </TouchableOpacity>
+              )}
+
               <TouchableOpacity style={styles.closeButton} onPress={() => setSelectedEvent(null)}>
                 <Text style={styles.closeButtonText}>Close</Text>
               </TouchableOpacity>
@@ -454,6 +468,11 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.6 },
   registerButtonText: { color: colors.white, fontSize: typography.sizes.md, fontWeight: '700' },
+  secondaryButton: {
+    borderWidth: 1, borderColor: colors.blue, borderRadius: borderRadius.md,
+    paddingVertical: spacing.md, alignItems: 'center', marginTop: spacing.sm,
+  },
+  secondaryButtonText: { color: colors.blue, fontSize: typography.sizes.sm, fontWeight: '700' },
   closeButton: {
     borderRadius: borderRadius.md, paddingVertical: spacing.md,
     alignItems: 'center', marginTop: spacing.sm,

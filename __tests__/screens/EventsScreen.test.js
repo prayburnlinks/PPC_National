@@ -56,11 +56,12 @@ const paidEvent = {
 
 const renderScreen = (user = mockUser) => {
   const navigation = { navigate: jest.fn(), goBack: jest.fn() };
-  return render(
+  const utils = render(
     <UserContext.Provider value={{ user, onLogin: jest.fn(), onLogout: jest.fn() }}>
       <EventsScreen navigation={navigation} />
     </UserContext.Provider>
   );
+  return { ...utils, navigation };
 };
 
 beforeEach(() => {
@@ -226,5 +227,54 @@ describe('EventsScreen', () => {
 
     await waitFor(() => getByText('Leaders Retreat'));
     expect(getAllByText('✅ Registered & Paid')).toHaveLength(1);
+  });
+});
+
+describe('EventsScreen: registering someone else', () => {
+  const openEvent = async (user) => {
+    getAllEvents.mockResolvedValue({ events: [paidEvent] });
+    const utils = renderScreen(user);
+    await waitFor(() => utils.getByText('Leaders Retreat'));
+    fireEvent.press(utils.getByText('Leaders Retreat'));
+    return utils;
+  };
+
+  it.each(['leader', 'admin'])('offers a %s a way to register someone who has no app', async (role) => {
+    const { getByText } = await openEvent({ ...mockUser, role });
+
+    await waitFor(() => getByText('Register Someone Else'));
+  });
+
+  it('opens the registration screen for that event, and closes the sheet', async () => {
+    const { getByText, queryByText, navigation } = await openEvent({ ...mockUser, role: 'leader' });
+    await waitFor(() => getByText('Register Someone Else'));
+
+    fireEvent.press(getByText('Register Someone Else'));
+
+    expect(navigation.navigate).toHaveBeenCalledWith('RegisterAttendee', { eventId: 'evt-paid' });
+    expect(queryByText('Register Someone Else')).toBeNull();
+  });
+
+  it('keeps the leader’s own Register button', async () => {
+    const { getByText } = await openEvent({ ...mockUser, role: 'leader' });
+
+    await waitFor(() => getByText('Register — R350'));
+  });
+
+  it('is not offered to a member', async () => {
+    const { getByText, queryByText } = await openEvent({ ...mockUser, role: 'member' });
+    await waitFor(() => getByText('Register — R350'));
+
+    expect(queryByText('Register Someone Else')).toBeNull();
+  });
+
+  it('is not offered to a visitor', async () => {
+    getAllEvents.mockResolvedValue({ events: [paidEvent] });
+    const { getByText, queryByText } = renderScreen(null);
+    await waitFor(() => getByText('Leaders Retreat'));
+    fireEvent.press(getByText('Leaders Retreat'));
+
+    await waitFor(() => getByText('Register — R350'));
+    expect(queryByText('Register Someone Else')).toBeNull();
   });
 });

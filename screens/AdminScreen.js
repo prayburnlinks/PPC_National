@@ -200,7 +200,11 @@ const AdminScreen = ({ navigation }) => {
         await rejectUser(item.uid, reason);
         setPendingUsers(prev => prev.filter(u => u.uid !== item.uid));
       } else if (kind === 'payment') {
-        await rejectEventRegistration(item.id, item.userId, reviewer?.uid, reason);
+        // Someone registered on a leader's behalf has no account to notify, so
+        // the outcome goes to the leader who registered them, naming the person.
+        await (item.userId
+          ? rejectEventRegistration(item.id, item.userId, reviewer?.uid, reason)
+          : rejectEventRegistration(item.id, item.registeredBy, reviewer?.uid, reason, item.userName));
         setPendingEventPayments(prev => prev.filter(r => r.id !== item.id));
       } else {
         await rejectMerchOrder(item.id, item.userId, reviewer?.uid, reason);
@@ -222,7 +226,9 @@ const AdminScreen = ({ navigation }) => {
         onPress: async () => {
           setProcessingRegistrationIds(prev => [...prev, registration.id]);
           try {
-            await approveEventRegistration(registration.id, registration.userId, reviewer?.uid);
+            await (registration.userId
+              ? approveEventRegistration(registration.id, registration.userId, reviewer?.uid)
+              : approveEventRegistration(registration.id, registration.registeredBy, reviewer?.uid, registration.userName));
             setPendingEventPayments(prev => prev.filter(r => r.id !== registration.id));
           } catch {
             Alert.alert('Error', 'Failed to approve payment. Please try again.');
@@ -302,12 +308,13 @@ const AdminScreen = ({ navigation }) => {
         a.district,
         REG_STATUS[a.status]?.label || a.status,
         formatDate(a.registeredAt?.toDate?.() || a.registeredAt),
+        a.registeredByName || '',
       ].map(esc).join(',')
     );
     try {
       await Share.share({
         title: `${group.eventName} — Attendees`,
-        message: ['name,congregation,district,status,registered', ...rows].join('\n'),
+        message: ['name,congregation,district,status,registered,registered by', ...rows].join('\n'),
       });
     } catch {
       // User dismissed the share sheet — nothing to do
@@ -478,6 +485,12 @@ const AdminScreen = ({ navigation }) => {
                     <Text style={styles.metaLabel}>Congregation</Text>
                     <Text style={styles.metaValue}>{registration.congregation || 'N/A'}</Text>
                   </View>
+                  {registration.registeredBy ? (
+                    <View style={styles.metaRow}>
+                      <Text style={styles.metaLabel}>Registered by</Text>
+                      <Text style={styles.metaValue}>{registration.registeredByName || 'A leader'}</Text>
+                    </View>
+                  ) : null}
                   <View style={styles.metaRow}>
                     <Text style={styles.metaLabel}>File</Text>
                     <Text style={styles.metaValue} numberOfLines={1}>{registration.fileName}</Text>
@@ -501,7 +514,12 @@ const AdminScreen = ({ navigation }) => {
                   <Text style={styles.viewBtnText}>👁  View Proof of Payment</Text>
                 </TouchableOpacity>
 
-                {processingRegistrationIds.includes(registration.id) ? (
+                {registration.registeredBy && registration.registeredBy === reviewer?.uid ? (
+                  // firestore.rules refuses this too; the note saves the tap.
+                  <Text style={styles.ownRegistrationNote}>
+                    You registered {registration.userName}, so another leader or an admin needs to review this payment.
+                  </Text>
+                ) : processingRegistrationIds.includes(registration.id) ? (
                   <ActivityIndicator style={styles.spinner} color={colors.blue} />
                 ) : (
                   <View style={styles.actions}>
@@ -788,6 +806,9 @@ const AdminScreen = ({ navigation }) => {
                           <View style={styles.attendeeInfo}>
                             <Text style={styles.attendeeName}>{a.userName || 'Unknown'}</Text>
                             <Text style={styles.attendeeCong}>{a.congregation || 'N/A'}</Text>
+                            {a.registeredByName ? (
+                              <Text style={styles.attendeeCong}>Registered by {a.registeredByName}</Text>
+                            ) : null}
                           </View>
                           <View style={[styles.statusPill, { borderColor: (REG_STATUS[a.status]?.color || colors.textSecondary) }]}>
                             <Text style={[styles.statusPillText, { color: (REG_STATUS[a.status]?.color || colors.textSecondary) }]}>
@@ -1281,6 +1302,13 @@ const styles = StyleSheet.create({
   },
   spinner: {
     marginVertical: spacing.md,
+  },
+  ownRegistrationNote: {
+    fontSize: typography.sizes.xs,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    lineHeight: 18,
+    marginTop: spacing.md,
   },
   viewBtn: {
     backgroundColor: colors.surfaceLight,

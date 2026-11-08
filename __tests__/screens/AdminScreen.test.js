@@ -510,3 +510,201 @@ describe('AdminScreen change role', () => {
     expect(queryByText('Change Role')).toBeNull();
   });
 });
+
+// Registrations a leader made for someone without the app: no userId, and the
+// leader who registered them is who gets the news.
+describe('AdminScreen payments for people a leader registered', () => {
+  const guestPayment = {
+    id: 'guest-reg-1',
+    userId: null,
+    userName: 'Alice Adams',
+    onBehalf: true,
+    registeredBy: 'leader-uid',
+    registeredByName: 'Lena Leader',
+    eventName: 'National Convention',
+    registrationFee: 350,
+    currency: 'R',
+    congregation: 'Ebenezer',
+    fileName: 'proof.jpg',
+    mimeType: 'image/jpeg',
+  };
+
+  const memberPayment = {
+    id: 'u2_e1',
+    userId: 'u2',
+    userName: 'Mary Adams',
+    eventName: 'Youth Camp',
+    registrationFee: 250,
+    currency: 'R',
+    congregation: 'Ebenezer',
+    fileName: 'proof.jpg',
+    mimeType: 'image/jpeg',
+  };
+
+  const openPayments = async (utils) => {
+    await waitFor(() => utils.getByText(/Payments/));
+    await act(async () => {
+      fireEvent.press(utils.getByText(/Payments/));
+    });
+  };
+
+  // Confirm the "Approve Payment" alert straight away.
+  const autoConfirmApprove = () =>
+    jest.spyOn(require('react-native').Alert, 'alert').mockImplementation((title, msg, buttons) => {
+      buttons?.find((b) => b.text === 'Approve')?.onPress();
+    });
+
+  it('says who registered them', async () => {
+    getPendingEventRegistrations.mockResolvedValue([guestPayment]);
+    const utils = renderAdmin();
+
+    await openPayments(utils);
+
+    await waitFor(() => utils.getByText('Alice Adams'));
+    expect(utils.getByText('Registered by')).toBeTruthy();
+    expect(utils.getByText('Lena Leader')).toBeTruthy();
+  });
+
+  it('does not add a "Registered by" line to a member’s own payment', async () => {
+    getPendingEventRegistrations.mockResolvedValue([memberPayment]);
+    const utils = renderAdmin();
+
+    await openPayments(utils);
+
+    await waitFor(() => utils.getByText('Mary Adams'));
+    expect(utils.queryByText('Registered by')).toBeNull();
+  });
+
+  it('tells the leader who registered them when an admin approves, naming the person', async () => {
+    const { approveEventRegistration } = require('../../services/eventRegistrationService');
+    approveEventRegistration.mockResolvedValue({ success: true });
+    autoConfirmApprove();
+    getPendingEventRegistrations.mockResolvedValue([guestPayment]);
+    const utils = renderAdmin();
+    await openPayments(utils);
+    await waitFor(() => utils.getByText('Approve'));
+
+    await act(async () => {
+      fireEvent.press(utils.getByText('Approve'));
+    });
+
+    await waitFor(() => {
+      expect(approveEventRegistration).toHaveBeenCalledWith('guest-reg-1', 'leader-uid', 'admin-uid', 'Alice Adams');
+    });
+  });
+
+  it('still tells a member about their own approved payment as before', async () => {
+    const { approveEventRegistration } = require('../../services/eventRegistrationService');
+    approveEventRegistration.mockResolvedValue({ success: true });
+    autoConfirmApprove();
+    getPendingEventRegistrations.mockResolvedValue([memberPayment]);
+    const utils = renderAdmin();
+    await openPayments(utils);
+    await waitFor(() => utils.getByText('Approve'));
+
+    await act(async () => {
+      fireEvent.press(utils.getByText('Approve'));
+    });
+
+    await waitFor(() => {
+      expect(approveEventRegistration).toHaveBeenCalledWith('u2_e1', 'u2', 'admin-uid');
+    });
+  });
+
+  it('tells the leader who registered them when a payment is rejected, with the reason', async () => {
+    const { rejectEventRegistration } = require('../../services/eventRegistrationService');
+    rejectEventRegistration.mockResolvedValue({ success: true });
+    getPendingEventRegistrations.mockResolvedValue([guestPayment]);
+    const utils = renderAdmin();
+    await openPayments(utils);
+    await waitFor(() => utils.getByText('Reject'));
+
+    await act(async () => {
+      fireEvent.press(utils.getByText('Reject'));
+    });
+    fireEvent.changeText(utils.getByPlaceholderText('Reason (optional — shown to the user)'), 'Wrong reference');
+    await act(async () => {
+      fireEvent.press(utils.getByText('Confirm Reject'));
+    });
+
+    await waitFor(() => {
+      expect(rejectEventRegistration).toHaveBeenCalledWith(
+        'guest-reg-1', 'leader-uid', 'admin-uid', 'Wrong reference', 'Alice Adams'
+      );
+    });
+  });
+
+  describe('when the reviewer is the one who registered them', () => {
+    it('hides Approve and Reject, and explains why', async () => {
+      getPendingEventRegistrations.mockResolvedValue([guestPayment]);
+      // mockLeader's uid is 'leader-uid', the leader who registered Alice.
+      const utils = renderAdmin(mockLeader);
+
+      await openPayments(utils);
+
+      await waitFor(() => utils.getByText('Alice Adams'));
+      expect(utils.queryByText('Approve')).toBeNull();
+      expect(utils.queryByText('Reject')).toBeNull();
+      expect(
+        utils.getByText('You registered Alice Adams, so another leader or an admin needs to review this payment.')
+      ).toBeTruthy();
+    });
+
+    it('still lets them review other people’s payments', async () => {
+      getPendingEventRegistrations.mockResolvedValue([{ ...guestPayment, registeredBy: 'someone-else' }]);
+      const utils = renderAdmin(mockLeader);
+
+      await openPayments(utils);
+
+      await waitFor(() => utils.getByText('Approve'));
+      expect(utils.getByText('Reject')).toBeTruthy();
+    });
+  });
+});
+
+describe('AdminScreen attendee list for people a leader registered', () => {
+  const groups = [
+    {
+      eventId: 'e1',
+      eventName: 'National Convention',
+      eventDate: new Date('2026-12-01'),
+      attendees: [
+        { id: 'g1', userId: null, userName: 'Alice Adams', congregation: 'Ceres', district: 'Boland', status: 'awaiting_payment', requiresPayment: true, registeredAt: new Date('2026-11-01'), registeredBy: 'leader-uid', registeredByName: 'Lena Leader' },
+        { id: 'm1', userId: 'u1', userName: 'Mia Member', congregation: 'Ceres', district: 'Boland', status: 'approved', requiresPayment: true, registeredAt: new Date('2026-11-02') },
+      ],
+    },
+  ];
+
+  const openEvent = async (utils) => {
+    await waitFor(() => utils.getByText('Events'));
+    fireEvent.press(utils.getByText('Events'));
+    await waitFor(() => utils.getByText('National Convention'));
+    fireEvent.press(utils.getByText('National Convention'));
+  };
+
+  it('shows who registered each guest, and nothing extra for members', async () => {
+    getEventRegistrationsByEvent.mockResolvedValue(groups);
+    const utils = renderAdmin();
+
+    await openEvent(utils);
+
+    expect(utils.getAllByText(/Registered by/)).toHaveLength(1);
+    expect(utils.getByText('Registered by Lena Leader')).toBeTruthy();
+  });
+
+  it('adds a "registered by" column to the shared CSV', async () => {
+    const { Share } = require('react-native');
+    jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' });
+    getEventRegistrationsByEvent.mockResolvedValue(groups);
+    const utils = renderAdmin();
+    await openEvent(utils);
+
+    fireEvent.press(utils.getByText('⬆  Share Attendee List (CSV)'));
+
+    await waitFor(() => expect(Share.share).toHaveBeenCalled());
+    const rows = Share.share.mock.calls[0][0].message.split('\n');
+    expect(rows[0]).toBe('name,congregation,district,status,registered,registered by');
+    expect(rows[1]).toMatch(/^Alice Adams,Ceres,Boland,Awaiting Payment,.*,Lena Leader$/);
+    expect(rows[2]).toMatch(/^Mia Member,Ceres,Boland,Paid ✓,.*,$/);
+  });
+});

@@ -140,6 +140,15 @@ const ProfileScreen = ({ navigation }) => {
             </View>
             <Text style={styles.rowArrow}>›</Text>
           </TouchableOpacity>
+          {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && (
+            <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('MyAttendees')}>
+              <View style={styles.rowLeft}>
+                <Text style={styles.rowIcon}>👥</Text>
+                <Text style={styles.rowLabel}>People I've Registered</Text>
+              </View>
+              <Text style={styles.rowArrow}>›</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('MyOrders')}>
             <View style={styles.rowLeft}>
               <Text style={styles.rowIcon}>🛍️</Text>
