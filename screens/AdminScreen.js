@@ -262,9 +262,14 @@ const AdminScreen = ({ navigation }) => {
     setRejectTarget({ kind: 'order', item: order });
   };
 
+  // Fields read straight from Firestore are Timestamps, which `new Date()`
+  // can't parse (it gives "Invalid Date"), so unwrap those first. Anything that
+  // still isn't a date reads N/A rather than "Invalid Date".
   const formatDate = (date) => {
     if (!date) return 'N/A';
-    return new Date(date).toLocaleDateString('en-ZA', {
+    const parsed = new Date(date.toDate ? date.toDate() : date);
+    if (isNaN(parsed.getTime())) return 'N/A';
+    return parsed.toLocaleDateString('en-ZA', {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
