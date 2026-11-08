@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
+import { Timestamp } from 'firebase/firestore';
 import AdminScreen from '../../screens/AdminScreen';
 import { UserContext } from '../../context/UserContext';
 
@@ -111,6 +112,49 @@ describe('AdminScreen rendering', () => {
       expect(getByText('John Smith')).toBeTruthy();
       expect(getByText('john@church.com')).toBeTruthy();
     });
+  });
+});
+
+describe('AdminScreen pending registration date', () => {
+  const REGISTERED = new Date('2026-08-26T12:00:00Z');
+  const formatted = REGISTERED.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
+
+  const renderWithCreatedAt = async (createdAt) => {
+    getPendingRegistrations.mockResolvedValue([{ ...mockPendingUsers[0], createdAt }]);
+    const utils = renderAdmin();
+    await waitFor(() => utils.getByText('John Smith'));
+    return utils;
+  };
+
+  // Firestore returns a field written with `new Date()` as a Timestamp, and
+  // new Date(timestamp) is "Invalid Date" — which is what the approval card
+  // used to show on every real sign-up.
+  it('shows when a leader or admin registered, from the Timestamp Firestore returns', async () => {
+    const { getByText, queryByText } = await renderWithCreatedAt(Timestamp.fromDate(REGISTERED));
+
+    expect(getByText(formatted)).toBeTruthy();
+    expect(queryByText('Invalid Date')).toBeNull();
+  });
+
+  it.each([
+    ['a Date', REGISTERED],
+    ['an ISO string', REGISTERED.toISOString()],
+    ['milliseconds', REGISTERED.getTime()],
+  ])('shows the date when it is %s', async (label, createdAt) => {
+    const { getByText } = await renderWithCreatedAt(createdAt);
+
+    expect(getByText(formatted)).toBeTruthy();
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['null', null],
+    ['not a date', 'not a date'],
+  ])('shows N/A rather than "Invalid Date" when it is %s', async (label, createdAt) => {
+    const { getByText, queryByText } = await renderWithCreatedAt(createdAt);
+
+    expect(getByText('N/A')).toBeTruthy();
+    expect(queryByText('Invalid Date')).toBeNull();
   });
 });
 
