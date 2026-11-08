@@ -23,9 +23,17 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            functions/package-lock.json
 
       - name: Install dependencies
         run: npm ci
+
+      # The Cloud Functions are their own package, and their tests load the
+      # Firebase libraries it depends on.
+      - name: Install Cloud Functions dependencies
+        run: npm ci --prefix functions
 
       - name: Run tests with coverage
         run: npm run test:coverage -- --ci
