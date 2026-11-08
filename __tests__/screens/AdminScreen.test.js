@@ -1,6 +1,5 @@
 import React from 'react';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
-import { Timestamp } from 'firebase/firestore';
 import AdminScreen from '../../screens/AdminScreen';
 import { UserContext } from '../../context/UserContext';
 
@@ -118,6 +117,9 @@ describe('AdminScreen rendering', () => {
 describe('AdminScreen pending registration date', () => {
   const REGISTERED = new Date('2026-08-26T12:00:00Z');
   const formatted = REGISTERED.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
+  // Same shape as a Firestore Timestamp. The real class can't be imported here:
+  // on SDK 54 jest resolves firebase/firestore to an ES module it doesn't transform.
+  const timestampOf = (date) => ({ seconds: date.getTime() / 1000, nanoseconds: 0, toDate: () => date });
 
   const renderWithCreatedAt = async (createdAt) => {
     getPendingRegistrations.mockResolvedValue([{ ...mockPendingUsers[0], createdAt }]);
@@ -130,7 +132,7 @@ describe('AdminScreen pending registration date', () => {
   // new Date(timestamp) is "Invalid Date" — which is what the approval card
   // used to show on every real sign-up.
   it('shows when a leader or admin registered, from the Timestamp Firestore returns', async () => {
-    const { getByText, queryByText } = await renderWithCreatedAt(Timestamp.fromDate(REGISTERED));
+    const { getByText, queryByText } = await renderWithCreatedAt(timestampOf(REGISTERED));
 
     expect(getByText(formatted)).toBeTruthy();
     expect(queryByText('Invalid Date')).toBeNull();
