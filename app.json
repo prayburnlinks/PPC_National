@@ -2,7 +2,7 @@
   "expo": {
     "name": "PPC I Love My Church",
     "slug": "ppc-national-church",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "updates": {
@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.ilovemychurch.app",
-      "buildNumber": "3",
+      "buildNumber": "4",
       "config": {
         "usesNonExemptEncryption": false
       }
@@ -28,13 +28,19 @@
         "backgroundColor": "#0A1F44"
       },
       "package": "com.ilovemychurch.app",
-      "versionCode": 4
+      "versionCode": 5
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/adaptive-icon-monochrome.png",
+          "color": "#0A1F44"
+        }
+      ],
       [
         "expo-splash-screen",
         {

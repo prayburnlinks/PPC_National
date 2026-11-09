@@ -15,8 +15,11 @@
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
+const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const admin = require('firebase-admin');
 const { getRegistrar, registerAttendee, cancelAttendee } = require('./registrations');
+const { deliverPush } = require('./push');
+const { runBroadcast } = require('./broadcast');
 
 admin.initializeApp();
 
@@ -266,6 +269,9 @@ exports.deleteMyAccount = onCall(
     await commitInBatches(db, registeredForOthers.docs, (batch, snapshot) =>
       batch.update(snapshot.ref, { registeredByName: ANONYMISED_NAME })
     );
+    // Stop the member's devices receiving anything the moment they leave.
+    const devices = await db.collection('pushTokens').where('userId', '==', uid).get();
+    await commitInBatches(db, devices.docs, (batch, snapshot) => batch.delete(snapshot.ref));
 
     // recursiveDelete takes the profile's notifications and givingHistory
     // subcollections with it; a plain delete would orphan them.
@@ -660,5 +666,60 @@ exports.sendReminders = onSchedule(
     });
 
     await remindUpcomingEvents(db, now);
+  }
+);
+
+/**
+ * Push notifications.
+ *
+ * The app and sendReminders already write a document to
+ * users/{uid}/notifications for everything a member should hear about, so
+ * delivery hangs off that single place instead of every call site: whatever
+ * lands in the feed also reaches the phone. See push.js for the delivery rules.
+ */
+exports.sendPushOnNotification = onDocumentCreated(
+  { document: 'users/{userId}/notifications/{notificationId}', region: 'us-central1', maxInstances: 10 },
+  async (event) => {
+    await deliverPush(
+      admin.firestore(),
+      {
+        userId: event.params.userId,
+        notificationId: event.params.notificationId,
+        notification: event.data?.data(),
+      },
+      // Optional: set in functions/.env if the Expo project has push security on.
+      { accessToken: process.env.EXPO_ACCESS_TOKEN }
+    );
+  }
+);
+
+/**
+ * Admin announcements: a message to everyone, a district or a congregation,
+ * delivered to each member's notification feed and pushed to their devices.
+ * firestore.rules would let an admin write those feed entries from the app, but
+ * that is one write per member and no push, so it runs here. The admin check is
+ * repeated server-side because a callable can be invoked by anything. See
+ * broadcast.js.
+ */
+exports.sendBroadcast = onCall(
+  { region: 'us-central1', cors: true, maxInstances: 5, timeoutSeconds: 300 },
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) {
+      throw new HttpsError('unauthenticated', 'Please sign in again, then send the announcement.');
+    }
+
+    const db = admin.firestore();
+    const sender = (await db.collection('users').doc(uid).get()).data();
+    if (sender?.role !== 'admin' || sender?.status !== 'approved') {
+      throw new HttpsError('permission-denied', 'Only administrators can send announcements.');
+    }
+
+    return runBroadcast(db, {
+      FieldValue: admin.firestore.FieldValue,
+      sender: { uid, name: sender.name },
+      data: request.data,
+      pushOptions: { accessToken: process.env.EXPO_ACCESS_TOKEN },
+    });
   }
 );

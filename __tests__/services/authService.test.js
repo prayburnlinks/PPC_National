@@ -19,6 +19,10 @@ jest.mock('firebase/auth', () => ({
   deleteUser: jest.fn(),
 }));
 
+jest.mock('../../services/pushNotificationService', () => ({
+  unregisterPushToken: jest.fn().mockResolvedValue(),
+}));
+
 jest.mock('firebase/firestore', () => ({
   collection: jest.fn((db, ...segments) => ({ path: segments.join('/') })),
   doc: jest.fn((db, ...segments) => ({ path: segments.join('/') })),
@@ -41,6 +45,7 @@ import {
 } from 'firebase/auth';
 
 import { getDoc, getDocs, setDoc, updateDoc, addDoc } from 'firebase/firestore';
+import { unregisterPushToken } from '../../services/pushNotificationService';
 
 const mockAuthUser = { uid: 'uid-123', email: 'test@test.com', displayName: 'Test User' };
 const mockApprovedProfile = {
@@ -370,5 +375,17 @@ describe('logoutUser', () => {
     const result = await logoutUser();
     expect(signOut).toHaveBeenCalled();
     expect(result.success).toBe(true);
+  });
+
+  it('stops pushing to this device before the session ends', async () => {
+    signOut.mockResolvedValue();
+
+    await logoutUser();
+
+    expect(unregisterPushToken).toHaveBeenCalled();
+    // The delete needs the signed-in session, so it has to come first.
+    expect(unregisterPushToken.mock.invocationCallOrder[0]).toBeLessThan(
+      signOut.mock.invocationCallOrder[0]
+    );
   });
 });

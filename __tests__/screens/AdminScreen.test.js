@@ -74,11 +74,14 @@ const mockPendingUsers = [
 
 const renderAdmin = (user = mockAdmin) => {
   const navigation = { navigate: jest.fn(), goBack: jest.fn() };
-  return render(
-    <UserContext.Provider value={{ user, onLogin: jest.fn(), onLogout: jest.fn() }}>
-      <AdminScreen navigation={navigation} />
-    </UserContext.Provider>
-  );
+  return {
+    navigation,
+    ...render(
+      <UserContext.Provider value={{ user, onLogin: jest.fn(), onLogout: jest.fn() }}>
+        <AdminScreen navigation={navigation} />
+      </UserContext.Provider>
+    ),
+  };
 };
 
 beforeEach(() => {
@@ -195,6 +198,28 @@ describe('AdminScreen tab navigation', () => {
     });
 
     expect(getByText('Quick Actions')).toBeTruthy();
+  });
+
+  it('offers admins the announcement composer under Actions', async () => {
+    const { getByText, navigation } = renderAdmin();
+    await waitFor(() => getByText('Actions'));
+    await act(async () => {
+      fireEvent.press(getByText('Actions'));
+    });
+
+    fireEvent.press(getByText('Send Announcement'));
+
+    expect(navigation.navigate).toHaveBeenCalledWith('AdminBroadcast');
+  });
+
+  it('does not offer leaders the announcement composer', async () => {
+    const { getByText, queryByText } = renderAdmin(mockLeader);
+    await waitFor(() => getByText('Actions'));
+    await act(async () => {
+      fireEvent.press(getByText('Actions'));
+    });
+
+    expect(queryByText('Send Announcement')).toBeNull();
   });
 });
 
