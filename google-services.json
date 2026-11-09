@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "651125416043",
+    "project_id": "ppc-national-church",
+    "storage_bucket": "ppc-national-church.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:651125416043:android:7a6f1f031361473baa512e",
+        "android_client_info": {
+          "package_name": "com.ilovemychurch.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "651125416043-nk8tdusqgtmpdl7o855tjrf1vd591e5e.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBVFK3ZvdTsfsCgY1RWIFrmG1oNRPA7HFQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "651125416043-nk8tdusqgtmpdl7o855tjrf1vd591e5e.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
