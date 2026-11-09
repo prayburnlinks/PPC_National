@@ -26,6 +26,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app, auth, db } from '../firebase-config';
 import { ROLES, USER_STATUS } from '../constants/config';
 import { createUserNotification } from './firestoreService';
+import { unregisterPushToken } from './pushNotificationService';
 import { normalizePhone, identifierKind } from '../utils/phone';
 
 // Must match the region declared in functions/index.js, or the callables
@@ -189,6 +190,9 @@ export const loginUser = async (identifier, password) => {
  */
 export const logoutUser = async () => {
   try {
+    // Before signOut: the delete needs the session. Never throws, so it can't
+    // stop the member signing out.
+    await unregisterPushToken();
     await signOut(auth);
     return { success: true };
   } catch (error) {

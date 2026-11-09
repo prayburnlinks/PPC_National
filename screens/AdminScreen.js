@@ -888,6 +888,16 @@ const AdminScreen = ({ navigation }) => {
               </TouchableOpacity>
             )}
             {isAdminReviewer && (
+              <TouchableOpacity style={styles.actionRow} onPress={() => navigation.navigate('AdminBroadcast')}>
+                <Text style={styles.actionIcon}>📣</Text>
+                <View style={styles.actionText}>
+                  <Text style={styles.actionLabel}>Send Announcement</Text>
+                  <Text style={styles.actionSub}>Push a message to members</Text>
+                </View>
+                <Text style={styles.actionArrow}>›</Text>
+              </TouchableOpacity>
+            )}
+            {isAdminReviewer && (
               <TouchableOpacity style={styles.actionRow} onPress={() => navigation.navigate('Documents')}>
                 <Text style={styles.actionIcon}>📁</Text>
                 <View style={styles.actionText}>

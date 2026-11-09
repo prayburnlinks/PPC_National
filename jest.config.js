@@ -6,6 +6,10 @@ module.exports = {
   moduleNameMapper: {
     '^.*firebase-config$': '<rootDir>/__mocks__/firebase-config.js',
     '^firebase/functions$': '<rootDir>/__mocks__/firebase-functions.js',
+    // pushNotificationService keeps the device's token in AsyncStorage, and the
+    // real module throws without its native half.
+    '^@react-native-async-storage/async-storage$':
+      '<rootDir>/node_modules/@react-native-async-storage/async-storage/jest/async-storage-mock.js',
   },
   collectCoverageFrom: [
     'services/**/*.js',

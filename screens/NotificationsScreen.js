@@ -20,6 +20,7 @@ const TYPE_ICONS = {
   event_reminder: '📅',
   giving_receipt: '💝',
   merch_order_status: '🛍️',
+  announcement: '📣',
 };
 
 const NotificationsScreen = ({ navigation }) => {

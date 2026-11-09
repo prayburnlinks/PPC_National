@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, Image, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { auth } from './firebase-config';
 import { onAuthStateChanged } from 'firebase/auth';
+import * as Notifications from 'expo-notifications';
 import { getCurrentUser } from './services/authService';
+import { configureNotificationHandling, registerForPushNotifications } from './services/pushNotificationService';
 import { colors } from './constants/theme';
 import { ROLES, USER_STATUS, NATIONAL_WOMENS_BOARD, NATIONAL_YOUTH_BOARD, NATIONAL_SUNDAY_SCHOOL_BOARD } from './constants/config';
 import { UserContext } from './context/UserContext';
@@ -32,9 +34,15 @@ import AdminMerchItemsScreen from './screens/AdminMerchItemsScreen';
 import AdminEventsScreen from './screens/AdminEventsScreen';
 import RegisterAttendeeScreen from './screens/RegisterAttendeeScreen';
 import MyAttendeesScreen from './screens/MyAttendeesScreen';
+import AdminBroadcastScreen from './screens/AdminBroadcastScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
+
+// Lets the push-tap handler below navigate from outside the navigator tree.
+const navigationRef = createNavigationContainerRef();
+
+configureNotificationHandling();
 
 const TAB_ICONS = { Home: '🏠', Media: '📺', Giving: '💝', Districts: '🗺', PrayerWall: '🙏', Profile: '👤', SignIn: '🔑' };
 
@@ -106,6 +114,8 @@ function VisitorTabs() {
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [navReady, setNavReady] = useState(false);
+  const lastNotificationResponse = Notifications.useLastNotificationResponse();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
@@ -133,6 +143,24 @@ export default function App() {
     return unsubscribe;
   }, []);
 
+  // Visitors have no account to notify, so only signed-in members register.
+  const canReceivePush = !!user?.uid && user.role !== ROLES.VISITOR;
+
+  useEffect(() => {
+    if (canReceivePush) registerForPushNotifications(user.uid);
+  }, [canReceivePush, user?.uid]);
+
+  // Tapping a push (from the lock screen, or the one that launched the app)
+  // opens the notifications list. Held until the navigator and the member's
+  // screens exist, so a cold start doesn't tap into nothing.
+  useEffect(() => {
+    if (!lastNotificationResponse || !navReady || !canReceivePush) return;
+    if (lastNotificationResponse.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER) {
+      navigationRef.navigate('Notifications');
+    }
+    Notifications.clearLastNotificationResponse();
+  }, [lastNotificationResponse, navReady, canReceivePush]);
+
   const handleLogin = useCallback((userData) => setUser(userData), []);
   const handleLogout = useCallback(() => setUser(null), []);
 
@@ -148,7 +176,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <UserContext.Provider value={{ user, onLogin: handleLogin, onLogout: handleLogout }}>
-        <NavigationContainer>
+        <NavigationContainer ref={navigationRef} onReady={() => setNavReady(true)}>
           <Stack.Navigator screenOptions={{ headerShown: false }}>
             {user && user.role !== ROLES.VISITOR && (
               <Stack.Screen name="Tabs" component={AppTabs} />
@@ -165,6 +193,7 @@ export default function App() {
             {user?.role === ROLES.ADMIN && <Stack.Screen name="AdminEvents" component={AdminEventsScreen} />}
             {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && <Stack.Screen name="RegisterAttendee" component={RegisterAttendeeScreen} />}
             {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && <Stack.Screen name="MyAttendees" component={MyAttendeesScreen} />}
+            {user?.role === ROLES.ADMIN && <Stack.Screen name="AdminBroadcast" component={AdminBroadcastScreen} />}
             {user && <Stack.Screen name="NationalBoard" component={NationalBoardScreen} />}
             {user && (
               <Stack.Screen
