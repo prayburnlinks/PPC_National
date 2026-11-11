@@ -52,7 +52,7 @@ export const DISTRICTS = [
     board: { chairperson: 'TBA', deputy: 'TBA', secretary: 'TBA', treasurer: 'TBA' },
   },
   {
-    id: 2, name: 'Central Cape', location: 'Cape Town', congregations: 10,
+    id: 2, name: 'Central Cape', location: 'Cape Town', congregations: 8,
     board: { chairperson: 'TBA', deputy: 'TBA', secretary: 'TBA', treasurer: 'TBA' },
   },
   {
@@ -117,11 +117,9 @@ export const CONGREGATIONS = [
   { name: 'Eden', district: 'Central Cape' },
   { name: 'Hannover Park', district: 'Central Cape' },
   { name: 'Heideveldt', district: 'Central Cape' },
-  { name: 'Lotusriver', district: 'Central Cape' },
   { name: 'Mt Olive', district: 'Central Cape' },
   { name: 'Ottery', district: 'Central Cape' },
   { name: 'Searidge Park', district: 'Central Cape' },
-  { name: 'Seawinds', district: 'Central Cape' },
   // Eastern Cape
   { name: 'Despatch', district: 'Eastern Cape' },
   { name: 'Gelvandale', district: 'Eastern Cape' },

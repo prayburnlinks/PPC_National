@@ -63,8 +63,20 @@ describe('DISTRICTS', () => {
 });
 
 describe('CONGREGATIONS', () => {
-  it('contains 81 congregations', () => {
-    expect(CONGREGATIONS).toHaveLength(81);
+  it('contains 79 congregations', () => {
+    expect(CONGREGATIONS).toHaveLength(79);
+  });
+
+  it('does not include the congregations that were removed (regression)', () => {
+    const names = CONGREGATIONS.map((c) => c.name);
+    expect(names).not.toContain('Lotusriver');
+    expect(names).not.toContain('Seawinds');
+  });
+
+  it("each district's declared congregation count matches the list", () => {
+    DISTRICTS.forEach((d) => {
+      expect(CONGREGATIONS.filter((c) => c.district === d.name)).toHaveLength(d.congregations);
+    });
   });
 
   it('every congregation has a name and district', () => {
