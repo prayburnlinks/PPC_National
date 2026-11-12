@@ -314,6 +314,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     maxHeight: 52,
+    // A ScrollView defaults to flexShrink: 1, so when the document list below
+    // is taller than the screen (the "All" tab) the layout squeezes this bar
+    // to make room and clips the chips. Keep it at its natural height.
+    flexGrow: 0,
+    flexShrink: 0,
   },
   filterContent: {
     paddingHorizontal: spacing.lg,

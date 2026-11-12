@@ -15,6 +15,21 @@ phone.
    looks up the owner's tokens and sends through Expo's push service. Tokens Expo
    reports as `DeviceNotRegistered` are deleted.
 3. **Open** — tapping a push opens the Notifications screen (`App.js`).
+4. **Count** — every push carries the member's unread total as the iPhone icon
+   number (`badge`, worked out in `functions/push.js` from their unread
+   notifications, which already include the one being pushed; an announcement
+   gets one count per member with a device). Android ignores it. While the app
+   is open it sets the number itself from the live feed (`setAppIconBadge`), and
+   leaving the Notifications screen marks everything read, which clears it.
+
+## In the app
+
+`context/NotificationsContext.js` holds one live listener on the member's feed.
+It drives the red count on the Home bell, the banner in the Home header, the
+badge on the Home tab, the icon number and the toast. A notification that
+arrives while the app is open slides in as a toast (only if it is under five
+minutes old); the phone's own banner is switched off for the foreground
+(`configureNotificationHandling`) so there aren't two.
 
 `deleteMyAccount` also deletes the member's tokens.
 

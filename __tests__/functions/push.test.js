@@ -28,24 +28,47 @@ const makeFetch = (ticketFor = okTicket) =>
 const sentBodies = (fetchImpl) => fetchImpl.mock.calls.map(([, init]) => JSON.parse(init.body));
 
 // Just enough of the Admin SDK's Firestore for the push helpers.
-// `tokensByUser` is { uid: [expoToken, ...] }.
-const makeDb = (tokensByUser = {}) => {
+// `tokensByUser` is { uid: [expoToken, ...] }; `unreadByUser` is { uid: count }
+// for the unread-notification counts behind each device's icon badge.
+const makeDb = (tokensByUser = {}, unreadByUser = {}, { failCountFor = [] } = {}) => {
   const queries = [];
+  const countQueries = [];
   const deleted = [];
   const batchSizes = [];
 
   const db = {
-    collection: jest.fn((name) => ({
-      where: (field, op, ids) => ({
-        get: async () => {
-          queries.push({ name, field, op, ids });
-          return {
-            docs: ids.flatMap((id) => (tokensByUser[id] || []).map((token) => ({ id: token }))),
-          };
-        },
-      }),
-      doc: (id) => ({ path: `${name}/${id}` }),
-    })),
+    collection: jest.fn((name) => {
+      if (name === 'users') {
+        return {
+          doc: (uid) => ({
+            collection: (sub) => ({
+              where: (field, op, value) => ({
+                count: () => ({
+                  get: async () => {
+                    countQueries.push({ uid, sub, field, op, value });
+                    if (failCountFor.includes(uid)) throw new Error('count failed');
+                    return { data: () => ({ count: unreadByUser[uid] ?? 0 }) };
+                  },
+                }),
+              }),
+            }),
+          }),
+        };
+      }
+      return {
+        where: (field, op, ids) => ({
+          get: async () => {
+            queries.push({ name, field, op, ids });
+            return {
+              docs: ids.flatMap((id) =>
+                (tokensByUser[id] || []).map((token) => ({ id: token, data: () => ({ userId: id }) }))
+              ),
+            };
+          },
+        }),
+        doc: (id) => ({ path: `${name}/${id}` }),
+      };
+    }),
     batch: () => {
       const ops = [];
       return {
@@ -58,7 +81,7 @@ const makeDb = (tokensByUser = {}) => {
     },
   };
 
-  return { db, queries, deleted, batchSizes };
+  return { db, queries, countQueries, deleted, batchSizes };
 };
 
 const notification = { type: 'approval_status', title: 'Account Approved', body: 'Welcome!' };
@@ -98,6 +121,23 @@ describe('buildMessages', () => {
       },
       expect.objectContaining({ to: TOKEN_B }),
     ]);
+  });
+
+  it('sends no badge unless it is given one, so an icon is never changed by accident', () => {
+    const [message] = buildMessages([TOKEN_A], notification, data);
+    expect(message).not.toHaveProperty('badge');
+  });
+
+  it("puts each device's own number on its message, including a 0 that clears the icon", () => {
+    const messages = buildMessages([TOKEN_A, TOKEN_B], notification, data, { [TOKEN_A]: 3, [TOKEN_B]: 0 });
+    expect(messages[0].badge).toBe(3);
+    expect(messages[1].badge).toBe(0);
+  });
+
+  it('leaves a device that has no number without a badge', () => {
+    const messages = buildMessages([TOKEN_A, TOKEN_B], notification, data, { [TOKEN_A]: 2 });
+    expect(messages[0].badge).toBe(2);
+    expect(messages[1]).not.toHaveProperty('badge');
   });
 });
 
@@ -249,6 +289,86 @@ describe('pushToMembers', () => {
   });
 });
 
+describe('pushToMembers badge', () => {
+  it("puts each member's own unread total on their devices", async () => {
+    const { db } = makeDb({ 'uid-1': [TOKEN_A, TOKEN_B], 'uid-2': ['ExponentPushToken[ccc]'] }, { 'uid-1': 4, 'uid-2': 1 });
+    const fetchImpl = makeFetch();
+
+    await pushToMembers(db, ['uid-1', 'uid-2'], notification, data, { fetchImpl });
+
+    const badges = Object.fromEntries(sentBodies(fetchImpl)[0].map((m) => [m.to, m.badge]));
+    expect(badges).toEqual({ [TOKEN_A]: 4, [TOKEN_B]: 4, 'ExponentPushToken[ccc]': 1 });
+  });
+
+  it('counts only unread notifications in the member’s own feed, once per member however many phones they have', async () => {
+    const { db, countQueries } = makeDb({ 'uid-1': [TOKEN_A, TOKEN_B] }, { 'uid-1': 2 });
+
+    await pushToMembers(db, ['uid-1'], notification, data, { fetchImpl: makeFetch() });
+
+    expect(countQueries).toEqual([
+      { uid: 'uid-1', sub: 'notifications', field: 'read', op: '==', value: false },
+    ]);
+  });
+
+  it('counts nobody when no member has a device', async () => {
+    const { db, countQueries } = makeDb({});
+
+    await pushToMembers(db, ['uid-1'], notification, data, { fetchImpl: makeFetch() });
+
+    expect(countQueries).toEqual([]);
+  });
+
+  it('still sends the push, without a badge, when a count cannot be read', async () => {
+    const { db } = makeDb({ 'uid-1': [TOKEN_A], 'uid-2': [TOKEN_B] }, { 'uid-2': 5 }, { failCountFor: ['uid-1'] });
+    const fetchImpl = makeFetch();
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const result = await pushToMembers(db, ['uid-1', 'uid-2'], notification, data, { fetchImpl });
+
+    const byToken = Object.fromEntries(sentBodies(fetchImpl)[0].map((m) => [m.to, m]));
+    expect(byToken[TOKEN_A]).not.toHaveProperty('badge');
+    expect(byToken[TOKEN_B].badge).toBe(5);
+    expect(result).toEqual({ devices: 2, failed: 0 });
+    console.error.mockRestore();
+  });
+
+  it('looks counts up in groups rather than all at once for a large audience', async () => {
+    const tokensByUser = {};
+    const userIds = Array.from({ length: 45 }, (_, i) => `uid-${i}`);
+    userIds.forEach((uid, i) => { tokensByUser[uid] = [`ExponentPushToken[t${i}]`]; });
+    let running = 0;
+    let peak = 0;
+    const { db } = makeDb(tokensByUser);
+    const original = db.collection.getMockImplementation();
+    db.collection.mockImplementation((name) => {
+      const c = original(name);
+      if (name !== 'users') return c;
+      return {
+        doc: (uid) => ({
+          collection: () => ({
+            where: () => ({
+              count: () => ({
+                get: async () => {
+                  running++;
+                  peak = Math.max(peak, running);
+                  await Promise.resolve();
+                  running--;
+                  return { data: () => ({ count: 1 }) };
+                },
+              }),
+            }),
+          }),
+        }),
+      };
+    });
+
+    await pushToMembers(db, userIds, notification, data, { fetchImpl: makeFetch() });
+
+    expect(peak).toBeLessThanOrEqual(20);
+    expect(peak).toBeGreaterThan(1);
+  });
+});
+
 describe('deliverPush', () => {
   it("pushes to every device registered to the notification's owner", async () => {
     const { db, queries } = makeDb({ 'uid-1': [TOKEN_A, TOKEN_B] });
@@ -311,5 +431,15 @@ describe('deliverPush', () => {
     ).resolves.toBeUndefined();
     expect(consoleError).toHaveBeenCalled();
     consoleError.mockRestore();
+  });
+
+  it("sets the icon to the owner's unread total, which already includes this notification", async () => {
+    const { db, countQueries } = makeDb({ 'uid-1': [TOKEN_A] }, { 'uid-1': 3 });
+    const fetchImpl = makeFetch();
+
+    await deliverPush(db, { userId: 'uid-1', notificationId: 'notif-1', notification }, { fetchImpl });
+
+    expect(sentBodies(fetchImpl)[0][0].badge).toBe(3);
+    expect(countQueries).toHaveLength(1);
   });
 });

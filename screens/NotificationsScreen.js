@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   ScrollView,
@@ -11,37 +11,34 @@ import {
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../context/UserContext';
-import { getUserNotifications, markNotificationAsRead } from '../services/firestoreService';
-
-const TYPE_ICONS = {
-  approval_status: '👤',
-  pop_status: '💳',
-  payment_reminder: '⏰',
-  event_reminder: '📅',
-  giving_receipt: '💝',
-  merch_order_status: '🛍️',
-  announcement: '📣',
-};
+import { useNotifications } from '../context/NotificationsContext';
+import { markNotificationAsRead, markAllNotificationsAsRead } from '../services/firestoreService';
+import { iconForType } from '../constants/notifications';
 
 const NotificationsScreen = ({ navigation }) => {
   const { user } = useUser();
   const insets = useSafeAreaInsets();
-  const [loading, setLoading] = useState(true);
-  const [notifications, setNotifications] = useState([]);
+  // The live feed: a notification that arrives while this screen is open shows
+  // up in the list, and marking one read updates it (and the bell) at once.
+  const { notifications, loaded, unreadIds = [] } = useNotifications();
+  const loading = !loaded;
 
-  const load = useCallback(async () => {
-    if (!user?.uid) return;
-    setLoading(true);
-    const list = await getUserNotifications(user.uid, 50);
-    setNotifications(list);
-    setLoading(false);
-  }, [user?.uid]);
-
-  useEffect(() => { load(); }, [load]);
+  // Leaving the screen counts as having seen everything on it, so the bell, the
+  // banner and the icon count clear instead of nagging about items already
+  // looked at. They stay marked as new while the member is on the screen, so
+  // they can still see what was new. The ref holds the latest list, including
+  // anything that arrived while the screen was open.
+  const unreadIdsRef = useRef(unreadIds);
+  unreadIdsRef.current = unreadIds;
+  const uid = user?.uid;
+  useEffect(() => () => {
+    if (uid && unreadIdsRef.current.length > 0) {
+      markAllNotificationsAsRead(uid, unreadIdsRef.current);
+    }
+  }, [uid]);
 
   const handlePress = async (item) => {
     if (item.read) return;
-    setNotifications(prev => prev.map(n => n.id === item.id ? { ...n, read: true } : n));
     await markNotificationAsRead(user.uid, item.id);
   };
 
@@ -78,7 +75,7 @@ const NotificationsScreen = ({ navigation }) => {
               activeOpacity={0.8}
             >
               <View style={styles.notifIconBox}>
-                <Text style={styles.notifIcon}>{TYPE_ICONS[item.type] || '🔔'}</Text>
+                <Text style={styles.notifIcon}>{iconForType(item.type)}</Text>
               </View>
               <View style={styles.notifInfo}>
                 <Text style={styles.notifTitle}>{item.title}</Text>

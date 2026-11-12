@@ -23,6 +23,9 @@ const IN_QUERY_LIMIT = 30;
 // How many of those lookups run at once.
 const LOOKUP_CONCURRENCY = 10;
 
+// How many unread-count lookups run at once when a push goes to many members.
+const COUNT_CONCURRENCY = 20;
+
 // Firestore refuses a batch of more than 500 writes; 400 leaves headroom.
 const BATCH_LIMIT = 400;
 
@@ -38,7 +41,11 @@ const chunk = (items, size) => {
 
 // `data` is what the app receives alongside the notification (see
 // App.js, which routes a tap by it).
-const buildMessages = (tokens, { title, body }, data) =>
+//
+// `badgeByToken` maps a device to the number to show on the app's icon (the
+// member's unread total, iOS only). A device missing from it gets no badge, so
+// its icon is left as it was.
+const buildMessages = (tokens, { title, body }, data, badgeByToken = {}) =>
   tokens.map((to) => ({
     to,
     title,
@@ -49,6 +56,7 @@ const buildMessages = (tokens, { title, body }, data) =>
     channelId: 'default',
     priority: 'high',
     data,
+    ...(badgeByToken[to] !== undefined && { badge: badgeByToken[to] }),
   }));
 
 /**
@@ -108,9 +116,9 @@ const forgetTokens = async (db, tokens) => {
   }
 };
 
-// Every device registered to any of these members.
-const findTokens = async (db, userIds) => {
-  const tokens = [];
+// Every device registered to any of these members, with the member it belongs to.
+const findDevices = async (db, userIds) => {
+  const devices = [];
   const lookups = chunk(userIds, IN_QUERY_LIMIT);
 
   for (const group of chunk(lookups, LOOKUP_CONCURRENCY)) {
@@ -118,11 +126,35 @@ const findTokens = async (db, userIds) => {
       group.map((ids) => db.collection('pushTokens').where('userId', 'in', ids).get())
     );
     snaps.forEach((snap) => snap.docs.forEach((d) => {
-      if (isExpoPushToken(d.id)) tokens.push(d.id);
+      if (isExpoPushToken(d.id)) devices.push({ token: d.id, userId: d.data().userId });
     }));
   }
 
-  return tokens;
+  return devices;
+};
+
+// How many notifications each of these members has not read yet, as a Map. A
+// member whose count can't be read is left out rather than failing the push:
+// their phone just keeps whatever number its icon already shows.
+const unreadCounts = async (db, userIds) => {
+  const counts = new Map();
+
+  for (const group of chunk(userIds, COUNT_CONCURRENCY)) {
+    await Promise.all(group.map(async (userId) => {
+      try {
+        const snap = await db
+          .collection('users').doc(userId).collection('notifications')
+          .where('read', '==', false)
+          .count()
+          .get();
+        counts.set(userId, snap.data().count);
+      } catch (err) {
+        console.error(`Could not count unread notifications for ${userId}:`, err);
+      }
+    }));
+  }
+
+  return counts;
 };
 
 /**
@@ -131,11 +163,20 @@ const findTokens = async (db, userIds) => {
  * push for, and the pushes that didn't go out. Throws only if Firestore fails.
  */
 const pushToMembers = async (db, userIds, notification, data, options = {}) => {
-  const tokens = await findTokens(db, userIds);
-  if (tokens.length === 0) return { devices: 0, failed: 0 };
+  const devices = await findDevices(db, userIds);
+  if (devices.length === 0) return { devices: 0, failed: 0 };
+
+  // The number on the app icon is each member's unread total. The notification
+  // is already in their feed by now, so it counts itself. Setting it here is
+  // what keeps the icon right while the app is closed.
+  const unread = await unreadCounts(db, [...new Set(devices.map((device) => device.userId))]);
+  const badgeByToken = {};
+  devices.forEach(({ token, userId }) => {
+    if (unread.has(userId)) badgeByToken[token] = unread.get(userId);
+  });
 
   const { accepted, failed, deadTokens } = await sendExpoPush(
-    buildMessages(tokens, notification, data),
+    buildMessages(devices.map((device) => device.token), notification, data, badgeByToken),
     options
   );
   await forgetTokens(db, deadTokens);
