@@ -1,13 +1,14 @@
 import React from 'react';
-import { render, waitFor } from '@testing-library/react-native';
+import { render, waitFor, fireEvent } from '@testing-library/react-native';
 import HomeScreen from '../../screens/HomeScreen';
 import { UserContext } from '../../context/UserContext';
+import { NotificationsContext } from '../../context/NotificationsContext';
 import { DISTRICTS, CONGREGATIONS } from '../../constants/config';
 
 jest.mock('../../services/firestoreService', () => ({
   getUpcomingEvents: jest.fn(),
-  getUserNotifications: jest.fn(),
   getLiveStatus: jest.fn(),
+  subscribeToNotifications: jest.fn(),
 }));
 
 jest.mock('@react-navigation/native', () => ({
@@ -16,7 +17,7 @@ jest.mock('@react-navigation/native', () => ({
   useFocusEffect: (cb) => require('react').useEffect(cb, [cb]),
 }));
 
-import { getUpcomingEvents, getUserNotifications, getLiveStatus } from '../../services/firestoreService';
+import { getUpcomingEvents, getLiveStatus } from '../../services/firestoreService';
 
 const mockUser = {
   uid: 'uid-1',
@@ -37,7 +38,6 @@ const renderHome = (user = mockUser) => {
 beforeEach(() => {
   jest.clearAllMocks();
   getUpcomingEvents.mockResolvedValue([]);
-  getUserNotifications.mockResolvedValue([]);
   getLiveStatus.mockResolvedValue({ isLive: false, title: '' });
 });
 
@@ -128,33 +128,70 @@ describe('HomeScreen events', () => {
 });
 
 describe('HomeScreen notification bell', () => {
-  it('navigates a member to Notifications and shows the dot only when unread exist', async () => {
-    getUserNotifications.mockResolvedValue([{ id: 'n1', read: false }]);
+  const renderWithFeed = (feed, user = mockUser) => {
     const navigation = { navigate: jest.fn(), goBack: jest.fn() };
-    const { getByText } = render(
-      <UserContext.Provider value={{ user: mockUser, onLogin: jest.fn(), onLogout: jest.fn() }}>
-        <HomeScreen navigation={navigation} />
+    const utils = render(
+      <UserContext.Provider value={{ user, onLogin: jest.fn(), onLogout: jest.fn() }}>
+        <NotificationsContext.Provider
+          value={{ notifications: [], unreadCount: 0, latestUnread: null, loaded: true, toast: null, dismissToast: jest.fn(), ...feed }}
+        >
+          <HomeScreen navigation={navigation} />
+        </NotificationsContext.Provider>
       </UserContext.Provider>
     );
+    return { ...utils, navigation };
+  };
 
-    await waitFor(() => expect(getUserNotifications).toHaveBeenCalledWith('uid-1', 20));
+  const latestUnread = { id: 'n1', title: 'Payment Approved', body: 'You are registered & paid!', read: false };
 
-    require('@testing-library/react-native').fireEvent.press(getByText('🔔'));
+  it('takes a member to Notifications when the bell is tapped', async () => {
+    const { getByText, navigation } = renderWithFeed({});
+    await waitFor(() => getByText('🔔'));
+
+    fireEvent.press(getByText('🔔'));
+
     expect(navigation.navigate).toHaveBeenCalledWith('Notifications');
   });
 
-  it('sends a visitor to the SignIn prompt instead', async () => {
-    const navigation = { navigate: jest.fn(), goBack: jest.fn() };
-    const { getByText } = render(
-      <UserContext.Provider value={{ user: { role: 'visitor', name: 'Visitor' }, onLogin: jest.fn(), onLogout: jest.fn() }}>
-        <HomeScreen navigation={navigation} />
-      </UserContext.Provider>
-    );
-
+  it('shows no badge and no banner when nothing is unread', async () => {
+    const { getByText, queryByText, queryByLabelText } = renderWithFeed({});
     await waitFor(() => getByText('🔔'));
-    require('@testing-library/react-native').fireEvent.press(getByText('🔔'));
+
+    expect(queryByText(/new notification/i)).toBeNull();
+    expect(queryByLabelText(/unread/i)).toBeNull();
+  });
+
+  it('puts the unread count on the bell and says so to screen readers', async () => {
+    const { getByText, getAllByText, getByLabelText } = renderWithFeed({ unreadCount: 3, latestUnread });
+    await waitFor(() => getByText('🔔'));
+
+    expect(getByLabelText('Notifications, 3 unread')).toBeTruthy();
+    // The count appears on the bell (hidden from screen readers, since the
+    // bell's own label already says it) and again in the banner.
+    expect(getAllByText('3', { includeHiddenElements: true })).toHaveLength(2);
+  });
+
+  it('shows the banner with the latest unread notification, and opens Notifications from it', async () => {
+    const { getByText, getByLabelText, navigation } = renderWithFeed({ unreadCount: 2, latestUnread });
+    await waitFor(() => getByText('2 new notifications'));
+
+    expect(getByText('Payment Approved · You are registered & paid!')).toBeTruthy();
+
+    fireEvent.press(getByLabelText('2 new notifications. Latest: Payment Approved'));
+    expect(navigation.navigate).toHaveBeenCalledWith('Notifications');
+  });
+
+  it('uses the singular for a single unread notification', async () => {
+    const { getByText } = renderWithFeed({ unreadCount: 1, latestUnread });
+    await waitFor(() => getByText('1 new notification'));
+  });
+
+  it('sends a visitor to the SignIn prompt instead', async () => {
+    const { getByText, navigation } = renderWithFeed({}, { role: 'visitor', name: 'Visitor' });
+    await waitFor(() => getByText('🔔'));
+
+    fireEvent.press(getByText('🔔'));
 
     expect(navigation.navigate).toHaveBeenCalledWith('SignIn');
-    expect(getUserNotifications).not.toHaveBeenCalled();
   });
 });

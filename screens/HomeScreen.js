@@ -15,8 +15,11 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
-import { getUpcomingEvents, getUserNotifications, getLiveStatus } from '../services/firestoreService';
+import { getUpcomingEvents, getLiveStatus } from '../services/firestoreService';
 import { useUser } from '../context/UserContext';
+import { useNotifications } from '../context/NotificationsContext';
+import NotificationBadge from '../components/NotificationBadge';
+import UnreadBanner from '../components/UnreadBanner';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DISTRICTS, CONGREGATIONS, ROLES } from '../constants/config';
 import appConfig from '../app.json';
@@ -35,12 +38,13 @@ const HomeScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [hasUnread, setHasUnread] = useState(false);
   const [liveStatus, setLiveStatus] = useState({ isLive: false, title: '' });
   const isVisitor = user?.role === ROLES.VISITOR;
+  // Live: updates the moment a notification arrives or is read, so the bell and
+  // banner never need a refresh on focus.
+  const { unreadCount, latestUnread } = useNotifications();
+  const openNotifications = () => navigation.navigate(user?.uid ? 'Notifications' : 'SignIn');
 
-  // Refresh the unread indicator every time Home regains focus, so reading
-  // notifications and coming back clears the dot.
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -48,13 +52,8 @@ const HomeScreen = ({ navigation }) => {
       getLiveStatus()
         .then(status => { if (active && status) setLiveStatus(status); })
         .catch(() => {});
-      if (user?.uid) {
-        getUserNotifications(user.uid, 20)
-          .then(list => { if (active) setHasUnread(list.some(n => !n.read)); })
-          .catch(() => {});
-      }
       return () => { active = false; };
-    }, [user?.uid])
+    }, [])
   );
 
   // Districts, Prayer Wall and Store are member-only routes — the Visitor
@@ -100,11 +99,13 @@ const HomeScreen = ({ navigation }) => {
             </View>
           </View>
           <TouchableOpacity
-            onPress={() => navigation.navigate(user?.uid ? 'Notifications' : 'SignIn')}
+            onPress={openNotifications}
             style={styles.notifBell}
+            accessibilityRole="button"
+            accessibilityLabel={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
           >
             <Text style={styles.notifIcon}>🔔</Text>
-            {hasUnread && <View style={styles.notifDot} />}
+            <NotificationBadge count={unreadCount} pulse />
           </TouchableOpacity>
         </View>
         <Text style={styles.greeting}>{getGreeting()}, beloved</Text>
@@ -117,6 +118,9 @@ const HomeScreen = ({ navigation }) => {
             <Text style={styles.releaseChipText}>Current release</Text>
             <Text style={styles.releaseChipVersion}>v{appVersion}</Text>
           </View>
+        </View>
+        <View style={styles.unreadBannerWrap}>
+          <UnreadBanner count={unreadCount} latest={latestUnread} onPress={openNotifications} />
         </View>
       </View>
 
@@ -299,27 +303,19 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   notifBell: {
-    width: 34,
-    height: 34,
+    width: 44,
+    height: 44,
     borderRadius: borderRadius.full,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
   },
   notifIcon: {
-    fontSize: typography.sizes.xl,
+    fontSize: typography.sizes.xxl,
   },
-  notifDot: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 7,
-    height: 7,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.gold,
-    borderWidth: 1.5,
-    borderColor: colors.darkPurple,
+  unreadBannerWrap: {
+    marginTop: spacing.lg,
   },
   greeting: {
     color: 'rgba(255, 255, 255, 0.55)',

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, Image, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { auth } from './firebase-config';
@@ -10,6 +10,9 @@ import { getCurrentUser } from './services/authService';
 import { colors } from './constants/theme';
 import { ROLES, USER_STATUS, NATIONAL_WOMENS_BOARD, NATIONAL_YOUTH_BOARD, NATIONAL_SUNDAY_SCHOOL_BOARD } from './constants/config';
 import { UserContext } from './context/UserContext';
+import { NotificationsProvider, useNotifications } from './context/NotificationsContext';
+import NotificationToastHost from './components/NotificationToastHost';
+import { tabBadge } from './utils/badge';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import HomeScreen from './screens/HomeScreen';
@@ -36,6 +39,9 @@ import MyAttendeesScreen from './screens/MyAttendeesScreen';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
+// Lets the notification toast navigate from outside the navigator tree.
+const navigationRef = createNavigationContainerRef();
+
 const TAB_ICONS = { Home: '🏠', Media: '📺', Giving: '💝', Districts: '🗺', PrayerWall: '🙏', Profile: '👤', SignIn: '🔑' };
 
 const tabBarScreenOptions = (insets) => ({ route }) => ({
@@ -43,6 +49,7 @@ const tabBarScreenOptions = (insets) => ({ route }) => ({
   tabBarActiveTintColor: colors.blue,
   tabBarInactiveTintColor: colors.textSecondary,
   tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
+  tabBarBadgeStyle: { backgroundColor: colors.red, color: colors.white, fontSize: 11, fontWeight: '800' },
   tabBarStyle: {
     borderTopWidth: 1,
     borderTopColor: colors.border,
@@ -59,9 +66,11 @@ const tabBarScreenOptions = (insets) => ({ route }) => ({
 // Full tabs for authenticated members, leaders and admins
 function AppTabs() {
   const insets = useSafeAreaInsets();
+  // The Home tab carries the unread count, so it shows on every tab.
+  const { unreadCount } = useNotifications();
   return (
     <Tab.Navigator screenOptions={tabBarScreenOptions(insets)}>
-      <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: 'Home' }} />
+      <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: 'Home', tabBarBadge: tabBadge(unreadCount) }} />
       <Tab.Screen name="Media" component={MediaScreen} options={{ tabBarLabel: 'Media' }} />
       <Tab.Screen name="Giving" component={GivingScreen} options={{ tabBarLabel: 'Give' }} />
       <Tab.Screen name="Districts" component={DistrictsScreen} options={{ tabBarLabel: 'Districts' }} />
@@ -148,52 +157,55 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <UserContext.Provider value={{ user, onLogin: handleLogin, onLogout: handleLogout }}>
-        <NavigationContainer>
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
-            {user && user.role !== ROLES.VISITOR && (
-              <Stack.Screen name="Tabs" component={AppTabs} />
-            )}
-            {user?.role === ROLES.VISITOR && (
-              <Stack.Screen name="VisitorTabs" component={VisitorTabs} />
-            )}
-            {!user && <Stack.Screen name="Login" component={LoginScreen} />}
-            {!user && <Stack.Screen name="Register" component={RegisterScreen} />}
-            {user && <Stack.Screen name="Events" component={EventsScreen} />}
-            {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && <Stack.Screen name="Admin" component={AdminScreen} />}
-            {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && <Stack.Screen name="Documents" component={DocumentsScreen} />}
-            {user?.role === ROLES.ADMIN && <Stack.Screen name="AdminMerchItems" component={AdminMerchItemsScreen} />}
-            {user?.role === ROLES.ADMIN && <Stack.Screen name="AdminEvents" component={AdminEventsScreen} />}
-            {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && <Stack.Screen name="RegisterAttendee" component={RegisterAttendeeScreen} />}
-            {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && <Stack.Screen name="MyAttendees" component={MyAttendeesScreen} />}
-            {user && <Stack.Screen name="NationalBoard" component={NationalBoardScreen} />}
-            {user && (
-              <Stack.Screen
-                name="NationalWomensBoard"
-                component={NationalBoardScreen}
-                initialParams={{ title: "National Women's Board", board: NATIONAL_WOMENS_BOARD }}
-              />
-            )}
-            {user && (
-              <Stack.Screen
-                name="NationalYouthBoard"
-                component={NationalBoardScreen}
-                initialParams={{ title: 'National Youth Board', board: NATIONAL_YOUTH_BOARD }}
-              />
-            )}
-            {user && (
-              <Stack.Screen
-                name="NationalSundaySchoolBoard"
-                component={NationalBoardScreen}
-                initialParams={{ title: 'National Sunday School Board', board: NATIONAL_SUNDAY_SCHOOL_BOARD }}
-              />
-            )}
-            {user && user.role !== ROLES.VISITOR && <Stack.Screen name="MyEvents" component={MyEventsScreen} />}
-            {user && user.role !== ROLES.VISITOR && <Stack.Screen name="MyPrayerRequests" component={MyPrayerRequestsScreen} />}
-            {user && user.role !== ROLES.VISITOR && <Stack.Screen name="Notifications" component={NotificationsScreen} />}
-            {user && user.role !== ROLES.VISITOR && <Stack.Screen name="Store" component={StoreScreen} />}
-            {user && user.role !== ROLES.VISITOR && <Stack.Screen name="MyOrders" component={MyOrdersScreen} />}
-          </Stack.Navigator>
-        </NavigationContainer>
+        <NotificationsProvider>
+          <NavigationContainer ref={navigationRef}>
+            <Stack.Navigator screenOptions={{ headerShown: false }}>
+              {user && user.role !== ROLES.VISITOR && (
+                <Stack.Screen name="Tabs" component={AppTabs} />
+              )}
+              {user?.role === ROLES.VISITOR && (
+                <Stack.Screen name="VisitorTabs" component={VisitorTabs} />
+              )}
+              {!user && <Stack.Screen name="Login" component={LoginScreen} />}
+              {!user && <Stack.Screen name="Register" component={RegisterScreen} />}
+              {user && <Stack.Screen name="Events" component={EventsScreen} />}
+              {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && <Stack.Screen name="Admin" component={AdminScreen} />}
+              {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && <Stack.Screen name="Documents" component={DocumentsScreen} />}
+              {user?.role === ROLES.ADMIN && <Stack.Screen name="AdminMerchItems" component={AdminMerchItemsScreen} />}
+              {user?.role === ROLES.ADMIN && <Stack.Screen name="AdminEvents" component={AdminEventsScreen} />}
+              {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && <Stack.Screen name="RegisterAttendee" component={RegisterAttendeeScreen} />}
+              {(user?.role === ROLES.ADMIN || user?.role === ROLES.LEADER) && <Stack.Screen name="MyAttendees" component={MyAttendeesScreen} />}
+              {user && <Stack.Screen name="NationalBoard" component={NationalBoardScreen} />}
+              {user && (
+                <Stack.Screen
+                  name="NationalWomensBoard"
+                  component={NationalBoardScreen}
+                  initialParams={{ title: "National Women's Board", board: NATIONAL_WOMENS_BOARD }}
+                />
+              )}
+              {user && (
+                <Stack.Screen
+                  name="NationalYouthBoard"
+                  component={NationalBoardScreen}
+                  initialParams={{ title: 'National Youth Board', board: NATIONAL_YOUTH_BOARD }}
+                />
+              )}
+              {user && (
+                <Stack.Screen
+                  name="NationalSundaySchoolBoard"
+                  component={NationalBoardScreen}
+                  initialParams={{ title: 'National Sunday School Board', board: NATIONAL_SUNDAY_SCHOOL_BOARD }}
+                />
+              )}
+              {user && user.role !== ROLES.VISITOR && <Stack.Screen name="MyEvents" component={MyEventsScreen} />}
+              {user && user.role !== ROLES.VISITOR && <Stack.Screen name="MyPrayerRequests" component={MyPrayerRequestsScreen} />}
+              {user && user.role !== ROLES.VISITOR && <Stack.Screen name="Notifications" component={NotificationsScreen} />}
+              {user && user.role !== ROLES.VISITOR && <Stack.Screen name="Store" component={StoreScreen} />}
+              {user && user.role !== ROLES.VISITOR && <Stack.Screen name="MyOrders" component={MyOrdersScreen} />}
+            </Stack.Navigator>
+          </NavigationContainer>
+          <NotificationToastHost navigationRef={navigationRef} />
+        </NotificationsProvider>
       </UserContext.Provider>
     </SafeAreaProvider>
   );
