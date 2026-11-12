@@ -11,6 +11,8 @@ import {
   getUserProfile,
   updateUserProfile,
   createUserNotification,
+  subscribeToNotifications,
+  markAllNotificationsAsRead,
   createEvent,
   updateEvent,
   deleteEvent,
@@ -22,6 +24,7 @@ jest.mock('firebase/firestore', () => ({
   getDoc: jest.fn(),
   getDocs: jest.fn(),
   getDocsFromServer: jest.fn(),
+  onSnapshot: jest.fn(),
   addDoc: jest.fn(),
   setDoc: jest.fn(),
   updateDoc: jest.fn(),
@@ -35,6 +38,7 @@ jest.mock('firebase/firestore', () => ({
   arrayRemove: jest.fn((v) => ({ __arrayRemove: v })),
   serverTimestamp: jest.fn(() => new Date('2026-01-01')),
   runTransaction: jest.fn(),
+  writeBatch: jest.fn(),
   Timestamp: { fromDate: jest.fn((d) => ({ __timestamp: d.toISOString() })) },
 }));
 
@@ -50,10 +54,12 @@ import {
   getDoc,
   getDocs,
   getDocsFromServer,
+  onSnapshot,
   addDoc,
   updateDoc,
   deleteDoc,
   runTransaction,
+  writeBatch,
 } from 'firebase/firestore';
 
 beforeEach(() => {
@@ -551,5 +557,110 @@ describe('deleteEvent', () => {
     deleteDoc.mockRejectedValue(new Error('Permission denied'));
 
     await expect(deleteEvent('event-1')).rejects.toEqual({ message: 'Permission denied' });
+  });
+});
+
+describe('subscribeToNotifications', () => {
+  const docOf = (id, data) => ({ id, data: () => data });
+  const snapshotOf = (docs, changes = []) => ({
+    docs,
+    docChanges: () => changes.map(([type, doc]) => ({ type, doc })),
+  });
+
+  it('listens to the member\'s own notifications feed and returns the unsubscribe', () => {
+    const unsubscribe = jest.fn();
+    onSnapshot.mockReturnValue(unsubscribe);
+
+    const result = subscribeToNotifications('uid-1', jest.fn());
+
+    expect(onSnapshot.mock.calls[0][0]).toEqual({ path: 'users' });
+    expect(result).toBe(unsubscribe);
+  });
+
+  it('hands over the feed newest first, with dates parsed, and says which were just added', () => {
+    const onChange = jest.fn();
+    onSnapshot.mockImplementation((ref, next) => next(snapshotOf(
+      [
+        docOf('old', { title: 'Old', createdAt: { toDate: () => new Date('2026-11-01T08:00:00Z') }, read: true }),
+        docOf('new', { title: 'New', createdAt: { toDate: () => new Date('2026-11-12T08:00:00Z') }, read: false }),
+      ],
+      [['added', docOf('new', {})], ['modified', docOf('old', {})]]
+    )));
+
+    subscribeToNotifications('uid-1', onChange);
+
+    const { notifications, addedIds } = onChange.mock.calls[0][0];
+    expect(notifications.map(n => n.id)).toEqual(['new', 'old']);
+    expect(notifications[0]).toMatchObject({ title: 'New', read: false });
+    expect(notifications[0].createdAt).toEqual(new Date('2026-11-12T08:00:00Z'));
+    expect(addedIds).toEqual(['new']);
+  });
+
+  it('puts a notification still waiting for its server timestamp at the top', () => {
+    const onChange = jest.fn();
+    onSnapshot.mockImplementation((ref, next) => next(snapshotOf([
+      docOf('settled', { createdAt: { toDate: () => new Date('2026-11-12T08:00:00Z') } }),
+      docOf('pending', { createdAt: null }),
+    ])));
+
+    subscribeToNotifications('uid-1', onChange);
+
+    expect(onChange.mock.calls[0][0].notifications.map(n => n.id)).toEqual(['pending', 'settled']);
+  });
+
+  it('reports a listener failure to the caller instead of throwing', () => {
+    const onError = jest.fn();
+    const error = new Error('permission-denied');
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    onSnapshot.mockImplementation((ref, next, fail) => fail(error));
+
+    expect(() => subscribeToNotifications('uid-1', jest.fn(), onError)).not.toThrow();
+
+    expect(onError).toHaveBeenCalledWith(error);
+    console.error.mockRestore();
+  });
+});
+
+describe('markAllNotificationsAsRead', () => {
+  const makeBatch = (commit = jest.fn().mockResolvedValue()) => ({ update: jest.fn(), commit });
+
+  it('marks each notification read, and nothing else', async () => {
+    const batch = makeBatch();
+    writeBatch.mockReturnValue(batch);
+
+    const result = await markAllNotificationsAsRead('uid-1', ['n1', 'n2']);
+
+    expect(batch.update).toHaveBeenCalledTimes(2);
+    expect(batch.update).toHaveBeenCalledWith({ path: 'users/uid-1/notifications/n1' }, { read: true });
+    expect(batch.update).toHaveBeenCalledWith({ path: 'users/uid-1/notifications/n2' }, { read: true });
+    expect(batch.commit).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ success: true });
+  });
+
+  it('splits a long backlog into batches under the 500-write limit', async () => {
+    const batches = [];
+    writeBatch.mockImplementation(() => { const b = makeBatch(); batches.push(b); return b; });
+    const ids = Array.from({ length: 950 }, (_, i) => `n${i}`);
+
+    await markAllNotificationsAsRead('uid-1', ids);
+
+    expect(batches.map(b => b.update.mock.calls.length)).toEqual([400, 400, 150]);
+    batches.forEach(b => expect(b.commit).toHaveBeenCalledTimes(1));
+  });
+
+  it('writes nothing for an empty list', async () => {
+    const result = await markAllNotificationsAsRead('uid-1', []);
+
+    expect(writeBatch).not.toHaveBeenCalled();
+    expect(result).toEqual({ success: true });
+  });
+
+  it('reports failure instead of throwing', async () => {
+    writeBatch.mockReturnValue(makeBatch(jest.fn().mockRejectedValue(new Error('offline'))));
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(markAllNotificationsAsRead('uid-1', ['n1'])).resolves.toEqual({ success: false });
+
+    console.error.mockRestore();
   });
 });

@@ -9,6 +9,7 @@ import {
   getDoc,
   getDocs,
   getDocsFromServer,
+  onSnapshot,
   addDoc,
   updateDoc,
   deleteDoc,
@@ -17,6 +18,7 @@ import {
   arrayRemove,
   serverTimestamp,
   runTransaction,
+  writeBatch,
   query,
   where,
   orderBy,
@@ -348,6 +350,36 @@ export const getUserNotifications = async (userId, maxResults = 10) => {
 };
 
 /**
+ * Listen to a member's notification feed, so the bell, banner and toast can
+ * react the moment something arrives instead of the next time a screen reloads.
+ *
+ * `onChange` runs with the whole feed (newest first) every time it changes,
+ * plus `addedIds`: the documents that were just added, so the caller can tell
+ * "arrived now" from "was already there". Returns the unsubscribe function.
+ * A failure is logged and handed to `onError`; the feed is a nicety, so it
+ * never throws.
+ */
+export const subscribeToNotifications = (userId, onChange, onError) => {
+  const notificationsRef = collection(db, 'users', userId, 'notifications');
+  return onSnapshot(
+    notificationsRef,
+    (snapshot) => {
+      const notifications = snapshot.docs
+        .map(d => ({ ...d.data(), id: d.id, createdAt: parseDate(d.data().createdAt) }))
+        .sort((a, b) => b.createdAt - a.createdAt);
+      const addedIds = snapshot.docChanges()
+        .filter(change => change.type === 'added')
+        .map(change => change.doc.id);
+      onChange({ notifications, addedIds });
+    },
+    (error) => {
+      console.error('Error listening to notifications:', error);
+      if (onError) onError(error);
+    }
+  );
+};
+
+/**
  * Create a notification in a user's feed. Only leaders/admins can do this
  * (firestore.rules) — it's meant for system/reviewer-triggered notices
  * (registration approved, payment reviewed, etc.), not self-service.
@@ -381,6 +413,30 @@ export const markNotificationAsRead = async (userId, notificationId) => {
     return { success: true };
   } catch (error) {
     console.error('Error marking notification as read:', error);
+    return { success: false };
+  }
+};
+
+/**
+ * Mark several notifications read in one go (the Notifications screen does this
+ * when the member leaves it). Batched, with room under Firestore's 500-write
+ * limit, so a long backlog still goes through. Never throws: a notification
+ * staying unread is a nuisance, not a reason to interrupt anyone.
+ */
+const READ_BATCH_SIZE = 400;
+
+export const markAllNotificationsAsRead = async (userId, notificationIds) => {
+  try {
+    for (let i = 0; i < notificationIds.length; i += READ_BATCH_SIZE) {
+      const batch = writeBatch(db);
+      notificationIds.slice(i, i + READ_BATCH_SIZE).forEach(id => {
+        batch.update(doc(db, 'users', userId, 'notifications', id), { read: true });
+      });
+      await batch.commit();
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('Error marking notifications as read:', error);
     return { success: false };
   }
 };
@@ -616,8 +672,10 @@ export default {
 
   // Notifications
   getUserNotifications,
+  subscribeToNotifications,
   createUserNotification,
   markNotificationAsRead,
+  markAllNotificationsAsRead,
 
   // Prayer Wall
   getPrayerRequests,

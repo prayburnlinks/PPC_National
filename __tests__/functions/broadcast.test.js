@@ -44,7 +44,18 @@ const makeDb = ({ users = members, pushTokens = tokens, failFeedWrites = false, 
       if (name === 'users') {
         return {
           where: (field, op, value) => userQuery([[field, value]]),
-          doc: (uid) => ({ collection: () => ({ doc: () => ({ uid }) }) }),
+          // A member's feed: `doc` is where the announcement is written, and the
+          // unread count is whatever has been written to that feed so far.
+          doc: (uid) => ({
+            collection: () => ({
+              doc: () => ({ uid }),
+              where: () => ({
+                count: () => ({
+                  get: async () => ({ data: () => ({ count: feed.filter((entry) => entry.uid === uid).length }) }),
+                }),
+              }),
+            }),
+          }),
         };
       }
       if (name === 'broadcasts') {
@@ -66,7 +77,7 @@ const makeDb = ({ users = members, pushTokens = tokens, failFeedWrites = false, 
             return {
               docs: Object.entries(pushTokens)
                 .filter(([, token]) => ids.includes(token.userId))
-                .map(([id]) => ({ id })),
+                .map(([id, token]) => ({ id, data: () => token })),
             };
           },
         }),
@@ -155,6 +166,17 @@ describe('runBroadcast', () => {
       createdAt: 'SERVER_TIMESTAMP',
       broadcastId: result.broadcastId,
     });
+  });
+
+  it('sets each phone\'s icon to that member\'s unread total, which already includes the announcement', async () => {
+    const { db } = makeDb();
+    const fetchImpl = okFetch();
+
+    await send(db, valid, fetchImpl);
+
+    const sent = JSON.parse(fetchImpl.mock.calls[0][1].body);
+    // Each member has only the announcement in their feed so far.
+    expect(sent.map((message) => message.badge)).toEqual([1, 1]);
   });
 
   it('pushes it to those members\' devices only', async () => {

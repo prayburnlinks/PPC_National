@@ -6,6 +6,7 @@ import {
   configureNotificationHandling,
   registerForPushNotifications,
   unregisterPushToken,
+  setAppIconBadge,
 } from '../../services/pushNotificationService';
 
 let mockIsDevice = true;
@@ -26,6 +27,7 @@ jest.mock('expo-notifications', () => ({
   getPermissionsAsync: jest.fn(),
   requestPermissionsAsync: jest.fn(),
   getExpoPushTokenAsync: jest.fn(),
+  setBadgeCountAsync: jest.fn(),
   AndroidImportance: { HIGH: 4 },
 }));
 
@@ -61,16 +63,58 @@ afterEach(() => {
 });
 
 describe('configureNotificationHandling', () => {
-  it('shows notifications that arrive while the app is open', async () => {
+  it('keeps notifications that arrive while the app is open, but leaves the banner to the in-app toast', async () => {
     configureNotificationHandling();
 
     const { handleNotification } = Notifications.setNotificationHandler.mock.calls[0][0];
     await expect(handleNotification()).resolves.toEqual({
-      shouldShowBanner: true,
+      shouldShowBanner: false,
       shouldShowList: true,
       shouldPlaySound: true,
       shouldSetBadge: false,
     });
+  });
+});
+
+describe('setAppIconBadge', () => {
+  it('puts the count on the app icon', async () => {
+    Notifications.setBadgeCountAsync.mockResolvedValue(true);
+
+    await expect(setAppIconBadge(4)).resolves.toBe(true);
+
+    expect(Notifications.setBadgeCountAsync).toHaveBeenCalledWith(4);
+  });
+
+  it('clears the icon at 0, and never goes negative or fractional', async () => {
+    Notifications.setBadgeCountAsync.mockResolvedValue(true);
+
+    await setAppIconBadge(0);
+    await setAppIconBadge(-3);
+    await setAppIconBadge(2.9);
+
+    expect(Notifications.setBadgeCountAsync.mock.calls).toEqual([[0], [0], [2]]);
+  });
+
+  it('resolves false when the phone will not show a badge (no permission, or no launcher support)', async () => {
+    Notifications.setBadgeCountAsync.mockResolvedValue(false);
+    await expect(setAppIconBadge(3)).resolves.toBe(false);
+  });
+
+  it('never throws, so a badge problem cannot break the app', async () => {
+    Notifications.setBadgeCountAsync.mockRejectedValue(new Error('native module missing'));
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(setAppIconBadge(3)).resolves.toBe(false);
+
+    console.error.mockRestore();
+  });
+
+  it('skips the web build', async () => {
+    setPlatform('web');
+
+    await expect(setAppIconBadge(3)).resolves.toBe(false);
+
+    expect(Notifications.setBadgeCountAsync).not.toHaveBeenCalled();
   });
 });
 

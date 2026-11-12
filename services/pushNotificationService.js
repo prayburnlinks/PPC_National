@@ -26,19 +26,38 @@ const TOKEN_STORAGE_KEY = 'pushToken';
 const UNREGISTER_TIMEOUT_MS = 4000;
 
 /**
- * Show notifications that arrive while the app is open, instead of dropping
- * them silently. Call once at startup.
+ * Handle notifications that arrive while the app is open. They are kept in the
+ * notification list and still play the sound, but the on-screen banner is left
+ * to the app's own toast (components/NotificationToast.js), which the live
+ * notification feed raises at the same moment. Showing both would put two
+ * banners on screen for one notification. Call once at startup.
  */
 export const configureNotificationHandling = () => {
   if (Platform.OS === 'web') return;
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
-      shouldShowBanner: true,
+      shouldShowBanner: false,
       shouldShowList: true,
       shouldPlaySound: true,
       shouldSetBadge: false,
     }),
   });
+};
+
+/**
+ * Put the member's unread count on the app icon (0 clears it). Resolves to
+ * whether it took: iOS only allows it once notification permission has been
+ * granted, and some Android launchers have no icon badges. Never throws; an
+ * icon badge is a nicety.
+ */
+export const setAppIconBadge = async (count) => {
+  if (Platform.OS === 'web') return false;
+  try {
+    return await Notifications.setBadgeCountAsync(Math.max(0, Math.floor(count) || 0));
+  } catch (error) {
+    console.error('Set app icon badge error:', error);
+    return false;
+  }
 };
 
 /**
