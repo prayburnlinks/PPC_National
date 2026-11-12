@@ -70,15 +70,151 @@ describe('DocumentsScreen', () => {
     jest.spyOn(Linking, 'canOpenURL').mockResolvedValue(true);
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
 
-    const { getByText, getAllByText } = renderScreen();
+    const { getByText, getByLabelText } = renderScreen();
     await waitFor(() => getByText('Constitution'));
 
-    fireEvent.press(getAllByText('⬇')[0]);
+    fireEvent.press(getByLabelText('Download Constitution'));
 
     await waitFor(() => {
       expect(Linking.openURL).toHaveBeenCalledWith(
         'https://storage.example.com/constitution.pdf'
       );
+    });
+  });
+
+  // DOC-03
+  describe('viewing without downloading', () => {
+    const imageDoc = {
+      id: 'd3',
+      name: 'Camp Photo',
+      category: 'Photos',
+      fileType: 'JPG',
+      fileSize: '400 KB',
+      downloadUrl: 'https://storage.example.com/camp.jpg?alt=media&token=abc',
+    };
+
+    beforeEach(() => {
+      jest.spyOn(Linking, 'canOpenURL').mockResolvedValue(true);
+      jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    });
+
+    it('offers View and Download on every document', async () => {
+      const { getByText, getByLabelText } = renderScreen();
+      await waitFor(() => getByText('Constitution'));
+
+      expect(getByLabelText('View Constitution')).toBeTruthy();
+      expect(getByLabelText('Download Constitution')).toBeTruthy();
+      expect(getByLabelText('View Camp Registration Form')).toBeTruthy();
+      expect(getByLabelText('Download Camp Registration Form')).toBeTruthy();
+    });
+
+    it('shows a PDF through Google\'s viewer, with its private link encoded, instead of the raw file', async () => {
+      const { getByText, getByLabelText } = renderScreen();
+      await waitFor(() => getByText('Constitution'));
+
+      fireEvent.press(getByLabelText('View Constitution'));
+
+      await waitFor(() => {
+        expect(Linking.openURL).toHaveBeenCalledWith(
+          'https://docs.google.com/gview?embedded=true&url=' +
+            encodeURIComponent('https://storage.example.com/constitution.pdf')
+        );
+      });
+      expect(Linking.openURL).not.toHaveBeenCalledWith('https://storage.example.com/constitution.pdf');
+    });
+
+    it('does the same for a Word document', async () => {
+      const { getByText, getByLabelText } = renderScreen();
+      await waitFor(() => getByText('Camp Registration Form'));
+
+      fireEvent.press(getByLabelText('View Camp Registration Form'));
+
+      await waitFor(() => {
+        expect(Linking.openURL).toHaveBeenCalledWith(
+          expect.stringContaining(encodeURIComponent('https://storage.example.com/camp-form.docx'))
+        );
+      });
+    });
+
+    it('keeps the token in the private link intact by encoding it as one parameter', async () => {
+      getDocuments.mockResolvedValue([
+        { ...mockDocs[0], downloadUrl: 'https://storage.example.com/a.pdf?alt=media&token=abc-123' },
+      ]);
+      const { getByText, getByLabelText } = renderScreen();
+      await waitFor(() => getByText('Constitution'));
+
+      fireEvent.press(getByLabelText('View Constitution'));
+
+      await waitFor(() => expect(Linking.openURL).toHaveBeenCalled());
+      const opened = Linking.openURL.mock.calls[0][0];
+      // One query string for Google: the document's own "&token=" must not leak out of it.
+      expect(opened.split('&').filter((part) => part.startsWith('token='))).toEqual([]);
+      expect(decodeURIComponent(opened.split('url=')[1])).toBe(
+        'https://storage.example.com/a.pdf?alt=media&token=abc-123'
+      );
+    });
+
+    it('opens a picture inside the app and never leaves for the browser', async () => {
+      getDocuments.mockResolvedValue([...mockDocs, imageDoc]);
+      const { getByText, getByLabelText, queryByLabelText } = renderScreen();
+      await waitFor(() => getByText('Camp Photo'));
+      expect(queryByLabelText('Close')).toBeNull();
+
+      fireEvent.press(getByLabelText('View Camp Photo'));
+
+      await waitFor(() => expect(getByLabelText('Close')).toBeTruthy());
+      expect(getByLabelText('Camp Photo').props.source).toEqual({ uri: imageDoc.downloadUrl });
+      expect(Linking.openURL).not.toHaveBeenCalled();
+    });
+
+    it('closes the picture viewer', async () => {
+      getDocuments.mockResolvedValue([...mockDocs, imageDoc]);
+      const { getByText, getByLabelText, queryByLabelText } = renderScreen();
+      await waitFor(() => getByText('Camp Photo'));
+      fireEvent.press(getByLabelText('View Camp Photo'));
+      await waitFor(() => getByLabelText('Close'));
+
+      fireEvent.press(getByLabelText('Close'));
+
+      await waitFor(() => expect(queryByLabelText('Close')).toBeNull());
+    });
+
+    it('treats a lowercase or JPEG extension as a picture too', async () => {
+      getDocuments.mockResolvedValue([
+        { ...imageDoc, id: 'd4', name: 'Banner', fileType: 'jpeg' },
+      ]);
+      const { getByText, getByLabelText } = renderScreen();
+      await waitFor(() => getByText('Banner'));
+
+      fireEvent.press(getByLabelText('View Banner'));
+
+      await waitFor(() => expect(getByLabelText('Close')).toBeTruthy());
+      expect(Linking.openURL).not.toHaveBeenCalled();
+    });
+
+    it('says so when the viewer page cannot be opened', async () => {
+      const { Alert } = require('react-native');
+      jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      Linking.canOpenURL.mockResolvedValue(false);
+      const { getByText, getByLabelText } = renderScreen();
+      await waitFor(() => getByText('Constitution'));
+
+      fireEvent.press(getByLabelText('View Constitution'));
+
+      await waitFor(() => expect(Alert.alert).toHaveBeenCalledWith('Error', 'Cannot open this document.'));
+      expect(Linking.openURL).not.toHaveBeenCalled();
+    });
+
+    it('does not crash when opening throws', async () => {
+      const { Alert } = require('react-native');
+      jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      Linking.openURL.mockRejectedValue(new Error('no browser'));
+      const { getByText, getByLabelText } = renderScreen();
+      await waitFor(() => getByText('Constitution'));
+
+      fireEvent.press(getByLabelText('View Constitution'));
+
+      await waitFor(() => expect(Alert.alert).toHaveBeenCalledWith('Error', 'Failed to open the document.'));
     });
   });
 
