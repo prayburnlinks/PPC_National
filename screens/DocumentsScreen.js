@@ -17,6 +17,8 @@ import { useUser } from '../context/UserContext';
 import { ROLES } from '../constants/config';
 import { getDocuments, uploadDocument } from '../services/documentsService';
 import * as DocumentPicker from 'expo-document-picker';
+import ImageViewerModal from '../components/ImageViewerModal';
+import { isImageType, googleViewerUrl } from '../utils/documentViewer';
 
 const emptyUploadForm = { name: '', description: '', category: '', file: null };
 
@@ -40,6 +42,7 @@ const DocumentsScreen = ({ navigation }) => {
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [uploadForm, setUploadForm] = useState(emptyUploadForm);
   const [uploading, setUploading] = useState(false);
+  const [viewingImage, setViewingImage] = useState(null);
 
   const loadDocuments = useCallback(() => {
     return getDocuments()
@@ -102,6 +105,26 @@ const DocumentsScreen = ({ navigation }) => {
       const supported = await Linking.canOpenURL(doc.downloadUrl);
       if (supported) {
         await Linking.openURL(doc.downloadUrl);
+      } else {
+        Alert.alert('Error', 'Cannot open this document.');
+      }
+    } catch {
+      Alert.alert('Error', 'Failed to open the document.');
+    }
+  };
+
+  // View without saving a copy: pictures open in the app; PDF, Word and Excel
+  // open in Google's viewer (see utils/documentViewer.js for the trade-off).
+  const handleView = async (doc) => {
+    if (isImageType(doc.fileType)) {
+      setViewingImage({ uri: doc.downloadUrl, name: doc.name });
+      return;
+    }
+    try {
+      const url = googleViewerUrl(doc.downloadUrl);
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
       } else {
         Alert.alert('Error', 'Cannot open this document.');
       }
@@ -230,28 +253,45 @@ const DocumentsScreen = ({ navigation }) => {
             const icon = FILE_ICONS[ext] || '📎';
             return (
               <View key={doc.id} style={styles.docCard}>
-                <View style={styles.iconWrap}>
-                  <Text style={styles.iconText}>{icon}</Text>
-                </View>
-                <View style={styles.docInfo}>
-                  <Text style={styles.docName}>{doc.name}</Text>
-                  {!!doc.description && (
-                    <Text style={styles.docDesc}>{doc.description}</Text>
-                  )}
-                  <View style={styles.docMeta}>
-                    {!!ext && (
-                      <View style={styles.metaTag}>
-                        <Text style={styles.metaTagText}>{ext}</Text>
-                      </View>
+                <View style={styles.docMain}>
+                  <View style={styles.iconWrap}>
+                    <Text style={styles.iconText}>{icon}</Text>
+                  </View>
+                  <View style={styles.docInfo}>
+                    <Text style={styles.docName}>{doc.name}</Text>
+                    {!!doc.description && (
+                      <Text style={styles.docDesc}>{doc.description}</Text>
                     )}
-                    {!!doc.fileSize && (
-                      <Text style={styles.docSize}>{doc.fileSize}</Text>
-                    )}
+                    <View style={styles.docMeta}>
+                      {!!ext && (
+                        <View style={styles.metaTag}>
+                          <Text style={styles.metaTagText}>{ext}</Text>
+                        </View>
+                      )}
+                      {!!doc.fileSize && (
+                        <Text style={styles.docSize}>{doc.fileSize}</Text>
+                      )}
+                    </View>
                   </View>
                 </View>
-                <TouchableOpacity style={styles.dlBtn} onPress={() => handleDownload(doc)}>
-                  <Text style={styles.dlBtnIcon}>⬇</Text>
-                </TouchableOpacity>
+                <View style={styles.docActions}>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, styles.viewBtn]}
+                    onPress={() => handleView(doc)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`View ${doc.name}`}
+                  >
+                    <Text style={styles.viewBtnText}>View</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, styles.downloadBtn]}
+                    onPress={() => handleDownload(doc)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Download ${doc.name}`}
+                  >
+                    <Text style={styles.downloadBtnText}>⬇ Download</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             );
           })}
@@ -260,6 +300,13 @@ const DocumentsScreen = ({ navigation }) => {
       )}
       </>
       )}
+
+      <ImageViewerModal
+        visible={!!viewingImage}
+        uri={viewingImage?.uri}
+        title={viewingImage?.name}
+        onClose={() => setViewingImage(null)}
+      />
     </View>
   );
 };
@@ -357,10 +404,12 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     marginBottom: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  docMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.md,
   },
   iconWrap: {
@@ -390,12 +439,15 @@ const styles = StyleSheet.create({
   },
   metaTagText: { fontSize: typography.sizes.xs, fontWeight: '700', color: colors.blue },
   docSize: { fontSize: typography.sizes.xs, color: colors.textSecondary },
-  dlBtn: {
-    width: 40, height: 40, borderRadius: borderRadius.md,
-    backgroundColor: colors.blue,
+  docActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  actionBtn: {
+    flex: 1, minHeight: 44, borderRadius: borderRadius.md,
     alignItems: 'center', justifyContent: 'center',
   },
-  dlBtnIcon: { color: colors.white, fontSize: 18 },
+  viewBtn: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.blue },
+  viewBtnText: { color: colors.blue, fontSize: typography.sizes.base, fontWeight: '700' },
+  downloadBtn: { backgroundColor: colors.blue },
+  downloadBtnText: { color: colors.white, fontSize: typography.sizes.base, fontWeight: '700' },
 });
 
 export default DocumentsScreen;
