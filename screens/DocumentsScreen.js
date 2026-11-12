@@ -10,6 +10,7 @@ import {
   Linking,
   Alert,
   Image,
+  Platform,
 } from 'react-native';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,6 +37,9 @@ const DocumentsScreen = ({ navigation }) => {
   const { user } = useUser();
   const insets = useSafeAreaInsets();
   const isAdmin = user?.role === ROLES.ADMIN;
+  // The View option is Android-only: iPhone keeps the original single ⬇ button
+  // (the owner asked for it that way on 2026-11-13).
+  const hasViewOption = Platform.OS !== 'ios';
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('All');
@@ -273,25 +277,37 @@ const DocumentsScreen = ({ navigation }) => {
                       )}
                     </View>
                   </View>
+                  {!hasViewOption && (
+                    <TouchableOpacity
+                      style={styles.dlBtn}
+                      onPress={() => handleDownload(doc)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Download ${doc.name}`}
+                    >
+                      <Text style={styles.dlBtnIcon}>⬇</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
-                <View style={styles.docActions}>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.viewBtn]}
-                    onPress={() => handleView(doc)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`View ${doc.name}`}
-                  >
-                    <Text style={styles.viewBtnText}>View</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.downloadBtn]}
-                    onPress={() => handleDownload(doc)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Download ${doc.name}`}
-                  >
-                    <Text style={styles.downloadBtnText}>⬇ Download</Text>
-                  </TouchableOpacity>
-                </View>
+                {hasViewOption && (
+                  <View style={styles.docActions}>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, styles.viewBtn]}
+                      onPress={() => handleView(doc)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`View ${doc.name}`}
+                    >
+                      <Text style={styles.viewBtnText}>View</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, styles.downloadBtn]}
+                      onPress={() => handleDownload(doc)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Download ${doc.name}`}
+                    >
+                      <Text style={styles.downloadBtnText}>⬇ Download</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             );
           })}
@@ -301,12 +317,14 @@ const DocumentsScreen = ({ navigation }) => {
       </>
       )}
 
-      <ImageViewerModal
-        visible={!!viewingImage}
-        uri={viewingImage?.uri}
-        title={viewingImage?.name}
-        onClose={() => setViewingImage(null)}
-      />
+      {hasViewOption && (
+        <ImageViewerModal
+          visible={!!viewingImage}
+          uri={viewingImage?.uri}
+          title={viewingImage?.name}
+          onClose={() => setViewingImage(null)}
+        />
+      )}
     </View>
   );
 };
@@ -439,6 +457,12 @@ const styles = StyleSheet.create({
   },
   metaTagText: { fontSize: typography.sizes.xs, fontWeight: '700', color: colors.blue },
   docSize: { fontSize: typography.sizes.xs, color: colors.textSecondary },
+  dlBtn: {
+    width: 40, height: 40, borderRadius: borderRadius.md,
+    backgroundColor: colors.blue,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  dlBtnIcon: { color: colors.white, fontSize: 18 },
   docActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   actionBtn: {
     flex: 1, minHeight: 44, borderRadius: borderRadius.md,

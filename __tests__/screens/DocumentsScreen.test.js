@@ -1,5 +1,5 @@
 import React from 'react';
-import { Linking } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import { render, waitFor, fireEvent } from '@testing-library/react-native';
 import DocumentsScreen from '../../screens/DocumentsScreen';
 import { UserContext } from '../../context/UserContext';
@@ -67,6 +67,7 @@ describe('DocumentsScreen', () => {
 
   // DOC-02
   it('opens the document URL from the download control', async () => {
+    jest.replaceProperty(Platform, 'OS', 'ios');
     jest.spyOn(Linking, 'canOpenURL').mockResolvedValue(true);
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
 
@@ -83,7 +84,35 @@ describe('DocumentsScreen', () => {
   });
 
   // DOC-03
-  describe('viewing without downloading', () => {
+  describe('on iPhone', () => {
+    beforeEach(() => jest.replaceProperty(Platform, 'OS', 'ios'));
+    afterEach(() => jest.restoreAllMocks());
+
+    it('keeps the original single ⬇ download button and offers no View', async () => {
+      const { getByText, getAllByText, queryByText, queryByLabelText } = renderScreen();
+      await waitFor(() => getByText('Constitution'));
+
+      expect(getAllByText('⬇')).toHaveLength(2);
+      expect(queryByLabelText('View Constitution')).toBeNull();
+      expect(queryByText('View')).toBeNull();
+      expect(queryByText('⬇ Download')).toBeNull();
+    });
+
+    it('opens the raw document link from the ⬇ button, not Google\'s viewer', async () => {
+      jest.spyOn(Linking, 'canOpenURL').mockResolvedValue(true);
+      jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+      const { getByText, getByLabelText } = renderScreen();
+      await waitFor(() => getByText('Constitution'));
+
+      fireEvent.press(getByLabelText('Download Constitution'));
+
+      await waitFor(() => expect(Linking.openURL).toHaveBeenCalledTimes(1));
+      expect(Linking.openURL).toHaveBeenCalledWith('https://storage.example.com/constitution.pdf');
+    });
+  });
+
+  // DOC-03
+  describe('viewing without downloading (Android)', () => {
     const imageDoc = {
       id: 'd3',
       name: 'Camp Photo',
@@ -94,13 +123,16 @@ describe('DocumentsScreen', () => {
     };
 
     beforeEach(() => {
+      jest.replaceProperty(Platform, 'OS', 'android');
       jest.spyOn(Linking, 'canOpenURL').mockResolvedValue(true);
       jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     });
+    afterEach(() => jest.restoreAllMocks());
 
-    it('offers View and Download on every document', async () => {
-      const { getByText, getByLabelText } = renderScreen();
+    it('offers View and Download on every document, instead of the lone ⬇', async () => {
+      const { getByText, getByLabelText, queryByText } = renderScreen();
       await waitFor(() => getByText('Constitution'));
+      expect(queryByText('⬇')).toBeNull();
 
       expect(getByLabelText('View Constitution')).toBeTruthy();
       expect(getByLabelText('Download Constitution')).toBeTruthy();
