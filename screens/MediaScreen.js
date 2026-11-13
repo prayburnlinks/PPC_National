@@ -280,6 +280,11 @@ const MediaScreen = ({ navigation }) => {
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        // On iPhone the keyboard covers the bottom of the page, and without
+        // this the add-video fields sat behind it with no way to scroll them
+        // into view. This adds room for the keyboard and keeps the field being
+        // typed in visible (the other form screens do the same).
+        automaticallyAdjustKeyboardInsets
       >
         <View style={styles.content}>
 

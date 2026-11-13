@@ -1,5 +1,5 @@
 import React from 'react';
-import { Linking, Alert } from 'react-native';
+import { Linking, Alert, ScrollView } from 'react-native';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import MediaScreen from '../../screens/MediaScreen';
 import { UserContext } from '../../context/UserContext';
@@ -254,5 +254,17 @@ describe('MediaScreen', () => {
       expect(queryByText('+ Add Featured Video')).toBeNull();
       expect(queryByLabelText('Remove Ebenezer Assembly video')).toBeNull();
     });
+  });
+});
+
+describe('MediaScreen keyboard handling', () => {
+  it('makes room for the keyboard, so the add-video fields stay in view while typing', async () => {
+    const { UNSAFE_getByType } = await renderScreen(admin);
+
+    const page = UNSAFE_getByType(ScrollView);
+
+    expect(page.props.automaticallyAdjustKeyboardInsets).toBe(true);
+    // Tapping Add or Save while the keyboard is up must still register.
+    expect(page.props.keyboardShouldPersistTaps).toBe('handled');
   });
 });
