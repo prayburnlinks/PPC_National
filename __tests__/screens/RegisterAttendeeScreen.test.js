@@ -180,8 +180,10 @@ describe('RegisterAttendeeScreen', () => {
       });
 
       const [title, message] = lastAlert();
-      expect(title).toBe('Registered ✓');
-      expect(message).toContain('Alice Adams is registered for Leaders Retreat.');
+      // Owing money, so not "registered" yet.
+      expect(title).toBe('Registration Pending');
+      expect(message).toContain("Alice Adams's registration for Leaders Retreat is pending until their R350 EFT payment is made and approved.");
+      expect(message).not.toMatch(/is registered/i);
       expect(message).toContain('R350');
       expect(message).toContain('Ref: Alice Adams · RETREAT26');
       expect(message).toContain('People I\'ve Registered');
@@ -263,7 +265,8 @@ describe('RegisterAttendeeScreen', () => {
         paidEvent,
         expect.objectContaining({ name: 'Alice Adams', allowDuplicate: true })
       );
-      expect(lastAlert()[0]).toBe('Registered ✓');
+      // A paid event: pending until the payment is made, so not "Registered".
+      expect(lastAlert()[0]).toBe('Registration Pending');
     });
   });
 

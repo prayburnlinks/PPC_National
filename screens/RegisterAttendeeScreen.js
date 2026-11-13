@@ -81,10 +81,12 @@ const RegisterAttendeeScreen = ({ navigation, route }) => {
       setAddedHere((n) => n + 1);
 
       const reference = `${trimmedName} · ${result.paymentReference || event.name}`;
+      // When money is owed they are not in until it is paid and approved, so
+      // the popup must not say "registered".
       Alert.alert(
-        'Registered ✓',
+        result.requiresPayment ? 'Registration Pending' : 'Registered ✓',
         result.requiresPayment
-          ? `${trimmedName} is registered for ${event.name}.\n\nTheir R${result.registrationFee} EFT payment:\nRef: ${reference}\nBank: ${BANK_DETAILS.bank}\nAccount: ${BANK_DETAILS.accountNumber}\n\nOnce it's paid, upload their proof of payment from People I've Registered.`
+          ? `${trimmedName}'s registration for ${event.name} is pending until their R${result.registrationFee} EFT payment is made and approved.\n\nTheir EFT payment:\nRef: ${reference}\nBank: ${BANK_DETAILS.bank}\nAccount: ${BANK_DETAILS.accountNumber}\n\nOnce it's paid, upload their proof of payment from People I've Registered.`
           : `${trimmedName} is registered for ${event.name}.`,
         [
           { text: 'Register Another', onPress: resetForm },
