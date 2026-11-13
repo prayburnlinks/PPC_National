@@ -15,11 +15,12 @@
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
-const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { onDocumentCreated, onDocumentWritten } = require('firebase-functions/v2/firestore');
 const admin = require('firebase-admin');
 const { getRegistrar, registerAttendee, cancelAttendee } = require('./registrations');
 const { deliverPush } = require('./push');
 const { runBroadcast } = require('./broadcast');
+const { startedWaiting, notifyReviewers } = require('./approvals');
 
 admin.initializeApp();
 
@@ -723,3 +724,42 @@ exports.sendBroadcast = onCall(
     });
   }
 );
+
+/**
+ * Tell the people who approve when something is waiting for them: a new leader
+ * or admin account, or proof of payment for an event or a merchandise order.
+ * Each reviewer gets an entry in their notification feed, and the
+ * sendPushOnNotification trigger above pushes it to their phone. Who counts as a
+ * reviewer, and the wording, are in approvals.js.
+ *
+ * These run on every write to the collection but act only on the one that starts
+ * the wait (see startedWaiting), so editing a profile or approving a payment
+ * notifies nobody.
+ */
+const notifyWhenWaiting = (kind, document, idParam) =>
+  onDocumentWritten(
+    { document, region: 'us-central1', maxInstances: 10 },
+    async (event) => {
+      const before = event.data?.before?.exists ? event.data.before.data() : undefined;
+      const after = event.data?.after?.exists ? event.data.after.data() : undefined;
+      if (!startedWaiting(kind, before, after)) return;
+
+      try {
+        await notifyReviewers(admin.firestore(), {
+          FieldValue: admin.firestore.FieldValue,
+          kind,
+          sourceId: event.params[idParam],
+          eventId: event.id,
+          data: after,
+        });
+      } catch (err) {
+        // The submission itself is already saved; a failed heads-up shouldn't
+        // look like a failed submission.
+        console.error(`Could not notify reviewers about ${kind} ${event.params[idParam]}:`, err);
+      }
+    }
+  );
+
+exports.notifyReviewersOfAccount = notifyWhenWaiting('account', 'users/{userId}', 'userId');
+exports.notifyReviewersOfEventPayment = notifyWhenWaiting('event_payment', 'eventRegistrations/{registrationId}', 'registrationId');
+exports.notifyReviewersOfMerchOrder = notifyWhenWaiting('merch_order', 'merchOrders/{orderId}', 'orderId');
