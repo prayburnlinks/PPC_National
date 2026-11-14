@@ -52,6 +52,26 @@ Each send is recorded in `broadcasts/{id}` (admin-readable, function-written)
 If a send errors or your connection drops, check **Recent announcements** before
 sending again — it may already have gone out. Admins only; leaders can't send.
 
+## Approval requests (telling the approver)
+
+Anything that now waits for someone to approve or reject sends the approvers a
+push, through the same feed-then-push path as everything else. Three triggers in
+`functions/index.js` (logic and wording in `functions/approvals.js`) watch for a
+document *starting* to wait; editing it or deciding it notifies nobody:
+
+| Waiting item | Notified | Left out |
+|---|---|---|
+| New leader or admin account (`users`, status `pending`) | every approved admin | — |
+| Event proof of payment (`eventRegistrations`, `payment_submitted`, including a resubmission after a rejection) | every approved admin, and the approved leaders of the registrant's congregation | the registrant, and the leader who registered a guest (they can't approve their own) |
+| Merchandise proof of payment (`merchOrders`, `payment_submitted`) | the same | the buyer |
+
+Each reviewer gets a `type: 'approval_needed'` feed entry (with `reviewKind` and
+`reviewId`), which `sendPushOnNotification` pushes; tapping it in the app opens
+the Admin screen on the matching tab (`REVIEW_TABS`). The entry id is built from
+the trigger's event id, so a redelivered event can't notify twice. Members sign
+up as members already approved, so only leader and admin sign-ups create
+"account" requests.
+
 ## One-time setup (before it works on a real phone)
 
 - **Android** — in the Firebase console add an Android app for
@@ -61,7 +81,7 @@ sending again — it may already have gone out. Admins only; leaders can't send.
   Notifications (FCM V1)*, upload a service-account key for the Firebase project.
 - **iOS** — `eas credentials` → iOS → *Push Notifications: Manage your Apple Push
   Notifications service key* (EAS can create the key for you).
-- **Rules and functions** — `firebase deploy --only firestore:rules,functions:sendPushOnNotification,functions:sendBroadcast`.
+- **Rules and functions** — `firebase deploy --only firestore:rules,functions:sendPushOnNotification,functions:sendBroadcast`, and for the approval requests `functions:notifyReviewersOfAccount,functions:notifyReviewersOfEventPayment,functions:notifyReviewersOfMerchOrder`.
 - **New native build** — the notification icon/colour and push entitlements are
   native, so this needs a new EAS build (with `versionCode` / `buildNumber`
   bumped), then store review. Don't publish this branch as an OTA update to the
@@ -85,7 +105,12 @@ Function logs: `firebase functions:log --only sendPushOnNotification`.
   linger until a later send is rejected outright. Harmless, but untidy.
 - No per-type mute switch; members control it from the phone's notification
   settings.
-- The admin "new registration" feed (top-level `notifications` collection) is
-  not pushed — only members' own notifications and announcements are.
+- The old admin "new registration" feed (top-level `notifications` collection,
+  written by the app at sign-up) is still not read by anything; new leader and
+  admin accounts now reach admins through the approval notifications below
+  instead.
+- Reported prayer-wall content (the admin Reported tab) is not pushed: it is a
+  moderation queue rather than an approve/reject, and nothing notifies admins
+  about it yet.
 - Announcements can't be recalled or scheduled, and can only target everyone, a
   district or a congregation (not a role).

@@ -11,6 +11,16 @@ export const NOTIFICATION_ICONS = {
   giving_receipt: '💝',
   merch_order_status: '🛍️',
   announcement: '📣',
+  approval_needed: '📋',
+};
+
+// "Something is waiting for you to approve" notifications (written by
+// functions/approvals.js) carry a reviewKind; this is the Admin tab that holds
+// that kind of item, so tapping the notification lands on it.
+export const REVIEW_TABS = {
+  account: 'Pending',
+  event_payment: 'Payments',
+  merch_order: 'Merch Orders',
 };
 
 export const iconForType = (type) => NOTIFICATION_ICONS[type] || '🔔';
