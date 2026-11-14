@@ -20,6 +20,12 @@ import {
   registerForEvent,
   getUserEventRegistrationsMap,
 } from '../services/eventRegistrationService';
+import {
+  eventNeedsPayment,
+  isRegistrationPending,
+  registrationNotice,
+  PENDING_STATUS_LABELS,
+} from '../utils/eventPayment';
 
 const EventsScreen = ({ navigation }) => {
   const { user } = useUser();
@@ -78,18 +84,32 @@ const EventsScreen = ({ navigation }) => {
     registeringRef.current = true;
     setRegistering(true);
     try {
+      const needsPayment = eventNeedsPayment(selectedEvent);
       await registerForEvent(user, selectedEvent);
 
       setRegisteredIds(prev => new Set([...prev, selectedEvent.id]));
+      // Same starting status the registration was saved with, so the card and
+      // the sheet are right straight away rather than after a reload.
+      setRegistrations(prev => new Map(prev).set(selectedEvent.id, {
+        status: needsPayment ? 'awaiting_payment' : 'confirmed',
+      }));
       setSelectedEvent(null);
 
-      Alert.alert(
-        'Registration Successful! 🎉',
-        selectedEvent.requiresPayment
-          ? `You are registered for ${selectedEvent.name}.\n\nPlease complete your R${selectedEvent.registrationFee} EFT payment using:\n\nRef: ${user.name} · ${selectedEvent.paymentReference || selectedEvent.name}\nBank: ${BANK_DETAILS.bank}\nAccount: ${BANK_DETAILS.accountNumber}`
-          : `You are registered for ${selectedEvent.name}.`,
-        [{ text: 'OK' }]
-      );
+      // An event that costs money is not "registered" until the payment is made
+      // and approved, so the popup must not say it is.
+      if (needsPayment) {
+        Alert.alert(
+          'Registration Pending',
+          `Your registration for ${selectedEvent.name} is pending until your R${selectedEvent.registrationFee} EFT payment is made and approved.\n\nPlease pay using:\n\nRef: ${user.name} · ${selectedEvent.paymentReference || selectedEvent.name}\nBank: ${BANK_DETAILS.bank}\nAccount: ${BANK_DETAILS.accountNumber}\n\nThen upload your proof of payment under Profile › My Events.`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert(
+          'Registration Successful! 🎉',
+          `You are registered for ${selectedEvent.name}.`,
+          [{ text: 'OK' }]
+        );
+      }
     } catch (error) {
       Alert.alert('Error', error.message || 'Failed to register');
     } finally {
@@ -142,6 +162,8 @@ const EventsScreen = ({ navigation }) => {
           {events.map(event => {
             const { day, month } = formatDateShort(event.eventDate);
             const isRegistered = registeredIds.has(event.id);
+            const registrationStatus = registrations.get(event.id)?.status;
+            const isPending = isRegistered && isRegistrationPending(registrationStatus);
             const catColor = CATEGORY_COLORS[event.category] || colors.blue;
 
             return (
@@ -174,9 +196,16 @@ const EventsScreen = ({ navigation }) => {
                       <Text style={styles.paidBadgeText}>✅ Registered & Paid</Text>
                     </View>
                   )}
+                  {isPending && (
+                    <View style={[styles.pendingBadge, registrationStatus === 'rejected' && styles.rejectedBadge]}>
+                      <Text style={[styles.pendingBadgeText, registrationStatus === 'rejected' && styles.rejectedBadgeText]}>
+                        {registrationStatus === 'rejected' ? '⚠️' : '⏳'} {PENDING_STATUS_LABELS[registrationStatus]}
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
-                {isRegistered ? (
+                {isRegistered && !isPending ? (
                   <View style={styles.registeredBadge}>
                     <Text style={styles.registeredText}>✓</Text>
                   </View>
@@ -301,11 +330,25 @@ const EventsScreen = ({ navigation }) => {
               </ScrollView>
 
               {/* Action buttons */}
-              {registeredIds.has(selectedEvent.id) ? (
-                <View style={styles.registeredConfirm}>
-                  <Text style={styles.registeredConfirmText}>✓ You are registered for this event</Text>
-                </View>
-              ) : (
+              {registeredIds.has(selectedEvent.id) ? (() => {
+                const notice = registrationNotice(registrations.get(selectedEvent.id)?.status);
+                return (
+                  <View style={[
+                    styles.registeredConfirm,
+                    notice.tone === 'pending' && styles.pendingConfirm,
+                    notice.tone === 'rejected' && styles.rejectedConfirm,
+                  ]}>
+                    <Text style={[
+                      styles.registeredConfirmText,
+                      notice.tone === 'pending' && styles.pendingConfirmText,
+                      notice.tone === 'rejected' && styles.rejectedConfirmText,
+                    ]}>
+                      {notice.text}
+                    </Text>
+                    {!!notice.hint && <Text style={styles.confirmHint}>{notice.hint}</Text>}
+                  </View>
+                );
+              })() : (
                 <TouchableOpacity
                   style={[styles.registerButton, registering && styles.buttonDisabled]}
                   onPress={handleRegister}
@@ -462,6 +505,22 @@ const styles = StyleSheet.create({
     padding: spacing.md, alignItems: 'center', marginTop: spacing.lg,
   },
   registeredConfirmText: { color: colors.green, fontWeight: '700', fontSize: typography.sizes.sm },
+  // Registered but not in yet (payment owed, under review, or rejected).
+  pendingConfirm: { backgroundColor: '#FFF4D6' },
+  pendingConfirmText: { color: '#8A5A00', textAlign: 'center' },
+  rejectedConfirm: { backgroundColor: '#FFF0EE' },
+  rejectedConfirmText: { color: colors.red, textAlign: 'center' },
+  confirmHint: {
+    color: colors.textSecondary, fontSize: typography.sizes.sm,
+    textAlign: 'center', marginTop: spacing.xs, lineHeight: 18,
+  },
+  pendingBadge: {
+    alignSelf: 'flex-start', marginTop: spacing.xs, backgroundColor: '#FFF4D6',
+    borderRadius: borderRadius.sm, paddingHorizontal: spacing.sm, paddingVertical: 2,
+  },
+  pendingBadgeText: { color: '#8A5A00', fontSize: typography.sizes.xs, fontWeight: '700' },
+  rejectedBadge: { backgroundColor: '#FFF0EE' },
+  rejectedBadgeText: { color: colors.red },
   registerButton: {
     backgroundColor: colors.blue, borderRadius: borderRadius.md,
     paddingVertical: spacing.md, alignItems: 'center', marginTop: spacing.lg,

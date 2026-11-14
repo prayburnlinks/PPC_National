@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../context/UserContext';
 import { useNotifications } from '../context/NotificationsContext';
 import { markNotificationAsRead, markAllNotificationsAsRead } from '../services/firestoreService';
-import { iconForType } from '../constants/notifications';
+import { iconForType, REVIEW_TABS } from '../constants/notifications';
 
 const NotificationsScreen = ({ navigation }) => {
   const { user } = useUser();
@@ -38,6 +38,10 @@ const NotificationsScreen = ({ navigation }) => {
   }, [uid]);
 
   const handlePress = async (item) => {
+    // Something waiting for approval: take the approver straight to it.
+    if (item.type === 'approval_needed') {
+      navigation.navigate('Admin', REVIEW_TABS[item.reviewKind] ? { tab: REVIEW_TABS[item.reviewKind] } : undefined);
+    }
     if (item.read) return;
     await markNotificationAsRead(user.uid, item.id);
   };

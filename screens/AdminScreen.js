@@ -23,7 +23,7 @@ import { getPendingMerchOrders, approveMerchOrder, rejectMerchOrder } from '../s
 import { getOpenContentReports, hidePrayerRequest, resolveContentReport } from '../services/firestoreService';
 import { useUser } from '../context/UserContext';
 
-const AdminScreen = ({ navigation }) => {
+const AdminScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const { user: reviewer } = useUser();
   // Only Admins can approve/reject user registrations (firestore.rules
@@ -45,6 +45,13 @@ const AdminScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState(isAdminReviewer ? 'Pending' : 'Payments');
+  // A "waiting for your approval" notification opens this screen on the tab that
+  // holds the item. Ignored if this reviewer doesn't have that tab (a leader has
+  // no Pending tab), and applied again if the screen is already open.
+  const requestedTab = route?.params?.tab;
+  useEffect(() => {
+    if (requestedTab && TABS.includes(requestedTab)) setActiveTab(requestedTab);
+  }, [requestedTab]);
   // Arrays, not a single id — otherwise acting on item B while item A is
   // still processing reassigns the shared id to B, which makes A's buttons
   // reappear and lets it be re-tapped (double-fire) while its own request

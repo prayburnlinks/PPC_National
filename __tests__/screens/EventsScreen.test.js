@@ -151,10 +151,106 @@ describe('EventsScreen', () => {
     await waitFor(() => {
       expect(registerForEvent).toHaveBeenCalledWith(mockUser, paidEvent);
       expect(Alert.alert).toHaveBeenCalledWith(
-        'Registration Successful! 🎉',
-        expect.stringContaining('R350 EFT payment'),
+        'Registration Pending',
+        expect.stringContaining('pending until your R350 EFT payment is made and approved'),
         expect.anything()
       );
+    });
+    // It must never claim success or say they are registered while payment is owed.
+    const [title, message] = Alert.alert.mock.calls.find(([t]) => t === 'Registration Pending');
+    expect(title).not.toMatch(/successful/i);
+    expect(message).not.toMatch(/you are registered/i);
+    expect(message).toContain('Ref: Alice · RETREAT26');
+    expect(message).toContain('Bank: Absa');
+    expect(message).toContain('upload your proof of payment under Profile › My Events');
+  });
+
+  it('shows the paid event as awaiting payment right after registering, not as registered', async () => {
+    getAllEvents.mockResolvedValue({ events: [paidEvent] });
+    registerForEvent.mockResolvedValue(undefined);
+
+    const { getByText, queryByText } = renderScreen();
+    await waitFor(() => getByText('Leaders Retreat'));
+    fireEvent.press(getByText('Leaders Retreat'));
+    await waitFor(() => getByText('Register — R350'));
+    fireEvent.press(getByText('Register — R350'));
+
+    await waitFor(() => expect(getByText('⏳ Awaiting Payment')).toBeTruthy());
+    expect(queryByText('✓')).toBeNull();
+    expect(queryByText('✅ Registered & Paid')).toBeNull();
+
+    // Opening it again says the same, and offers no second Register button.
+    fireEvent.press(getByText('Leaders Retreat'));
+    await waitFor(() => expect(getByText('Registration pending: payment needed')).toBeTruthy());
+    expect(queryByText('✓ You are registered for this event')).toBeNull();
+    expect(queryByText(/^Register/)).toBeNull();
+  });
+
+  it('keeps the success wording and the ✓ for a free event', async () => {
+    getAllEvents.mockResolvedValue({ events: [freeEvent] });
+    registerForEvent.mockResolvedValue(undefined);
+
+    const { getByText, queryByText } = renderScreen();
+    await waitFor(() => getByText('Youth Camp'));
+    fireEvent.press(getByText('Youth Camp'));
+    await waitFor(() => getByText('Register'));
+    fireEvent.press(getByText('Register'));
+
+    await waitFor(() => expect(Alert.alert).toHaveBeenCalledWith(
+      'Registration Successful! 🎉', 'You are registered for Youth Camp.', expect.anything()
+    ));
+    expect(getByText('✓')).toBeTruthy();
+    expect(queryByText(/Awaiting Payment/)).toBeNull();
+  });
+
+  describe('a registration that already exists', () => {
+    const open = async (status) => {
+      getAllEvents.mockResolvedValue({ events: [paidEvent] });
+      getUserEventRegistrationsMap.mockResolvedValue(new Map([['evt-paid', { status }]]));
+      const utils = renderScreen();
+      await waitFor(() => utils.getByText('Leaders Retreat'));
+      return utils;
+    };
+
+    it('awaiting payment: amber badge, no green ✓, and the sheet says payment is needed', async () => {
+      const { getByText, queryByText } = await open('awaiting_payment');
+      expect(getByText('⏳ Awaiting Payment')).toBeTruthy();
+      expect(queryByText('✓')).toBeNull();
+      expect(queryByText('✅ Registered & Paid')).toBeNull();
+
+      fireEvent.press(getByText('Leaders Retreat'));
+      await waitFor(() => getByText('Registration pending: payment needed'));
+      expect(getByText(/upload your proof of payment under Profile › My Events/)).toBeTruthy();
+      expect(queryByText('✓ You are registered for this event')).toBeNull();
+    });
+
+    it('payment submitted: under review', async () => {
+      const { getByText, queryByText } = await open('payment_submitted');
+      expect(getByText('⏳ Payment Under Review')).toBeTruthy();
+      expect(queryByText('✓')).toBeNull();
+
+      fireEvent.press(getByText('Leaders Retreat'));
+      await waitFor(() => getByText('Registration pending: your payment is being reviewed'));
+    });
+
+    it('payment rejected: says so and points to a new upload', async () => {
+      const { getByText, queryByText } = await open('rejected');
+      expect(getByText('⚠️ Payment Rejected')).toBeTruthy();
+      expect(queryByText('✓')).toBeNull();
+
+      fireEvent.press(getByText('Leaders Retreat'));
+      await waitFor(() => getByText('Payment rejected'));
+      expect(getByText('Upload a new proof of payment under Profile › My Events.')).toBeTruthy();
+    });
+
+    it('approved: green ✓, Registered & Paid, and registered in the sheet', async () => {
+      const { getByText, queryByText } = await open('approved');
+      expect(getByText('✓')).toBeTruthy();
+      expect(getByText('✅ Registered & Paid')).toBeTruthy();
+      expect(queryByText(/Awaiting Payment|Under Review|Rejected/)).toBeNull();
+
+      fireEvent.press(getByText('Leaders Retreat'));
+      await waitFor(() => getByText('✓ You are registered for this event'));
     });
   });
 

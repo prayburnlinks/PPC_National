@@ -14,6 +14,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app, db, storage } from '../firebase-config';
 import { createUserNotification, getEventById, incrementEventAttendeeCount } from './firestoreService';
+import { eventNeedsPayment } from '../utils/eventPayment';
 
 // Must match the region declared in functions/index.js, or the callables
 // resolve to URLs that don't exist.
@@ -58,7 +59,7 @@ export const registerForEvent = async (user, event) => {
       throw { message: 'You are already registered for this event.' };
     }
 
-    const requiresPayment = !!event.requiresPayment && (event.registrationFee || 0) > 0;
+    const requiresPayment = eventNeedsPayment(event);
 
     await setDoc(registrationRef, {
       userId: user.uid,

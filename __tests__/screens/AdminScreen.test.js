@@ -71,11 +71,11 @@ const mockPendingUsers = [
   },
 ];
 
-const renderAdmin = (user = mockAdmin) => {
+const renderAdmin = (user = mockAdmin, route) => {
   const navigation = { navigate: jest.fn(), goBack: jest.fn() };
   return render(
     <UserContext.Provider value={{ user, onLogin: jest.fn(), onLogout: jest.fn() }}>
-      <AdminScreen navigation={navigation} />
+      <AdminScreen navigation={navigation} route={route} />
     </UserContext.Provider>
   );
 };
@@ -708,5 +708,53 @@ describe('AdminScreen attendee list for people a leader registered', () => {
     expect(rows[0]).toBe('name,congregation,district,status,registered,registered by');
     expect(rows[1]).toMatch(/^Alice Adams,Ceres,Boland,Awaiting Payment,.*,Lena Leader$/);
     expect(rows[2]).toMatch(/^Mia Member,Ceres,Boland,Paid ✓,.*,$/);
+  });
+});
+
+describe('AdminScreen opened from a "waiting for approval" notification', () => {
+  const panel = (user, tab) => (
+    <UserContext.Provider value={{ user, onLogin: jest.fn(), onLogout: jest.fn() }}>
+      <AdminScreen navigation={{ navigate: jest.fn(), goBack: jest.fn() }} route={{ params: { tab } }} />
+    </UserContext.Provider>
+  );
+
+  it('lands on the requested tab', async () => {
+    const { getByText } = renderAdmin(mockAdmin, { params: { tab: 'Merch Orders' } });
+
+    await waitFor(() => expect(getByText('No merch orders awaiting review.')).toBeTruthy());
+  });
+
+  it('lands on Payments for a payment notification', async () => {
+    const { getByText } = renderAdmin(mockAdmin, { params: { tab: 'Payments' } });
+
+    await waitFor(() => expect(getByText('No pending proof of payments.')).toBeTruthy());
+  });
+
+  it('starts on Pending for an admin when nothing is requested', async () => {
+    const { getByText } = renderAdmin(mockAdmin);
+
+    await waitFor(() => expect(getByText('John Smith')).toBeTruthy());
+  });
+
+  it('ignores a tab this reviewer does not have: a leader asked for Pending stays on Payments', async () => {
+    const { getByText, queryByText } = renderAdmin(mockLeader, { params: { tab: 'Pending' } });
+
+    await waitFor(() => expect(getByText('No pending proof of payments.')).toBeTruthy());
+    expect(queryByText('John Smith')).toBeNull();
+  });
+
+  it('ignores a made-up tab name', async () => {
+    const { getByText } = renderAdmin(mockAdmin, { params: { tab: 'Nonsense' } });
+
+    await waitFor(() => expect(getByText('John Smith')).toBeTruthy());
+  });
+
+  it('switches tab when the screen is already open and a notification asks for another', async () => {
+    const { getByText, rerender } = render(panel(mockAdmin, 'Payments'));
+    await waitFor(() => expect(getByText('No pending proof of payments.')).toBeTruthy());
+
+    rerender(panel(mockAdmin, 'Merch Orders'));
+
+    await waitFor(() => expect(getByText('No merch orders awaiting review.')).toBeTruthy());
   });
 });

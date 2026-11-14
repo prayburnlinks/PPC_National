@@ -155,4 +155,64 @@ describe('NotificationsScreen', () => {
       expect(markAllNotificationsAsRead).not.toHaveBeenCalled();
     });
   });
+
+  describe('a "waiting for your approval" notification', () => {
+    const approval = (reviewKind, overrides = {}) => ({
+      id: 'a1', type: 'approval_needed', title: 'Payment to review', body: 'Sarah sent proof of payment.',
+      read: false, createdAt: new Date(), reviewKind, reviewId: 'reg-1', ...overrides,
+    });
+
+    const open = (item, navigation = { navigate: jest.fn(), goBack: jest.fn() }) => {
+      const utils = render(screen(feedOf([item]), navigation));
+      return { ...utils, navigation };
+    };
+
+    it('has its own icon', () => {
+      const { getByText } = open(approval('event_payment'));
+      expect(getByText('📋')).toBeTruthy();
+    });
+
+    it.each([
+      ['event_payment', 'Payments'],
+      ['merch_order', 'Merch Orders'],
+      ['account', 'Pending'],
+    ])('takes the approver to the right Admin tab for %s', async (kind, tab) => {
+      markNotificationAsRead.mockResolvedValue({ success: true });
+      const { getByText, navigation } = open(approval(kind));
+
+      await act(async () => { fireEvent.press(getByText('Payment to review')); });
+
+      expect(navigation.navigate).toHaveBeenCalledWith('Admin', { tab });
+      expect(markNotificationAsRead).toHaveBeenCalledWith('uid-1', 'a1');
+    });
+
+    it('still opens the Admin screen for a kind it does not recognise', async () => {
+      markNotificationAsRead.mockResolvedValue({ success: true });
+      const { getByText, navigation } = open(approval('something_new'));
+
+      await act(async () => { fireEvent.press(getByText('Payment to review')); });
+
+      expect(navigation.navigate).toHaveBeenCalledWith('Admin', undefined);
+    });
+
+    it('opens the Admin screen even when it was already read, without marking it again', async () => {
+      const { getByText, navigation } = open(approval('event_payment', { read: true }));
+
+      await act(async () => { fireEvent.press(getByText('Payment to review')); });
+
+      expect(navigation.navigate).toHaveBeenCalledWith('Admin', { tab: 'Payments' });
+      expect(markNotificationAsRead).not.toHaveBeenCalled();
+    });
+
+    it('leaves every other kind of notification where it is', async () => {
+      markNotificationAsRead.mockResolvedValue({ success: true });
+      const { getByText, navigation } = open({
+        id: 'n1', type: 'approval_status', title: 'Account Approved', body: 'Welcome!', read: false, createdAt: new Date(),
+      });
+
+      await act(async () => { fireEvent.press(getByText('Account Approved')); });
+
+      expect(navigation.navigate).not.toHaveBeenCalled();
+    });
+  });
 });
